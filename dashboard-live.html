@@ -6,327 +6,308 @@
 <title>Amor1970s — Live Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
-/* ═══════════════════════════════════════════════════════════════════
-   CONFIG: paste GAS URL vào biến GAS_URL ở cuối file (script section)
-   ═══════════════════════════════════════════════════════════════════ */
 :root {
-  --pink:#e91e8c; --pink-l:#f8bbdb; --pink-bg:#fff5fb;
-  --green:#16a34a; --green-bg:#f0fdf4;
-  --red:#dc2626;   --red-bg:#fef2f2;
-  --yellow:#d97706;--yellow-bg:#fffbeb;
-  --blue:#2563eb;  --blue-bg:#eff6ff;
-  --gray:#6b7280;  --gray-l:#f9fafb;
-  --border:#e5e7eb;
-  --text:#111827;  --text2:#374151; --text3:#6b7280;
+  --pink:#e91e8c; --pink-bg:#fff5fb;
+  --green:#16a34a; --green-bg:#f0fdf4; --green-b:#86efac;
+  --red:#dc2626;   --red-bg:#fef2f2;   --red-b:#fca5a5;
+  --yellow:#d97706;--yellow-bg:#fffbeb;--yellow-b:#fcd34d;
+  --blue:#2563eb;  --blue-bg:#eff6ff;  --blue-b:#93c5fd;
+  --purple:#7c3aed;--purple-bg:#f5f3ff;
+  --border:#e5e7eb; --text:#111827; --text2:#374151; --text3:#6b7280;
   --shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04);
-  --shadow-h:0 4px 12px rgba(0,0,0,.12);
+  --shadow-h:0 4px 16px rgba(0,0,0,.10);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
      background:#f5f5f7;color:var(--text);font-size:14px;line-height:1.5}
 
+/* ── LOADING ── */
+.loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.88);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:10px}
+.spinner{width:34px;height:34px;border:3px solid var(--border);
+  border-top-color:var(--pink);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
 /* ── HEADER ── */
 .header{background:linear-gradient(135deg,#ff6eb4 0%,#e91e8c 50%,#c2006a 100%);
-        color:#fff;padding:24px 32px 20px}
-.header-top{display:flex;justify-content:space-between;align-items:flex-start;
-            flex-wrap:wrap;gap:16px}
-.header h1{font-size:20px;font-weight:700;letter-spacing:-.3px}
-.header h1 span{opacity:.75;font-size:13px;font-weight:400;display:block;margin-top:3px}
-.countdown-group{display:flex;gap:10px;flex-wrap:wrap}
-.cd-card{background:rgba(255,255,255,.15);border-radius:10px;padding:9px 14px;
-         text-align:center;backdrop-filter:blur(10px);
-         border:1px solid rgba(255,255,255,.25);min-width:110px}
-.cd-days{font-size:26px;font-weight:800;line-height:1}
-.cd-label{font-size:11px;opacity:.85;margin-top:2px;text-transform:uppercase;letter-spacing:.5px}
-.meta-bar{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.meta-tag{background:rgba(255,255,255,.15);border-radius:20px;padding:3px 11px;
-          font-size:12px;display:flex;align-items:center;gap:6px}
-.status-dot{width:7px;height:7px;border-radius:50%;background:#4ade80;
-            animation:pulse 2s infinite;flex-shrink:0}
+  color:#fff;padding:22px 32px 18px}
+.header-top{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px}
+.header h1{font-size:19px;font-weight:700;letter-spacing:-.3px}
+.header h1 span{opacity:.75;font-size:12px;font-weight:400;display:block;margin-top:3px}
+.cd-group{display:flex;gap:8px;flex-wrap:wrap}
+.cd-card{background:rgba(255,255,255,.15);border-radius:10px;padding:8px 13px;text-align:center;
+  backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.25);min-width:105px}
+.cd-days{font-size:24px;font-weight:800;line-height:1}
+.cd-label{font-size:10px;opacity:.85;margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+.meta-bar{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.meta-tag{background:rgba(255,255,255,.15);border-radius:20px;padding:3px 10px;
+  font-size:11px;display:flex;align-items:center;gap:5px}
+.dot{width:6px;height:6px;border-radius:50%;background:#4ade80;animation:pulse 2s infinite;flex-shrink:0}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.btn-refresh{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);
-             color:#fff;padding:5px 14px;border-radius:20px;cursor:pointer;
-             font-size:12px;font-weight:600;transition:background .2s}
-.btn-refresh:hover{background:rgba(255,255,255,.35)}
-.btn-refresh.loading{opacity:.6;cursor:not-allowed}
-
-/* ── LOADING / ERROR ── */
-.loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.85);
-                 display:flex;flex-direction:column;align-items:center;
-                 justify-content:center;z-index:999;gap:12px}
-.spinner{width:36px;height:36px;border:3px solid var(--border);
-         border-top-color:var(--pink);border-radius:50%;animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.error-box{background:var(--red-bg);border:1px solid #fca5a5;border-radius:12px;
-           padding:20px 24px;max-width:500px;margin:20px auto;color:#991b1b}
+.btn-ref{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;
+  padding:4px 12px;border-radius:20px;cursor:pointer;font-size:11px;font-weight:600;transition:background .2s}
+.btn-ref:hover{background:rgba(255,255,255,.35)}
 
 /* ── TAB NAV ── */
-.tab-nav{background:#fff;border-bottom:1px solid var(--border);
-         display:flex;padding:0 32px;position:sticky;top:0;z-index:100;
-         box-shadow:0 1px 4px rgba(0,0,0,.06)}
-.tab-btn{padding:14px 20px;font-size:13px;font-weight:600;color:var(--text3);
-         border-bottom:2px solid transparent;cursor:pointer;
-         transition:color .2s,border-color .2s;white-space:nowrap}
+.tab-nav{background:#fff;border-bottom:1px solid var(--border);display:flex;
+  padding:0 28px;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.tab-btn{padding:13px 18px;font-size:13px;font-weight:600;color:var(--text3);
+  border-bottom:2px solid transparent;cursor:pointer;transition:color .2s,border-color .2s;white-space:nowrap}
 .tab-btn:hover{color:var(--text)}
 .tab-btn.active{color:var(--pink);border-bottom-color:var(--pink)}
 .tab-content{display:none}
 .tab-content.active{display:block}
 
 /* ── PERIOD TOGGLE ── */
-.period-toggle{display:flex;gap:6px;align-items:center}
-.period-btn{padding:5px 14px;border-radius:20px;border:1px solid var(--border);
-            background:#fff;font-size:12px;font-weight:600;color:var(--text3);
-            cursor:pointer;transition:all .2s}
-.period-btn:hover{border-color:var(--pink);color:var(--pink)}
-.period-btn.active{background:var(--pink);border-color:var(--pink);color:#fff}
+.period-toggle{display:flex;gap:5px}
+.pbtn{padding:4px 12px;border-radius:20px;border:1px solid var(--border);background:#fff;
+  font-size:11px;font-weight:600;color:var(--text3);cursor:pointer;transition:all .15s}
+.pbtn:hover{border-color:var(--pink);color:var(--pink)}
+.pbtn.active{background:var(--pink);border-color:var(--pink);color:#fff}
 
 /* ── MAIN ── */
-.main{max-width:1300px;margin:0 auto;padding:20px 24px 60px}
+.main{max-width:1320px;margin:0 auto;padding:18px 22px 60px}
 
 /* ── ALERTS ── */
-.alert{border-radius:10px;padding:11px 15px;margin-bottom:10px;
-       display:flex;align-items:flex-start;gap:10px;font-size:13px}
-.alert.red{background:var(--red-bg);border:1px solid #fca5a5;color:#991b1b}
-.alert.yellow{background:var(--yellow-bg);border:1px solid #fcd34d;color:#92400e}
-.alert.green{background:var(--green-bg);border:1px solid #86efac;color:#166534}
-.alert.blue{background:var(--blue-bg);border:1px solid #93c5fd;color:#1e40af}
-.alert-icon{font-size:15px;flex-shrink:0;margin-top:1px}
+.alert{border-radius:10px;padding:10px 14px;margin-bottom:8px;
+  display:flex;align-items:flex-start;gap:9px;font-size:13px}
+.alert.red{background:var(--red-bg);border:1px solid var(--red-b);color:#991b1b}
+.alert.yellow{background:var(--yellow-bg);border:1px solid var(--yellow-b);color:#92400e}
+.alert.green{background:var(--green-bg);border:1px solid var(--green-b);color:#166534}
+.alert.blue{background:var(--blue-bg);border:1px solid var(--blue-b);color:#1e40af}
+.ai{font-size:14px;flex-shrink:0;margin-top:1px}
 
 /* ── SECTION ── */
-.section{margin-bottom:24px}
-.section-hd{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
-            color:var(--text3);margin-bottom:10px;padding-bottom:7px;
-            border-bottom:1px solid var(--border);display:flex;
-            justify-content:space-between;align-items:center}
+.section{margin-bottom:22px}
+.sec-hd{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
+  color:var(--text3);margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center}
 
 /* ── KPI GRID ── */
-.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px}
-.kpi{background:#fff;border-radius:12px;padding:15px;box-shadow:var(--shadow);
-     border:1px solid var(--border);transition:box-shadow .2s}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:9px}
+.kpi{background:#fff;border-radius:12px;padding:14px;box-shadow:var(--shadow);
+  border:1px solid var(--border);transition:box-shadow .2s}
 .kpi:hover{box-shadow:var(--shadow-h)}
-.kpi-lbl{font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;
-         letter-spacing:.5px;margin-bottom:5px}
-.kpi-val{font-size:24px;font-weight:800;letter-spacing:-.5px;line-height:1}
-.kpi-val.green{color:var(--green)} .kpi-val.red{color:var(--red)} .kpi-val.yellow{color:var(--yellow)}
-.kpi-sub{font-size:12px;color:var(--text3);margin-top:3px}
-.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;
-       border-radius:20px;font-size:11px;font-weight:600;margin-top:5px}
+.kpi-lbl{font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;
+  letter-spacing:.5px;margin-bottom:4px}
+.kpi-val{font-size:22px;font-weight:800;letter-spacing:-.5px;line-height:1}
+.kpi-val.g{color:var(--green)}.kpi-val.r{color:var(--red)}.kpi-val.y{color:var(--yellow)}
+.kpi-sub{font-size:11px;color:var(--text3);margin-top:3px}
+.badge{display:inline-flex;align-items:center;gap:2px;padding:2px 7px;
+  border-radius:20px;font-size:10px;font-weight:600;margin-top:4px}
 .badge.above{background:var(--green-bg);color:var(--green)}
 .badge.below{background:var(--red-bg);color:var(--red)}
-.badge.neutral{background:var(--yellow-bg);color:var(--yellow)}
+.badge.warn{background:var(--yellow-bg);color:var(--yellow)}
 
-/* ── ACCOUNT CARDS ── */
-.acct-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.acct-card{background:#fff;border-radius:12px;padding:18px;box-shadow:var(--shadow);
-           border:1px solid var(--border)}
-.acct-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.acct-name{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
-.acct-icon{width:30px;height:30px;border-radius:8px;display:flex;
-           align-items:center;justify-content:center;font-size:15px}
-.acct-roas{font-size:22px;font-weight:800}
-.acct-roas.above{color:var(--green)} .acct-roas.below{color:var(--red)}
-.acct-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
-.acct-stat-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
-.acct-stat-val{font-size:14px;font-weight:600;color:var(--text2)}
-.be-bar{margin-top:8px}
-.be-bar-lbl{font-size:11px;color:var(--text3);margin-bottom:3px;display:flex;justify-content:space-between}
+/* ── CHANNEL SPLIT ── */
+.ch-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ch-card{background:#fff;border-radius:12px;padding:16px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.ch-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.ch-name{font-weight:700;font-size:14px;display:flex;align-items:center;gap:7px}
+.ch-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px}
+.ch-fb{background:#e7f0ff}.ch-gg{background:#fef3c7}
+.ch-roas{font-size:22px;font-weight:800}
+.ch-roas.above{color:var(--green)}.ch-roas.below{color:var(--red)}
+.ch-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.cs-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px}
+.cs-val{font-size:13px;font-weight:600;color:var(--text2)}
+.be-bar{margin-top:10px}
+.be-bar-lbl{font-size:10px;color:var(--text3);margin-bottom:3px;display:flex;justify-content:space-between}
 .be-bar-track{height:5px;background:#f3f4f6;border-radius:3px;overflow:hidden}
 .be-bar-fill{height:100%;border-radius:3px;transition:width .6s}
-.be-bar-fill.above{background:var(--green)} .be-bar-fill.below{background:var(--red)}
+.be-bar-fill.above{background:var(--green)}.be-bar-fill.below{background:var(--red)}
 
-/* ── PRODUCT TYPE ── */
-.prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
-.prod-card{background:#fff;border-radius:12px;padding:16px;box-shadow:var(--shadow);
-           border:1px solid var(--border)}
-.prod-name{font-weight:700;font-size:14px;margin-bottom:10px;
-           display:flex;justify-content:space-between;align-items:center}
-.prod-roas{font-size:18px;font-weight:800}
-.prod-roas.above{color:var(--green)} .prod-roas.below{color:var(--red)}
-.prod-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.ps-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px}
-.ps-val{font-size:13px;font-weight:600;color:var(--text2)}
-
-/* ── CHARTS ── */
-.chart-card{background:#fff;border-radius:12px;padding:20px;box-shadow:var(--shadow);
-            border:1px solid var(--border)}
-.chart-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
-.chart-title{font-size:14px;font-weight:700}
-.chart-legend{display:flex;gap:14px;flex-wrap:wrap}
-.legend-item{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text3)}
-.legend-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
-.chart-wrap{position:relative;height:240px}
+/* ── ACCOUNT CARDS ── */
+.acct-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.acct-card{background:#fff;border-radius:12px;padding:15px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.acct-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.acct-nm{font-size:14px;font-weight:700;display:flex;align-items:center;gap:7px}
+.acct-ic{width:27px;height:27px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px}
+.acct-roas{font-size:20px;font-weight:800}
+.acct-roas.above{color:var(--green)}.acct-roas.below{color:var(--red)}
+.acct-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
 
 /* ── PERIOD COMPARISON ── */
-.period-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.period-card{background:#fff;border-radius:12px;padding:17px;box-shadow:var(--shadow);
-             border:1px solid var(--border)}
-.period-card-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.period-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.period-card{background:#fff;border-radius:12px;padding:15px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.period-card-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .period-card-title{font-size:13px;font-weight:700}
-.period-roas-badge{padding:4px 10px;border-radius:20px;font-size:13px;font-weight:700}
+.period-roas-badge{padding:3px 9px;border-radius:20px;font-size:12px;font-weight:700}
 .period-roas-badge.above{background:var(--green-bg);color:var(--green)}
 .period-roas-badge.below{background:var(--red-bg);color:var(--red)}
-.period-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.ps2-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
-.ps2-val{font-size:15px;font-weight:700}
+.period-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ps-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
+.ps-val{font-size:14px;font-weight:700}
+
+/* ── CHART ── */
+.chart-card{background:#fff;border-radius:12px;padding:18px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.chart-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.chart-title{font-size:13px;font-weight:700}
+.chart-legend{display:flex;gap:12px;flex-wrap:wrap}
+.leg{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text3)}
+.leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.chart-wrap{position:relative;height:230px}
 
 /* ── TABLE ── */
 .tbl-wrap{background:#fff;border-radius:12px;box-shadow:var(--shadow);
-          border:1px solid var(--border);overflow:hidden}
-.tbl-wrap table{width:100%;border-collapse:collapse}
-.tbl-wrap th{background:#f9fafb;font-size:11px;font-weight:600;text-transform:uppercase;
-             letter-spacing:.5px;color:var(--text3);padding:9px 13px;
-             text-align:right;border-bottom:1px solid var(--border)}
-.tbl-wrap th:first-child,.tbl-wrap th:nth-child(2){text-align:left}
-.tbl-wrap td{padding:10px 13px;text-align:right;border-bottom:1px solid #f3f4f6;font-size:13px}
-.tbl-wrap td:first-child,.tbl-wrap td:nth-child(2){text-align:left;font-weight:500}
+  border:1px solid var(--border);overflow:hidden;overflow-x:auto}
+.tbl-wrap table{width:100%;border-collapse:collapse;min-width:600px}
+.tbl-wrap th{background:#f9fafb;font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.5px;color:var(--text3);padding:8px 12px;
+  text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
+.tbl-wrap th:first-child,.tbl-wrap th.left{text-align:left}
+.tbl-wrap td{padding:9px 12px;text-align:right;border-bottom:1px solid #f3f4f6;font-size:12px}
+.tbl-wrap td:first-child,.tbl-wrap td.left{text-align:left;font-weight:500}
 .tbl-wrap tr:last-child td{border-bottom:none}
 .tbl-wrap tr:hover td{background:var(--pink-bg)}
 .roas-cell{font-weight:700}
-.roas-cell.above{color:var(--green)} .roas-cell.below{color:var(--red)}
+.roas-cell.above{color:var(--green)}.roas-cell.below{color:var(--red)}.roas-cell.warn{color:var(--yellow)}
 .total-row td{background:#f9fafb;font-weight:700;border-top:2px solid var(--border)}
-.prod-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500}
-.pb-apparel{background:#dbeafe;color:#1e40af}
-.pb-acrylic{background:#fce7f3;color:#9d174d}
-.pb-frame{background:#d1fae5;color:#065f46}
-.pb-unknown{background:#f3f4f6;color:#6b7280}
+.prod-badge{display:inline-block;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:500;white-space:nowrap}
+.pb-t{background:#dbeafe;color:#1e40af}
+.pb-c{background:#fce7f3;color:#9d174d}
+.pb-m{background:#fef3c7;color:#92400e}
+.pb-w{background:#d1fae5;color:#065f46}
+.pb-u{background:#f3f4f6;color:#6b7280}
+.mkt-badge{display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600}
+.mkt-es{background:#fef9c3;color:#854d0e}
+.mkt-it{background:#fee2e2;color:#991b1b}
+.mkt-oth{background:#f3f4f6;color:#6b7280}
+.num-note{font-size:10px;color:var(--text3);font-style:italic}
+
+/* ── MARKET GRID ── */
+.mkt-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.mkt-card{background:#fff;border-radius:12px;padding:15px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.mkt-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.mkt-nm{font-size:15px;font-weight:700}
+.mkt-roas{font-size:20px;font-weight:800}
+.mkt-roas.above{color:var(--green)}.mkt-roas.below{color:var(--red)}
+.mkt-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 
 /* ── PLACEHOLDER ── */
-.placeholder{background:#fff;border-radius:12px;padding:28px;box-shadow:var(--shadow);
-             border:2px dashed var(--border);text-align:center;color:var(--text3)}
-.placeholder-icon{font-size:28px;margin-bottom:8px}
-.placeholder-text{font-size:13px}
-
-/* ── SHOPIFY KPI ── */
-.shop-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.placeholder{background:#fff;border-radius:12px;padding:24px;box-shadow:var(--shadow);
+  border:2px dashed var(--border);text-align:center;color:var(--text3)}
+.ph-icon{font-size:26px;margin-bottom:7px}
+.ph-text{font-size:12px}
 
 /* ── FOOTER ── */
-.footer{text-align:center;color:var(--text3);font-size:12px;padding:20px;
-        border-top:1px solid var(--border);margin-top:40px}
+.footer{text-align:center;color:var(--text3);font-size:11px;padding:16px;
+  border-top:1px solid var(--border);margin-top:40px}
+
+/* ── 2-COL ── */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.three-col{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 
 @media(max-width:768px){
-  .acct-grid,.period-grid{grid-template-columns:1fr}
+  .acct-grid,.ch-grid,.period-grid,.mkt-grid,.two-col,.three-col{grid-template-columns:1fr}
   .kpi-grid{grid-template-columns:repeat(2,1fr)}
   .period-stats{grid-template-columns:repeat(2,1fr)}
-  .header{padding:16px}
-  .main{padding:12px 12px 40px}
-  .tab-nav{padding:0 12px}
-  .tab-btn{padding:12px 14px;font-size:12px}
+  .header,.main{padding:14px}
+  .tab-nav{padding:0 10px}
+  .tab-btn{padding:11px 12px;font-size:11px}
 }
 </style>
 </head>
 <body>
 
-<!-- ═══════════════════ LOADING ═══════════════════ -->
 <div class="loading-overlay" id="loadingOverlay">
   <div class="spinner"></div>
-  <div style="color:var(--text3);font-size:13px">Đang tải dữ liệu từ Google Sheets...</div>
+  <div style="color:var(--text3);font-size:12px">Đang tải dữ liệu...</div>
 </div>
 
-<!-- ═══════════════════ HEADER ═══════════════════ -->
+<!-- ═══ HEADER ═══ -->
 <div class="header">
   <div class="header-top">
     <div>
       <h1>🌸 Mother's Day 2026 — Live Dashboard
-        <span>Amor1970s &nbsp;|&nbsp; ES + IT &nbsp;|&nbsp; Campaign: từ 20/3/2026</span>
+        <span>Amor1970s &nbsp;|&nbsp; 🇪🇸 ES + 🇮🇹 IT &nbsp;|&nbsp; Campaign từ 20/3/2026</span>
       </h1>
     </div>
-    <div class="countdown-group">
-      <div class="cd-card">
-        <div class="cd-days" id="cntES">--</div>
-        <div class="cd-label">🇪🇸 España (3/5)</div>
-      </div>
-      <div class="cd-card">
-        <div class="cd-days" id="cntIT">--</div>
-        <div class="cd-label">🇮🇹 Italia (10/5)</div>
-      </div>
+    <div class="cd-group">
+      <div class="cd-card"><div class="cd-days" id="cntES">--</div><div class="cd-label">🇪🇸 España 3/5</div></div>
+      <div class="cd-card"><div class="cd-days" id="cntIT">--</div><div class="cd-label">🇮🇹 Italia 10/5</div></div>
     </div>
   </div>
   <div class="meta-bar">
-    <div class="meta-tag"><span class="status-dot"></span> Live Data</div>
-    <div class="meta-tag">📊 Source: FB Ads + Shopify</div>
-    <div class="meta-tag" id="metaUpdated">🔄 Đang tải...</div>
+    <div class="meta-tag"><span class="dot"></span>Live</div>
+    <div class="meta-tag">📣 FB Ads + GG Ads</div>
+    <div class="meta-tag">🛍️ Shopify</div>
+    <div class="meta-tag" id="metaUpdated">🔄 --</div>
     <div class="meta-tag" id="metaRows">📋 --</div>
-    <button class="btn-refresh" id="btnRefresh" onclick="fetchData()">🔄 Refresh</button>
+    <button class="btn-ref" id="btnRef" onclick="fetchData()">🔄 Refresh</button>
   </div>
 </div>
 
-<!-- ═══════════════════ TAB NAV ═══════════════════ -->
+<!-- ═══ TAB NAV ═══ -->
 <div class="tab-nav">
-  <div class="tab-btn active" onclick="switchTab('campaign', this)">📣 Campaign Performance</div>
-  <div class="tab-btn" onclick="switchTab('store', this)">🛍️ Store Performance</div>
+  <div class="tab-btn active" onclick="switchTab('campaign',this)">📣 Campaign Performance</div>
+  <div class="tab-btn" onclick="switchTab('product',this)">🎯 Product Intelligence</div>
+  <div class="tab-btn" onclick="switchTab('store',this)">🛍️ Store Performance</div>
 </div>
 
-<!-- ═══════════════════ CAMPAIGN TAB ═══════════════════ -->
+<!-- ═══ TAB: CAMPAIGN ═══ -->
 <div class="tab-content active" id="tab-campaign">
 <div class="main">
-
-  <!-- Alerts -->
   <div class="section" id="alertSection"></div>
 
-  <!-- Period toggle + KPI totals -->
+  <!-- Blended KPIs -->
   <div class="section">
-    <div class="section-hd">
-      <span>📊 Tổng quan campaign</span>
+    <div class="sec-hd">
+      <span>📊 Blended KPIs (FB + GG)</span>
       <div class="period-toggle">
-        <button class="period-btn active" onclick="setPeriod('all',this)">Toàn bộ</button>
-        <button class="period-btn" onclick="setPeriod('l7',this)">7 ngày</button>
-        <button class="period-btn" onclick="setPeriod('l3',this)">3 ngày</button>
+        <button class="pbtn active" onclick="setPeriod('all',this)">Toàn bộ</button>
+        <button class="pbtn" onclick="setPeriod('l7',this)">7 ngày</button>
+        <button class="pbtn" onclick="setPeriod('l3',this)">3 ngày</button>
       </div>
     </div>
     <div class="kpi-grid" id="kpiGrid"></div>
   </div>
 
-  <!-- Period comparison L7 vs L3 -->
+  <!-- Channel Split -->
   <div class="section">
-    <div class="section-hd">🔄 So sánh thời kỳ</div>
+    <div class="sec-hd">📣 Channel Breakdown — Facebook vs Google</div>
+    <div class="ch-grid" id="channelGrid"></div>
+  </div>
+
+  <!-- Period Comparison -->
+  <div class="section">
+    <div class="sec-hd">🔄 So sánh thời kỳ</div>
     <div class="period-grid" id="periodGrid"></div>
   </div>
 
-  <!-- By Account -->
+  <!-- Accounts -->
   <div class="section">
-    <div class="section-hd">🏦 Breakdown theo Ad Account</div>
+    <div class="sec-hd">🏦 Breakdown theo Ad Account (FB)</div>
     <div class="acct-grid" id="acctGrid"></div>
-  </div>
-
-  <!-- By Product Type -->
-  <div class="section">
-    <div class="section-hd">👕 Breakdown theo Product Type</div>
-    <div class="prod-grid" id="prodGrid"></div>
   </div>
 
   <!-- Daily Trend Chart -->
   <div class="section">
     <div class="chart-card">
       <div class="chart-hd">
-        <div class="chart-title">📈 Daily Trend — Spend vs Revenue</div>
+        <div class="chart-title">📈 Daily Trend — Spend vs Revenue (Blended)</div>
         <div class="chart-legend">
-          <div class="legend-item"><div class="legend-dot" style="background:#e91e8c"></div>Spend</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#16a34a"></div>Revenue</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#2563eb"></div>ROAS</div>
+          <div class="leg"><div class="leg-dot" style="background:#e91e8c"></div>FB Spend</div>
+          <div class="leg"><div class="leg-dot" style="background:#f97316"></div>GG Spend</div>
+          <div class="leg"><div class="leg-dot" style="background:#16a34a"></div>Revenue</div>
+          <div class="leg"><div class="leg-dot" style="background:#2563eb"></div>ROAS</div>
         </div>
       </div>
       <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
     </div>
   </div>
 
-  <!-- Daily table -->
+  <!-- Daily Table -->
   <div class="section">
-    <div class="section-hd">📅 Dữ liệu theo ngày</div>
+    <div class="sec-hd">📅 Dữ liệu theo ngày</div>
     <div class="tbl-wrap">
-      <table id="dailyTable">
-        <thead>
-          <tr>
-            <th>Ngày</th>
-            <th style="text-align:right">Spend</th>
-            <th style="text-align:right">Revenue</th>
-            <th style="text-align:right">ROAS</th>
-            <th style="text-align:right">Purchases</th>
-            <th style="text-align:right">CPA</th>
-            <th style="text-align:right">CPM</th>
-            <th style="text-align:right">CTR</th>
-            <th style="text-align:right">ATC</th>
-          </tr>
-        </thead>
+      <table>
+        <thead><tr>
+          <th class="left">Ngày</th>
+          <th>Spend</th><th>FB</th><th>GG</th>
+          <th>Revenue</th><th>ROAS</th><th>Purchases</th>
+          <th>Clicks</th><th>CPM</th>
+        </tr></thead>
         <tbody id="dailyTbody"></tbody>
       </table>
     </div>
@@ -334,131 +315,147 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 
   <!-- Top Creatives -->
   <div class="section">
-    <div class="section-hd">🎨 Top Creatives (theo Spend)</div>
+    <div class="sec-hd">🎨 Top FB Creatives (theo Spend)</div>
     <div class="tbl-wrap">
-      <table id="creativeTable">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Creative / URL Path</th>
-            <th>Product Type</th>
-            <th style="text-align:right">Spend</th>
-            <th style="text-align:right">Revenue</th>
-            <th style="text-align:right">ROAS</th>
-            <th style="text-align:right">Purchases</th>
-            <th style="text-align:right">CPA</th>
-            <th style="text-align:right">CTR</th>
-          </tr>
-        </thead>
+      <table>
+        <thead><tr>
+          <th class="left">#</th>
+          <th class="left">Creative</th>
+          <th class="left">Type</th>
+          <th>Spend</th><th>Revenue</th><th>ROAS</th>
+          <th>Purchases</th><th>CPA</th><th>CTR</th>
+        </tr></thead>
         <tbody id="creativeTbody"></tbody>
       </table>
     </div>
   </div>
+</div>
+</div>
 
-</div><!-- /main -->
-</div><!-- /tab-campaign -->
+<!-- ═══ TAB: PRODUCT ═══ -->
+<div class="tab-content" id="tab-product">
+<div class="main">
 
-<!-- ═══════════════════ STORE TAB ═══════════════════ -->
+  <!-- By Product Type -->
+  <div class="section">
+    <div class="sec-hd">👕 Breakdown theo Product Type (Blended)</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th class="left">Product Type</th>
+          <th>Total Spend</th><th>FB</th><th>GG</th>
+          <th>Revenue</th><th>ROAS</th><th>vs BE</th>
+          <th>Purchases</th><th>CPA</th>
+        </tr></thead>
+        <tbody id="prodTypeTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- By Market -->
+  <div class="section">
+    <div class="sec-hd">🌍 Breakdown theo Market</div>
+    <div class="mkt-grid" id="mktGrid"></div>
+  </div>
+
+  <!-- Top Products by Spend (Ads) -->
+  <div class="section">
+    <div class="sec-hd">🏆 Top Products — Ads Spend (FB + GG)</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th class="left">#</th>
+          <th class="left">Product</th>
+          <th class="left">Type</th>
+          <th class="left">Mkt</th>
+          <th>Total Spend</th><th>FB</th><th>GG</th>
+          <th>Revenue</th><th>ROAS</th><th>CPA</th>
+        </tr></thead>
+        <tbody id="topProdTbody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:6px;padding:0 4px">
+      <span class="num-note">* GG Conversions = modeled attribution (Google) — có thể là số thập phân</span>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ═══ TAB: STORE ═══ -->
 <div class="tab-content" id="tab-store">
 <div class="main">
 
   <!-- Shopify KPIs -->
   <div class="section">
-    <div class="section-hd">🛍️ Shopify — Campaign Totals</div>
-    <div class="shop-kpi-grid" id="shopKpiGrid"></div>
+    <div class="sec-hd">🛍️ Shopify — Campaign Totals</div>
+    <div class="kpi-grid" id="shopKpiGrid"></div>
   </div>
 
-  <!-- Shopify chart -->
+  <!-- Shopify Chart -->
   <div class="section">
     <div class="chart-card">
       <div class="chart-hd">
         <div class="chart-title">📦 Shopify Daily — Revenue & Units Sold</div>
         <div class="chart-legend">
-          <div class="legend-item"><div class="legend-dot" style="background:#e91e8c"></div>Revenue ($)</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#2563eb"></div>Units Sold</div>
+          <div class="leg"><div class="leg-dot" style="background:#e91e8c"></div>Revenue ($)</div>
+          <div class="leg"><div class="leg-dot" style="background:#2563eb"></div>Units</div>
         </div>
       </div>
-      <div class="chart-wrap"><canvas id="shopifyChart"></canvas></div>
+      <div class="chart-wrap"><canvas id="shopChart"></canvas></div>
     </div>
   </div>
 
-  <!-- Top Products -->
+  <!-- Shopify Top Products -->
   <div class="section">
-    <div class="section-hd">🏆 Top Products theo Revenue</div>
+    <div class="sec-hd">🏆 Top Products — Shopify Revenue</div>
     <div class="tbl-wrap">
       <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Product Title</th>
-            <th style="text-align:right">Revenue</th>
-            <th style="text-align:right">Units Sold</th>
-            <th style="text-align:right">Order Lines</th>
-            <th style="text-align:right">Revenue/Unit</th>
-          </tr>
-        </thead>
-        <tbody id="shopifyTopTbody"></tbody>
+        <thead><tr>
+          <th class="left">#</th>
+          <th class="left">Product Title</th>
+          <th>Revenue</th><th>Units Sold</th><th>Orders</th><th>Rev/Unit</th>
+        </tr></thead>
+        <tbody id="shopTopTbody"></tbody>
       </table>
     </div>
   </div>
 
-  <!-- Placeholders cho data chưa có -->
+  <!-- Placeholders -->
   <div class="section">
-    <div class="section-hd">🔮 Coming Soon — Cần data bổ sung</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
-      <div class="placeholder">
-        <div class="placeholder-icon">🌍</div>
-        <div class="placeholder-text"><strong>Breakdown ES vs IT</strong><br>Cần thêm cột Market vào SHOPIFY_SALES_DAILY</div>
-      </div>
-      <div class="placeholder">
-        <div class="placeholder-icon">📈</div>
-        <div class="placeholder-text"><strong>Google Ads Data</strong><br>Script GoogleAds_Sync.js chưa deploy</div>
-      </div>
-      <div class="placeholder">
-        <div class="placeholder-icon">💰</div>
-        <div class="placeholder-text"><strong>Profit Estimator</strong><br>Cần config COGS / Fulfillment cost</div>
-      </div>
-      <div class="placeholder">
-        <div class="placeholder-icon">🔄</div>
-        <div class="placeholder-text"><strong>Returning Customer Rate</strong><br>Cần SHOPIFY_CUSTOMERS sheet</div>
-      </div>
+    <div class="sec-hd">🔮 Coming Soon</div>
+    <div class="three-col">
+      <div class="placeholder"><div class="ph-icon">🌍</div><div class="ph-text"><strong>ES vs IT Revenue</strong><br>Cần thêm Market vào SHOPIFY_SALES_DAILY</div></div>
+      <div class="placeholder"><div class="ph-icon">💰</div><div class="ph-text"><strong>Profit Calculator</strong><br>Cần config COGS + Fulfillment cost</div></div>
+      <div class="placeholder"><div class="ph-icon">🔄</div><div class="ph-text"><strong>Returning Customers</strong><br>Cần SHOPIFY_CUSTOMERS sheet</div></div>
     </div>
   </div>
 
 </div>
-</div><!-- /tab-store -->
+</div>
 
-<!-- ── FOOTER ── -->
 <div class="footer">
-  Amor1970s Marketing Dashboard &nbsp;·&nbsp; Data: FB Ads API + Shopify API &nbsp;·&nbsp;
-  Auto-refresh qua GAS Web App &nbsp;·&nbsp;
+  Amor1970s Marketing Dashboard &nbsp;·&nbsp; FB Ads + Google Ads + Shopify &nbsp;·&nbsp;
   <span id="footerTime"></span>
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════════════════
-// ⚙️  CẤU HÌNH — Paste URL GAS Web App của bạn vào đây
-// ═══════════════════════════════════════════════════════════════════
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxLoWKvx3W7C90IWScQ8vM2Iz-fSftiIGQHVM6YEMnJVLdvKLiccQRzfT97J3II7_KC/exec';
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzVhS2gQSOeJ7t4tuVnbyqXYNuTMNFmmbmtyDBwNQ_AFjEMbIHrDwjGiwWbFHkGQH-f/exec';
+// ═══════════════════════════════════════════════════════
 
 let DATA = null;
 let currentPeriod = 'all';
-let trendChartInst = null;
-let shopifyChartInst = null;
+let charts = {};
 
 // ── Countdown ──
 function updateCountdown() {
   const now = new Date();
-  const ES = new Date('2026-05-03');
-  const IT = new Date('2026-05-10');
-  const daysES = Math.max(0, Math.ceil((ES - now) / 86400000));
-  const daysIT = Math.max(0, Math.ceil((IT - now) / 86400000));
-  document.getElementById('cntES').textContent = daysES === 0 ? '🎉' : daysES;
-  document.getElementById('cntIT').textContent = daysIT === 0 ? '🎉' : daysIT;
+  document.getElementById('cntES').textContent = Math.max(0, Math.ceil((new Date('2026-05-03') - now) / 86400000));
+  document.getElementById('cntIT').textContent = Math.max(0, Math.ceil((new Date('2026-05-10') - now) / 86400000));
 }
 
-// ── Tab switching ──
+// ── Tab ──
 function switchTab(name, el) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -469,456 +466,508 @@ function switchTab(name, el) {
 // ── Period ──
 function setPeriod(p, el) {
   currentPeriod = p;
-  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.pbtn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
   if (DATA) renderKPIs(DATA);
 }
 
-// ── Format helpers ──
-const $  = (v, d=2) => '$' + num(v).toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
-const pct = v => num(v).toFixed(2) + '%';
-const x   = v => num(v).toFixed(2) + 'x';
-const n   = v => Math.round(num(v)).toLocaleString('en-US');
-const num = v => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
+// ── Format ──
+const $v   = (v, d=2) => '$' + n(v).toFixed(d).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+const pct  = v => n(v).toFixed(2) + '%';
+const xv   = v => n(v).toFixed(2) + 'x';
+const nn   = v => Math.round(n(v)).toLocaleString();
+const nf   = v => n(v) < 10 ? n(v).toFixed(1) : Math.round(n(v)).toLocaleString(); // fractional-aware
+const n    = v => isNaN(parseFloat(v)) ? 0 : parseFloat(v);
 function fmtDate(s) {
   if (!s) return '';
-  const d = new Date(s + 'T00:00:00');
+  const d = new Date(s + 'T12:00:00');
   return d.toLocaleDateString('vi-VN', {day:'2-digit', month:'2-digit'});
 }
-function roasClass(roas, be=1.63) { return num(roas) >= be ? 'above' : 'below'; }
+function rc(roas, be) { be = be || 1.63; return n(roas) >= be ? 'above' : n(roas) >= be * 0.9 ? 'warn' : 'below'; }
 function prodBadgeClass(type) {
-  if (!type) return 'pb-unknown';
+  if (!type) return 'pb-u';
   const t = type.toLowerCase();
-  if (t.includes('apparel')) return 'pb-apparel';
-  if (t.includes('acrylic')) return 'pb-acrylic';
-  if (t.includes('frame'))   return 'pb-frame';
-  return 'pb-unknown';
+  if (t.includes('t-shirt') || t.includes('apparel') || t.includes('unisex') || t.includes('women')) return 'pb-t';
+  if (t.includes('customizer') || t.includes('frame') || t.includes('acrylic') || t.includes('canvas') || t.includes('cuadro')) return 'pb-c';
+  if (t.includes('mug') || t.includes('taza')) return 'pb-m';
+  return 'pb-u';
 }
-function getBE(beRoasMap, prodType) {
-  if (!beRoasMap || !prodType) return 1.63;
-  return beRoasMap[prodType] || 1.63;
+function mktBadge(markets) {
+  if (!markets || !markets.length) return '<span class="mkt-badge mkt-oth">?</span>';
+  return markets.map(m => {
+    const cls = m === 'ES' ? 'mkt-es' : m === 'IT' ? 'mkt-it' : 'mkt-oth';
+    const flag = m === 'ES' ? '🇪🇸' : m === 'IT' ? '🇮🇹' : '?';
+    return `<span class="mkt-badge ${cls}">${flag}${m}</span>`;
+  }).join(' ');
+}
+function beBar(roas, be) {
+  be = be || 1.63;
+  const pctVal = Math.min(120, (n(roas) / be * 100)).toFixed(0);
+  const cls = rc(roas, be);
+  const sign = n(roas) >= be ? '✅' : '⚠️';
+  return `<div class="be-bar">
+    <div class="be-bar-lbl"><span>vs BE ${be}x</span><span>${xv(roas)} ${sign}</span></div>
+    <div class="be-bar-track"><div class="be-bar-fill ${cls}" style="width:${Math.min(100,pctVal)}%"></div></div>
+  </div>`;
 }
 
-// ── Fetch data ──
+// ── Fetch ──
 async function fetchData() {
-  const btn = document.getElementById('btnRefresh');
-  btn.classList.add('loading');
-  btn.textContent = '⏳ Đang tải...';
+  const btn = document.getElementById('btnRef');
+  btn.textContent = '⏳...'; btn.disabled = true;
   document.getElementById('loadingOverlay').style.display = 'flex';
-
   try {
     const res  = await fetch(GAS_URL + '?t=' + Date.now());
     const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'GAS trả về lỗi');
+    if (!data.ok) throw new Error(data.error || 'GAS error');
     DATA = data;
     renderAll(data);
   } catch (err) {
-    showError(err.message);
+    document.getElementById('alertSection').innerHTML =
+      `<div class="alert red"><span class="ai">❌</span><div>
+       <strong>Lỗi kết nối GAS Web App:</strong> ${err.message}<br>
+       <small>Kiểm tra GAS_URL và đảm bảo Web App deploy với "Anyone can access".</small>
+       </div></div>`;
   } finally {
-    btn.classList.remove('loading');
-    btn.textContent = '🔄 Refresh';
+    btn.textContent = '🔄 Refresh'; btn.disabled = false;
     document.getElementById('loadingOverlay').style.display = 'none';
   }
 }
 
-function showError(msg) {
-  document.getElementById('alertSection').innerHTML =
-    `<div class="alert red"><span class="alert-icon">❌</span>
-     <div><strong>Lỗi kết nối GAS Web App:</strong> ${msg}<br>
-     <small>Kiểm tra URL trong file HTML (biến GAS_URL) và đảm bảo Web App đã deploy đúng.</small></div></div>`;
-}
-
-// ── Render all ──
 function renderAll(d) {
-  updateMeta(d);
+  const t = new Date(d.generatedAt);
+  document.getElementById('metaUpdated').textContent = '🔄 ' +
+    t.toLocaleTimeString('vi-VN', {hour:'2-digit', minute:'2-digit'}) + ' ' +
+    t.toLocaleDateString('vi-VN');
+  document.getElementById('metaRows').textContent =
+    `📋 FB:${(d.fbRows||0).toLocaleString()} GG:${(d.ggTotals&&d.ggTotals.rows?d.ggTotals.rows:0).toLocaleString()}`;
+  document.getElementById('footerTime').textContent = 'Updated: ' + t.toLocaleString('vi-VN');
+
   renderAlerts(d);
   renderKPIs(d);
-  renderPeriodComparison(d);
+  renderChannels(d);
+  renderPeriods(d);
   renderAccounts(d);
-  renderProducts(d);
-  renderDailyTrend(d);
+  renderTrendChart(d);
   renderDailyTable(d);
   renderCreatives(d);
+  renderProductTypes(d);
+  renderMarkets(d);
+  renderTopProducts(d);
   renderShopify(d);
 }
 
-function updateMeta(d) {
-  const t = new Date(d.generatedAt);
-  document.getElementById('metaUpdated').textContent =
-    '🔄 ' + t.toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit'}) + ' ' +
-    t.toLocaleDateString('vi-VN');
-  document.getElementById('metaRows').textContent = '📋 FB: ' + (d.fbTotalRows||0).toLocaleString() + ' rows';
-  document.getElementById('footerTime').textContent = 'Cập nhật: ' + t.toLocaleString('vi-VN');
-}
-
-// ── Alerts ──
+// ── ALERTS ──
 function renderAlerts(d) {
   const alerts = [];
-  const t = d.totals;
-  const l7 = d.l7;
-  const l3 = d.l3;
+  const bl = d.blended || {};
+  const be = 1.63;
 
-  // ROAS alert
-  const beDefault = 1.63;
-  if (t.roas > 0 && t.roas < beDefault) {
-    alerts.push({type:'red', icon:'🔴',
-      msg:`<strong>ROAS tổng: ${x(t.roas)} — DƯỚI ngưỡng BE ${beDefault}x.</strong> Spend: ${$(t.spend)} | Revenue: ${$(t.revenue)}. Cần review ngay!`});
-  } else if (t.roas >= beDefault) {
-    alerts.push({type:'green', icon:'✅',
-      msg:`<strong>ROAS tổng: ${x(t.roas)} — Trên BE.</strong> Campaign đang sinh lời. Spend: ${$(t.spend)} | Revenue: ${$(t.revenue)}.`});
-  }
-
-  // L3 trend warning
-  if (l3.roas > 0 && l3.roas < l7.roas * 0.9) {
-    alerts.push({type:'yellow', icon:'📉',
-      msg:`<strong>L3 ROAS (${x(l3.roas)}) thấp hơn L7 (${x(l7.roas)}) >10%.</strong> Xu hướng xấu đi trong 3 ngày gần nhất — cần điều chỉnh creative hoặc budget.`});
+  // L3 trend
+  if (n(d.blendedL3 && d.blendedL3.roas) > 0 && n(d.blendedL3.roas) < be) {
+    alerts.push({t:'red', i:'📉', m:`<strong>L3 ROAS ${xv(d.blendedL3.roas)} — Dưới BE ${be}x.</strong> Spend $${n(d.blendedL3.spend).toFixed(0)} / Revenue $${n(d.blendedL3.revenue).toFixed(0)} trong 3 ngày gần nhất. Cần điều chỉnh ngay.`});
+  } else if (n(d.blendedL7 && d.blendedL7.roas) >= be) {
+    alerts.push({t:'green', i:'✅', m:`<strong>Blended ROAS L7: ${xv(d.blendedL7.roas)} — Trên BE.</strong> Spend $${n(d.blendedL7.spend).toFixed(0)} | Revenue $${n(d.blendedL7.revenue).toFixed(0)}.`});
   }
 
   // Account alerts
   const accts = d.byAccount || {};
   Object.entries(accts).forEach(([name, m]) => {
-    if (m.spend > 50 && m.roas < beDefault) {
-      alerts.push({type:'red', icon:'⚠️',
-        msg:`<strong>${name}: ROAS ${x(m.roas)} — Dưới BE.</strong> Spend: ${$(m.spend)} | Revenue: ${$(m.revenue)}. Cân nhắc pause hoặc cắt budget.`});
+    if (n(m.spend) > 30 && n(m.roas) < be) {
+      alerts.push({t:'red', i:'🔴', m:`<strong>${name}: ROAS ${xv(m.roas)} — Dưới BE.</strong> Spend ${$v(m.spend)} | Revenue ${$v(m.revenue)}. Cân nhắc cắt budget hoặc pause.`});
     }
   });
 
-  // Shopify data present
-  if (d.shopifyTotals && d.shopifyTotals.revenue > 0) {
-    const sr = d.shopifyTotals;
-    alerts.push({type:'blue', icon:'📦',
-      msg:`<strong>Shopify:</strong> ${n(sr.unitsSold)} units sold | Revenue: ${$(sr.revenue)} | ${n(sr.orderLines)} orders | AOV: ${$(sr.aov)}`});
+  // Product type alerts
+  const pt = d.byProductType || {};
+  Object.entries(pt).forEach(([type, m]) => {
+    if (n(m.spend) > 50 && n(m.roas) < be && type !== 'Unknown') {
+      alerts.push({t:'yellow', i:'⚠️', m:`<strong>${type}: ROAS ${xv(m.roas)} — Dưới BE.</strong> Spend ${$v(m.spend)}. GG: ${$v(m.gg_spend)} | FB: ${$v(m.fb_spend)}.`});
+    }
+  });
+
+  // Scale candidate
+  const top = (d.topCreatives || []).find(c => n(c.roas) > 4 && n(c.spend) < 100 && n(c.spend) > 20);
+  if (top) {
+    const name = (top.fullUrl || '').split('/').pop().substring(0, 50);
+    alerts.push({t:'blue', i:'🚀', m:`<strong>Scale candidate:</strong> "${top.prodTitle || name}" — ROAS ${xv(top.roas)}, Spend ${$v(top.spend)}. Nên tăng budget 2-3x.`});
   }
 
-  // No data
-  if (t.rows === 0) {
-    alerts.push({type:'yellow', icon:'⚠️',
-      msg:`<strong>Chưa có data FB Ads.</strong> GAS Web App kết nối được nhưng không tìm thấy dòng nào hợp lệ. Kiểm tra debug: <code>${GAS_URL}?debug=1</code>`});
+  // GG vs FB note
+  if (d.hasGGData && n(d.ggTotals && d.ggTotals.roas) > n(d.fbTotals && d.fbTotals.roas)) {
+    alerts.push({t:'blue', i:'📊', m:`<strong>GG ROAS ${xv(d.ggTotals.roas)} > FB ROAS ${xv(d.fbTotals.roas)}.</strong> Google Ads đang outperform Facebook. Xem xét tăng budget GG, giảm FB spend ở các account yếu.`});
   }
 
-  document.getElementById('alertSection').innerHTML =
-    alerts.map(a => `<div class="alert ${a.type}"><span class="alert-icon">${a.icon}</span><div>${a.msg}</div></div>`).join('');
+  document.getElementById('alertSection').innerHTML = alerts.map(a =>
+    `<div class="alert ${a.t}"><span class="ai">${a.i}</span><div>${a.m}</div></div>`
+  ).join('');
 }
 
-// ── KPI Grid ──
+// ── KPI GRID ──
 function renderKPIs(d) {
-  const m = currentPeriod === 'l7' ? d.l7 : currentPeriod === 'l3' ? d.l3 : d.totals;
+  const m = currentPeriod === 'l7' ? d.blendedL7 : currentPeriod === 'l3' ? d.blendedL3 : d.blended;
+  const be = 1.63;
+  const rcls = rc(m.roas, be);
+  const rbadge = n(m.roas) >= be
+    ? `<div class="badge above">✅ Trên BE ${be}x</div>`
+    : n(m.roas) > 0 ? `<div class="badge below">⚠️ Dưới BE ${be}x</div>` : '';
   const label = currentPeriod === 'l7' ? 'Last 7 days' : currentPeriod === 'l3' ? 'Last 3 days' : 'Toàn campaign';
-  const beDefault = 1.63;
-  const roasCls = m.roas >= beDefault ? 'green' : m.roas > 0 ? 'red' : '';
-  const roasBadge = m.roas >= beDefault
-    ? `<div class="badge above">✅ Trên BE ${beDefault}x</div>`
-    : m.roas > 0
-    ? `<div class="badge below">⚠️ Dưới BE ${beDefault}x</div>`
-    : '';
 
   document.getElementById('kpiGrid').innerHTML = `
-    <div class="kpi">
-      <div class="kpi-lbl">Total Spend</div>
-      <div class="kpi-val">${$(m.spend)}</div>
-      <div class="kpi-sub">${label}</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-lbl">Revenue (FB)</div>
-      <div class="kpi-val ${m.revenue > m.spend * beDefault ? 'green' : ''}">${$(m.revenue)}</div>
-      <div class="kpi-sub">${n(m.purchases)} purchases</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-lbl">ROAS</div>
-      <div class="kpi-val ${roasCls}">${x(m.roas)}</div>
-      ${roasBadge}
-    </div>
-    <div class="kpi">
-      <div class="kpi-lbl">Purchases</div>
-      <div class="kpi-val">${n(m.purchases)}</div>
-      <div class="kpi-sub">ATC: ${n(m.atc)} | CVR: ${pct(m.cvr)}</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-lbl">CPA</div>
-      <div class="kpi-val">${$(m.cpa)}</div>
-      <div class="kpi-sub">Cost per purchase</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-lbl">CPM</div>
-      <div class="kpi-val">${$(m.cpm)}</div>
-      <div class="kpi-sub">Impressions: ${(num(m.impressions)/1000).toFixed(1)}K</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-lbl">CTR</div>
+    <div class="kpi"><div class="kpi-lbl">Total Spend</div>
+      <div class="kpi-val">${$v(m.spend)}</div>
+      <div class="kpi-sub">FB ${$v(m.fb_spend||0)} + GG ${$v(m.gg_spend||0)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Revenue</div>
+      <div class="kpi-val ${n(m.roas)>=be?'g':''}">${$v(m.revenue)}</div>
+      <div class="kpi-sub">FB ${$v(m.fb_revenue||0)} + GG ${$v(m.gg_revenue||0)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Blended ROAS</div>
+      <div class="kpi-val ${rcls==='above'?'g':rcls==='below'?'r':'y'}">${xv(m.roas)}</div>
+      ${rbadge}</div>
+    <div class="kpi"><div class="kpi-lbl">Purchases</div>
+      <div class="kpi-val">${nf(m.purchases)}</div>
+      <div class="kpi-sub">${label}</div></div>
+    <div class="kpi"><div class="kpi-lbl">CPA</div>
+      <div class="kpi-val">${$v(m.cpa)}</div>
+      <div class="kpi-sub">Cost / purchase</div></div>
+    <div class="kpi"><div class="kpi-lbl">CPM</div>
+      <div class="kpi-val">${$v(m.cpm)}</div>
+      <div class="kpi-sub">${nn(m.impressions)} impr.</div></div>
+    <div class="kpi"><div class="kpi-lbl">CTR</div>
       <div class="kpi-val">${pct(m.ctr)}</div>
-      <div class="kpi-sub">Clicks: ${n(m.clicks)}</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-lbl">AOV</div>
-      <div class="kpi-val">${$(m.aov)}</div>
-      <div class="kpi-sub">Avg order value</div>
-    </div>
+      <div class="kpi-sub">${nn(m.clicks)} clicks</div></div>
+    <div class="kpi"><div class="kpi-lbl">ATC</div>
+      <div class="kpi-val">${nn(m.atc)}</div>
+      <div class="kpi-sub">Add to cart</div></div>
   `;
 }
 
-// ── Period Comparison ──
-function renderPeriodComparison(d) {
+// ── CHANNELS ──
+function renderChannels(d) {
+  const fb = d.fbTotals || {}; const gg = d.ggTotals || {};
+  const be = 1.63;
+  const mkCard = (name, icon, iconCls, m, chCls) => {
+    const cls = rc(m.roas, be);
+    return `<div class="ch-card">
+      <div class="ch-hd">
+        <div class="ch-name"><div class="ch-icon ${iconCls}">${icon}</div>${name}</div>
+        <div class="ch-roas ${cls}">${xv(m.roas)}</div>
+      </div>
+      <div class="ch-stats">
+        <div><div class="cs-lbl">Spend</div><div class="cs-val">${$v(m.spend)}</div></div>
+        <div><div class="cs-lbl">Revenue</div><div class="cs-val">${$v(m.revenue)}</div></div>
+        <div><div class="cs-lbl">Purchases</div><div class="cs-val">${nf(m.purchases)}</div></div>
+        <div><div class="cs-lbl">CPA</div><div class="cs-val">${$v(m.cpa)}</div></div>
+        <div><div class="cs-lbl">CPM</div><div class="cs-val">${$v(m.cpm)}</div></div>
+        <div><div class="cs-lbl">CTR</div><div class="cs-val">${pct(m.ctr)}</div></div>
+      </div>
+      ${beBar(m.roas, be)}
+    </div>`;
+  };
+  document.getElementById('channelGrid').innerHTML =
+    mkCard('Facebook Ads', '📘', 'ch-fb', fb) +
+    mkCard('Google Ads', '🟡', 'ch-gg', gg);
+}
+
+// ── PERIOD COMPARISON ──
+function renderPeriods(d) {
   const periods = [
-    { key:'l7', label:'Last 7 Days', data:d.l7 },
-    { key:'l3', label:'Last 3 Days', data:d.l3 }
+    {label:'Last 7 Days', data: d.blendedL7},
+    {label:'Last 3 Days', data: d.blendedL3}
   ];
+  const be = 1.63;
   document.getElementById('periodGrid').innerHTML = periods.map(p => {
-    const m = p.data;
-    const rc = roasClass(m.roas);
-    return `
-    <div class="period-card">
+    const m = p.data || {}; const cls = rc(m.roas, be);
+    return `<div class="period-card">
       <div class="period-card-hd">
         <div class="period-card-title">${p.label}</div>
-        <div class="period-roas-badge ${rc}">${x(m.roas)} ROAS</div>
+        <div class="period-roas-badge ${cls}">${xv(m.roas)} ROAS</div>
       </div>
       <div class="period-stats">
-        <div><div class="ps2-lbl">Spend</div><div class="ps2-val">${$(m.spend)}</div></div>
-        <div><div class="ps2-lbl">Revenue</div><div class="ps2-val">${$(m.revenue)}</div></div>
-        <div><div class="ps2-lbl">Purchases</div><div class="ps2-val">${n(m.purchases)}</div></div>
-        <div><div class="ps2-lbl">CPA</div><div class="ps2-val">${$(m.cpa)}</div></div>
-        <div><div class="ps2-lbl">CPM</div><div class="ps2-val">${$(m.cpm)}</div></div>
-        <div><div class="ps2-lbl">CTR</div><div class="ps2-val">${pct(m.ctr)}</div></div>
+        <div><div class="ps-lbl">Spend</div><div class="ps-val">${$v(m.spend)}</div></div>
+        <div><div class="ps-lbl">Revenue</div><div class="ps-val">${$v(m.revenue)}</div></div>
+        <div><div class="ps-lbl">Purchases</div><div class="ps-val">${nf(m.purchases)}</div></div>
+        <div><div class="ps-lbl">CPA</div><div class="ps-val">${$v(m.cpa)}</div></div>
+        <div><div class="ps-lbl">CPM</div><div class="ps-val">${$v(m.cpm)}</div></div>
+        <div><div class="ps-lbl">CTR</div><div class="ps-val">${pct(m.ctr)}</div></div>
       </div>
     </div>`;
   }).join('');
 }
 
-// ── Accounts ──
+// ── ACCOUNTS ──
 function renderAccounts(d) {
   const accts = d.byAccount || {};
-  const icons = { 'TXG07':'🔵', 'TXG14':'🟣', 'AMOR01':'🟠' };
-  const bgs   = { 'TXG07':'#eff6ff', 'TXG14':'#faf5ff', 'AMOR01':'#fff7ed' };
-  const known = ['TXG07','TXG14','AMOR01'];
-  const allKeys = [...known.filter(k => accts[k]), ...Object.keys(accts).filter(k => !known.includes(k))];
-
-  document.getElementById('acctGrid').innerHTML = allKeys.length ? allKeys.map(name => {
-    const m = accts[name];
-    const rc = roasClass(m.roas);
-    const be = 1.63;
-    const pct_be = Math.min(100, (m.roas / be * 100)).toFixed(0);
-    return `
-    <div class="acct-card">
-      <div class="acct-header">
-        <div class="acct-name">
-          <div class="acct-icon" style="background:${bgs[name]||'#f3f4f6'}">${icons[name]||'⚪'}</div>
-          ${name}
+  const icons = {'TXG 07':'🔵','TXG 14':'🟣','Amor 01':'🟠'};
+  const bgs   = {'TXG 07':'#eff6ff','TXG 14':'#faf5ff','Amor 01':'#fff7ed'};
+  const be = 1.63;
+  document.getElementById('acctGrid').innerHTML = Object.entries(accts)
+    .sort((a,b) => n(b[1].spend) - n(a[1].spend))
+    .map(([name, m]) => {
+      const cls = rc(m.roas, be);
+      const pctBe = Math.min(100, n(m.roas) / be * 100).toFixed(0);
+      return `<div class="acct-card">
+        <div class="acct-hd">
+          <div class="acct-nm">
+            <div class="acct-ic" style="background:${bgs[name]||'#f3f4f6'}">${icons[name]||'⚪'}</div>
+            ${name}
+          </div>
+          <div class="acct-roas ${cls}">${xv(m.roas)}</div>
         </div>
-        <div class="acct-roas ${rc}">${x(m.roas)}</div>
-      </div>
-      <div class="acct-stats">
-        <div><div class="acct-stat-lbl">Spend</div><div class="acct-stat-val">${$(m.spend)}</div></div>
-        <div><div class="acct-stat-lbl">Revenue</div><div class="acct-stat-val">${$(m.revenue)}</div></div>
-        <div><div class="acct-stat-lbl">Purchases</div><div class="acct-stat-val">${n(m.purchases)}</div></div>
-        <div><div class="acct-stat-lbl">CPA</div><div class="acct-stat-val">${$(m.cpa)}</div></div>
-        <div><div class="acct-stat-lbl">CPM</div><div class="acct-stat-val">${$(m.cpm)}</div></div>
-        <div><div class="acct-stat-lbl">CTR</div><div class="acct-stat-val">${pct(m.ctr)}</div></div>
-      </div>
-      <div class="be-bar">
-        <div class="be-bar-lbl"><span>ROAS vs BE ${be}x</span><span>${x(m.roas)} ${m.roas >= be ? '✅' : '⛔'} ${pct_be}%</span></div>
-        <div class="be-bar-track"><div class="be-bar-fill ${rc}" style="width:${pct_be}%"></div></div>
-      </div>
-    </div>`;
-  }).join('')
-  : '<div class="placeholder"><div class="placeholder-icon">📭</div><div class="placeholder-text">Chưa có data account. Kiểm tra cột "Account" trong FB_AD_DATA.</div></div>';
+        <div class="acct-stats">
+          <div><div class="cs-lbl">Spend</div><div class="cs-val">${$v(m.spend)}</div></div>
+          <div><div class="cs-lbl">Revenue</div><div class="cs-val">${$v(m.revenue)}</div></div>
+          <div><div class="cs-lbl">Purchases</div><div class="cs-val">${nn(m.purchases)}</div></div>
+          <div><div class="cs-lbl">CPA</div><div class="cs-val">${$v(m.cpa)}</div></div>
+          <div><div class="cs-lbl">CPM</div><div class="cs-val">${$v(m.cpm)}</div></div>
+          <div><div class="cs-lbl">CTR</div><div class="cs-val">${pct(m.ctr)}</div></div>
+        </div>
+        ${beBar(m.roas, be)}
+      </div>`;
+    }).join('');
 }
 
-// ── Product Types ──
-function renderProducts(d) {
-  const prods = d.byProduct || {};
-  const beMap = d.beRoasMap || {};
-  document.getElementById('prodGrid').innerHTML = Object.entries(prods).length ?
-    Object.entries(prods)
-      .sort((a,b) => num(b[1].spend) - num(a[1].spend))
-      .map(([type, m]) => {
-        const be = beMap[type] || 1.63;
-        const rc = roasClass(m.roas, be);
-        return `
-        <div class="prod-card">
-          <div class="prod-name">
-            <span>${type}</span>
-            <span class="prod-roas ${rc}">${x(m.roas)}</span>
-          </div>
-          <div class="prod-stats">
-            <div><div class="ps-lbl">Spend</div><div class="ps-val">${$(m.spend)}</div></div>
-            <div><div class="ps-lbl">Revenue</div><div class="ps-val">${$(m.revenue)}</div></div>
-            <div><div class="ps-lbl">Purchases</div><div class="ps-val">${n(m.purchases)}</div></div>
-            <div><div class="ps-lbl">CPA</div><div class="ps-val">${$(m.cpa)}</div></div>
-            <div><div class="ps-lbl">BE ROAS</div><div class="ps-val">${be}x</div></div>
-            <div><div class="ps-lbl">CTR</div><div class="ps-val">${pct(m.ctr)}</div></div>
-          </div>
-        </div>`;
-      }).join('')
-  : '<div class="placeholder"><div class="placeholder-icon">🔗</div><div class="placeholder-text">Cần match Creative URL Path ↔ SHOPIFY_PRODUCT để phân loại sản phẩm.</div></div>';
-}
-
-// ── Daily Trend Chart ──
-function renderDailyTrend(d) {
+// ── TREND CHART ──
+function renderTrendChart(d) {
   const trend = d.dailyTrend || [];
   if (!trend.length) return;
-  const labels  = trend.map(r => fmtDate(r.date));
-  const spends  = trend.map(r => num(r.spend));
-  const revs    = trend.map(r => num(r.revenue));
-  const roas    = trend.map(r => num(r.roas));
-
-  if (trendChartInst) trendChartInst.destroy();
-  trendChartInst = new Chart(document.getElementById('trendChart'), {
-    data: {
-      labels,
-      datasets: [
-        { type:'bar',  label:'Spend',   data:spends, backgroundColor:'rgba(233,30,140,.3)', borderColor:'#e91e8c', borderWidth:1.5, yAxisID:'y' },
-        { type:'bar',  label:'Revenue', data:revs,   backgroundColor:'rgba(22,163,74,.25)', borderColor:'#16a34a', borderWidth:1.5, yAxisID:'y' },
-        { type:'line', label:'ROAS',    data:roas,   borderColor:'#2563eb', backgroundColor:'transparent', pointRadius:3, tension:.3, yAxisID:'y2' }
-      ]
-    },
+  const labels = trend.map(r => fmtDate(r.date));
+  if (charts.trend) charts.trend.destroy();
+  charts.trend = new Chart(document.getElementById('trendChart'), {
+    data: { labels, datasets: [
+      {type:'bar',  label:'FB Spend',  data:trend.map(r=>n(r.fb_spend)),  backgroundColor:'rgba(233,30,140,.35)', borderColor:'#e91e8c', borderWidth:1.5, yAxisID:'y'},
+      {type:'bar',  label:'GG Spend',  data:trend.map(r=>n(r.gg_spend)),  backgroundColor:'rgba(249,115,22,.35)', borderColor:'#f97316', borderWidth:1.5, yAxisID:'y'},
+      {type:'bar',  label:'Revenue',   data:trend.map(r=>n(r.revenue)),   backgroundColor:'rgba(22,163,74,.2)',   borderColor:'#16a34a', borderWidth:1.5, yAxisID:'y'},
+      {type:'line', label:'ROAS',      data:trend.map(r=>n(r.roas)),      borderColor:'#2563eb', backgroundColor:'transparent', pointRadius:3, tension:.3, yAxisID:'y2'}
+    ]},
     options: {
       responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{display:false}, tooltip:{ callbacks:{
-        label: ctx => {
-          if (ctx.dataset.label==='ROAS') return ' ROAS: ' + ctx.raw.toFixed(2) + 'x';
-          return ' ' + ctx.dataset.label + ': $' + ctx.raw.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-        }
+      plugins:{legend:{display:false}, tooltip:{callbacks:{
+        label: ctx => ctx.dataset.label==='ROAS'
+          ? ` ROAS: ${ctx.raw.toFixed(2)}x`
+          : ` ${ctx.dataset.label}: $${n(ctx.raw).toFixed(2)}`
       }}},
       scales:{
-        y:{ position:'left', grid:{color:'#f3f4f6'}, ticks:{callback: v => '$'+v.toLocaleString()} },
-        y2:{ position:'right', grid:{drawOnChartArea:false}, min:0,
-             ticks:{callback: v => v.toFixed(1)+'x'},
-             afterDraw: chart => {
-               const ctx = chart.ctx;
-               const y2 = chart.scales.y2;
-               const be = 1.63;
-               const y = y2.getPixelForValue(be);
-               ctx.save(); ctx.strokeStyle='#dc2626'; ctx.lineWidth=1;
-               ctx.setLineDash([4,3]);
-               ctx.beginPath(); ctx.moveTo(chart.chartArea.left, y); ctx.lineTo(chart.chartArea.right, y); ctx.stroke();
-               ctx.fillStyle='#dc2626'; ctx.font='11px sans-serif';
-               ctx.fillText('BE ' + be + 'x', chart.chartArea.right + 4, y + 4);
-               ctx.restore();
-             }
-           },
-        x:{ grid:{display:false} }
+        y:{position:'left', stacked:false, grid:{color:'#f3f4f6'}, ticks:{callback:v=>'$'+v}},
+        y2:{position:'right', grid:{drawOnChartArea:false}, min:0,
+            ticks:{callback:v=>v.toFixed(1)+'x'},
+            afterDraw: chart => {
+              const y2 = chart.scales.y2; const ctx = chart.ctx;
+              const be = 1.63; const y = y2.getPixelForValue(be);
+              ctx.save(); ctx.strokeStyle='#dc2626'; ctx.lineWidth=1; ctx.setLineDash([4,3]);
+              ctx.beginPath(); ctx.moveTo(chart.chartArea.left,y); ctx.lineTo(chart.chartArea.right,y); ctx.stroke();
+              ctx.fillStyle='#dc2626'; ctx.font='10px sans-serif';
+              ctx.fillText('BE '+be+'x', chart.chartArea.right+4, y+4);
+              ctx.restore();
+            }},
+        x:{grid:{display:false}}
       }
     }
   });
 }
 
-// ── Daily Table ──
+// ── DAILY TABLE ──
 function renderDailyTable(d) {
-  const trend = [...(d.dailyTrend || [])].reverse(); // newest first
-  const beDefault = 1.63;
-  // Totals row
-  const t = d.totals;
+  const trend = [...(d.dailyTrend || [])].reverse();
+  const be = 1.63;
+  const tot = d.blended || {};
   document.getElementById('dailyTbody').innerHTML =
-    trend.map(r => {
-      const rc = roasClass(r.roas, beDefault);
-      return `<tr>
-        <td>${fmtDate(r.date)}</td>
-        <td>${$(r.spend)}</td>
-        <td>${$(r.revenue)}</td>
-        <td class="roas-cell ${rc}">${x(r.roas)}</td>
-        <td>${n(r.purchases)}</td>
-        <td>${$(r.cpa)}</td>
-        <td>${$(r.cpm)}</td>
-        <td>${pct(r.ctr)}</td>
-        <td>${n(r.atc)}</td>
-      </tr>`;
-    }).join('') +
+    trend.map(r => `<tr>
+      <td class="left">${fmtDate(r.date)}</td>
+      <td>${$v(r.spend)}</td>
+      <td style="color:var(--pink)">${$v(r.fb_spend)}</td>
+      <td style="color:var(--yellow)">${$v(r.gg_spend)}</td>
+      <td>${$v(r.revenue)}</td>
+      <td class="roas-cell ${rc(r.roas,be)}">${xv(r.roas)}</td>
+      <td>${nf(r.purchases)}</td>
+      <td>${nn(r.clicks)}</td>
+      <td>${$v(n(r.impressions)>0 ? n(r.spend)/n(r.impressions)*1000 : 0)}</td>
+    </tr>`).join('') +
     `<tr class="total-row">
-      <td>TOTAL</td>
-      <td>${$(t.spend)}</td>
-      <td>${$(t.revenue)}</td>
-      <td class="roas-cell ${roasClass(t.roas)}">${x(t.roas)}</td>
-      <td>${n(t.purchases)}</td>
-      <td>${$(t.cpa)}</td>
-      <td>${$(t.cpm)}</td>
-      <td>${pct(t.ctr)}</td>
-      <td>${n(t.atc)}</td>
+      <td class="left">TOTAL</td>
+      <td>${$v(tot.spend)}</td>
+      <td style="color:var(--pink)">${$v(tot.fb_spend)}</td>
+      <td style="color:var(--yellow)">${$v(tot.gg_spend)}</td>
+      <td>${$v(tot.revenue)}</td>
+      <td class="roas-cell ${rc(tot.roas,be)}">${xv(tot.roas)}</td>
+      <td>${nf(tot.purchases)}</td>
+      <td>${nn(tot.clicks)}</td>
+      <td>${$v(tot.cpm)}</td>
     </tr>`;
 }
 
-// ── Top Creatives ──
+// ── CREATIVES ──
 function renderCreatives(d) {
-  const creatives = d.topCreatives || [];
-  const beMap = d.beRoasMap || {};
-  document.getElementById('creativeTbody').innerHTML = creatives.map((c, i) => {
-    const be = beMap[c.prodType] || c.beRoas || 1.63;
-    const rc = roasClass(c.roas, be);
-    const name = c.urlPath
-      ? c.urlPath.split('/').pop().substring(0, 45)
-      : (c.adName || '').substring(0, 45);
-    const pbCls = prodBadgeClass(c.prodType);
+  const be = 1.63;
+  document.getElementById('creativeTbody').innerHTML = (d.topCreatives||[]).map((c,i) => {
+    const name = (c.fullUrl||c.ad||'').split('/').pop().substring(0,50) || c.prodTitle||'—';
     return `<tr>
-      <td style="color:var(--text3)">${i+1}</td>
-      <td title="${c.urlPath||c.adName||''}">${name || '—'}</td>
-      <td><span class="prod-badge ${pbCls}">${c.prodType||'—'}</span></td>
-      <td>${$(c.spend)}</td>
-      <td>${$(c.revenue)}</td>
-      <td class="roas-cell ${rc}">${x(c.roas)}</td>
-      <td>${n(c.purchases)}</td>
-      <td>${$(c.cpa)}</td>
+      <td class="left" style="color:var(--text3)">${i+1}</td>
+      <td class="left" title="${c.fullUrl||''}" style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</td>
+      <td class="left"><span class="prod-badge ${prodBadgeClass(c.prodType)}">${c.prodType||'—'}</span></td>
+      <td>${$v(c.spend)}</td>
+      <td>${$v(c.revenue)}</td>
+      <td class="roas-cell ${rc(c.roas,c.beRoas||be)}">${xv(c.roas)}</td>
+      <td>${nn(c.purchases)}</td>
+      <td>${$v(c.cpa)}</td>
       <td>${pct(c.ctr)}</td>
     </tr>`;
   }).join('');
 }
 
-// ── Shopify ──
+// ── PRODUCT TYPES ──
+function renderProductTypes(d) {
+  const pt = d.byProductType || {};
+  const be = 1.63;
+  const rows = Object.entries(pt)
+    .sort((a,b) => n(b[1].spend)-n(a[1].spend))
+    .map(([type, m]) => {
+      const b = m.beRoas || be;
+      const cls = rc(m.roas, b);
+      const diff = ((n(m.roas)-b)/b*100).toFixed(0);
+      const diffStr = n(m.roas)>=b ? `<span style="color:var(--green)">+${diff}%</span>` : `<span style="color:var(--red)">${diff}%</span>`;
+      return `<tr>
+        <td class="left"><span class="prod-badge ${prodBadgeClass(type)}">${type}</span></td>
+        <td>${$v(m.spend)}</td>
+        <td style="color:var(--pink)">${$v(m.fb_spend)}</td>
+        <td style="color:var(--yellow)">${$v(m.gg_spend)}</td>
+        <td>${$v(m.revenue)}</td>
+        <td class="roas-cell ${cls}">${xv(m.roas)}</td>
+        <td>${diffStr} <small style="color:var(--text3)">(BE ${b}x)</small></td>
+        <td>${nf(m.purchases)}</td>
+        <td>${$v(m.cpa)}</td>
+      </tr>`;
+    });
+
+  // Total row
+  const tot = d.blended || {};
+  document.getElementById('prodTypeTbody').innerHTML = rows.join('') +
+    `<tr class="total-row">
+      <td class="left">TOTAL</td>
+      <td>${$v(tot.spend)}</td>
+      <td style="color:var(--pink)">${$v(tot.fb_spend)}</td>
+      <td style="color:var(--yellow)">${$v(tot.gg_spend)}</td>
+      <td>${$v(tot.revenue)}</td>
+      <td class="roas-cell ${rc(tot.roas,be)}">${xv(tot.roas)}</td>
+      <td>—</td>
+      <td>${nf(tot.purchases)}</td>
+      <td>${$v(tot.cpa)}</td>
+    </tr>`;
+}
+
+// ── MARKETS ──
+function renderMarkets(d) {
+  const mkts = d.byMarket || {};
+  const be = 1.63;
+  const order = ['ES','IT','Unknown','Other'];
+  const flags = {ES:'🇪🇸',IT:'🇮🇹',Unknown:'❓',Other:'🌐'};
+  const allKeys = [...order.filter(k=>mkts[k]), ...Object.keys(mkts).filter(k=>!order.includes(k))];
+
+  document.getElementById('mktGrid').innerHTML = allKeys.map(mkt => {
+    const m = mkts[mkt];
+    const cls = rc(m.roas, be);
+    return `<div class="mkt-card">
+      <div class="mkt-hd">
+        <div class="mkt-nm">${flags[mkt]||'🌐'} ${mkt}</div>
+        <div class="mkt-roas ${cls}">${xv(m.roas)}</div>
+      </div>
+      <div class="mkt-stats">
+        <div><div class="cs-lbl">Total Spend</div><div class="cs-val">${$v(m.spend)}</div></div>
+        <div><div class="cs-lbl">Revenue</div><div class="cs-val">${$v(m.revenue)}</div></div>
+        <div><div class="cs-lbl">FB Spend</div><div class="cs-val" style="color:var(--pink)">${$v(m.fb_spend)}</div></div>
+        <div><div class="cs-lbl">GG Spend</div><div class="cs-val" style="color:var(--yellow)">${$v(m.gg_spend)}</div></div>
+        <div><div class="cs-lbl">Purchases</div><div class="cs-val">${nf(m.purchases)}</div></div>
+        <div><div class="cs-lbl">CPA</div><div class="cs-val">${$v(m.cpa)}</div></div>
+      </div>
+      ${beBar(m.roas, be)}
+    </div>`;
+  }).join('');
+}
+
+// ── TOP PRODUCTS ──
+function renderTopProducts(d) {
+  const be = 1.63;
+  document.getElementById('topProdTbody').innerHTML = (d.topProducts||[]).map((p,i) => {
+    const cls = rc(p.roas, p.beRoas||be);
+    return `<tr>
+      <td class="left" style="color:var(--text3)">${i+1}</td>
+      <td class="left" style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${p.title}">${p.title}</td>
+      <td class="left"><span class="prod-badge ${prodBadgeClass(p.type)}">${p.type||'—'}</span></td>
+      <td class="left">${mktBadge(p.markets)}</td>
+      <td>${$v(p.spend)}</td>
+      <td style="color:var(--pink)">${$v(p.fb_spend)}</td>
+      <td style="color:var(--yellow)">${$v(p.gg_spend)}</td>
+      <td>${$v(p.revenue)}</td>
+      <td class="roas-cell ${cls}">${p.roas > 0 ? xv(p.roas) : '—'}</td>
+      <td>${p.cpa > 0 ? $v(p.cpa) : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── SHOPIFY ──
 function renderShopify(d) {
-  const st = d.shopifyTotals || { unitsSold:0, revenue:0, orderLines:0, aov:0 };
+  const st = d.shopifyTotals || {};
+  const fbRev = n(d.blended && d.blended.revenue);
+  const shopRev = n(st.revenue);
+  const gap = shopRev - fbRev;
+
   document.getElementById('shopKpiGrid').innerHTML = `
-    <div class="kpi"><div class="kpi-lbl">Revenue (Shopify)</div>
-      <div class="kpi-val green">${$(st.revenue)}</div>
+    <div class="kpi"><div class="kpi-lbl">Shopify Revenue</div>
+      <div class="kpi-val g">${$v(st.revenue)}</div>
       <div class="kpi-sub">Toàn campaign</div></div>
     <div class="kpi"><div class="kpi-lbl">Units Sold</div>
-      <div class="kpi-val">${n(st.unitsSold)}</div></div>
-    <div class="kpi"><div class="kpi-lbl">Order Lines</div>
-      <div class="kpi-val">${n(st.orderLines)}</div></div>
+      <div class="kpi-val">${nn(st.unitsSold)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Orders</div>
+      <div class="kpi-val">${nn(st.orderLines)}</div></div>
     <div class="kpi"><div class="kpi-lbl">AOV</div>
-      <div class="kpi-val">${$(st.aov)}</div>
-      <div class="kpi-sub">Revenue / Orders</div></div>
+      <div class="kpi-val">${$v(st.aov)}</div>
+      <div class="kpi-sub">Avg order value</div></div>
+    <div class="kpi"><div class="kpi-lbl">Attributed (Ads)</div>
+      <div class="kpi-val">${$v(fbRev)}</div>
+      <div class="kpi-sub">FB+GG reported</div></div>
+    <div class="kpi"><div class="kpi-lbl">Organic / Direct</div>
+      <div class="kpi-val ${gap>0?'g':'r'}">${$v(Math.abs(gap))}</div>
+      <div class="kpi-sub">${gap>0?'Shopify > Ads attributed':'Ads > Shopify'}</div></div>
   `;
 
-  // Shopify chart
-  const shopDaily = d.shopifyDaily || [];
-  if (shopDaily.length) {
-    const labels = shopDaily.map(r => fmtDate(r.date));
-    const revs   = shopDaily.map(r => num(r.revenue));
-    const units  = shopDaily.map(r => num(r.unitsSold));
-    if (shopifyChartInst) shopifyChartInst.destroy();
-    shopifyChartInst = new Chart(document.getElementById('shopifyChart'), {
+  const daily = d.shopifyDaily || [];
+  if (daily.length) {
+    if (charts.shop) charts.shop.destroy();
+    charts.shop = new Chart(document.getElementById('shopChart'), {
       data: {
-        labels,
+        labels: daily.map(r => fmtDate(r.date)),
         datasets: [
-          { type:'bar',  label:'Revenue ($)', data:revs,  backgroundColor:'rgba(233,30,140,.3)', borderColor:'#e91e8c', borderWidth:1.5, yAxisID:'y' },
-          { type:'line', label:'Units Sold',  data:units, borderColor:'#2563eb', backgroundColor:'transparent', pointRadius:3, tension:.3, yAxisID:'y2' }
+          {type:'bar',  label:'Revenue', data:daily.map(r=>n(r.revenue)), backgroundColor:'rgba(233,30,140,.3)', borderColor:'#e91e8c', borderWidth:1.5, yAxisID:'y'},
+          {type:'line', label:'Units',   data:daily.map(r=>n(r.unitsSold)), borderColor:'#2563eb', backgroundColor:'transparent', pointRadius:3, tension:.3, yAxisID:'y2'}
         ]
       },
-      options: {
+      options:{
         responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:false} },
+        plugins:{legend:{display:false}},
         scales:{
-          y:{ position:'left', grid:{color:'#f3f4f6'}, ticks:{callback: v => '$'+v.toLocaleString()} },
-          y2:{ position:'right', grid:{drawOnChartArea:false}, ticks:{callback: v => v+' units'} },
-          x:{ grid:{display:false} }
+          y:{position:'left',grid:{color:'#f3f4f6'},ticks:{callback:v=>'$'+v}},
+          y2:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>v+' u'}},
+          x:{grid:{display:false}}
         }
       }
     });
   }
 
-  // Top products table
-  const tops = d.shopifyTopProducts || [];
-  document.getElementById('shopifyTopTbody').innerHTML = tops.map((p, i) => {
-    const rpu = p.unitsSold > 0 ? (num(p.revenue) / num(p.unitsSold)).toFixed(2) : 0;
-    return `<tr>
-      <td style="color:var(--text3)">${i+1}</td>
-      <td>${p.title}</td>
-      <td>${$(p.revenue)}</td>
-      <td>${n(p.unitsSold)}</td>
-      <td>${n(p.orderLines)}</td>
-      <td>${$(rpu)}</td>
+  document.getElementById('shopTopTbody').innerHTML = (d.shopifyTopProducts||[]).map((p,i) => {
+    const rpu = n(p.unitsSold) > 0 ? n(p.revenue)/n(p.unitsSold) : 0;
+    // Flag shipping protection / add-ons
+    const isAddon = p.title && (p.title.toLowerCase().includes('shipping') || p.title.toLowerCase().includes('backside') || p.title.toLowerCase().includes('protection'));
+    return `<tr ${isAddon?'style="opacity:.5"':''}>
+      <td class="left" style="color:var(--text3)">${i+1}</td>
+      <td class="left" style="max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${p.title}">${p.title}${isAddon?' <small>(add-on)</small>':''}</td>
+      <td>${$v(p.revenue)}</td>
+      <td>${nn(p.unitsSold)}</td>
+      <td>${nn(p.orderLines)}</td>
+      <td>${$v(rpu)}</td>
     </tr>`;
   }).join('');
 }
 
-// ── Init ──
+// ── INIT ──
 updateCountdown();
 setInterval(updateCountdown, 60000);
 fetchData();
