@@ -72,7 +72,7 @@ a{color:inherit;text-decoration:none}
 .section{margin-bottom:20px}
 
 /* ── CHART BOX ── */
-.cbox{background:#131626;border:1px solid #252840;border-radius:10px;padding:15px;margin-bottom:16px;position:relative}
+.cbox{background:#131626;border:1px solid #252840;border-radius:10px;padding:15px;margin-bottom:16px}
 .ctitle{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px}
 
 /* ── PLACEHOLDER ── */
@@ -147,8 +147,6 @@ tbody tr:hover{background:#181b2e}
 
 /* ── BE NOTE ── */
 .be{font-size:10px;color:#475569;margin-left:4px}
-
-/* ── ROAS colors (inline style helpers via JS) ── */
 </style>
 </head>
 <body>
@@ -222,7 +220,6 @@ tbody tr:hover{background:#181b2e}
   <div class="tab-panel active" id="tab-overview">
     <div id="ov-kpis" class="kpi-grid"></div>
 
-    <!-- Market comparison -->
     <div class="section">
       <div class="st">Hiệu quả theo Market — ES vs IT</div>
       <div id="ov-market-tbl" class="twrap"></div>
@@ -235,11 +232,10 @@ tbody tr:hover{background:#181b2e}
       </div>
       <div>
         <div class="st">Phân bổ chi phí (Revenue Allocation)</div>
-        <div class="cbox"><div class="ctitle">Cost & Profit Breakdown</div><canvas id="ch-ov-donut" height="220"></canvas></div>
+        <div class="cbox"><div class="ctitle">Cost &amp; Profit Breakdown</div><canvas id="ch-ov-donut" height="220"></canvas></div>
       </div>
     </div>
 
-    <!-- Gap Analysis -->
     <div class="section">
       <div class="st">Gap Analysis — Shopify vs Ads Attributed</div>
       <div id="ov-gap" class="cbox"></div>
@@ -307,16 +303,15 @@ tbody tr:hover{background:#181b2e}
         <div class="cbox"><div class="ctitle">Blended Spend — ES vs IT</div><canvas id="ch-cp-mkt-donut" height="200"></canvas></div>
       </div>
       <div>
-        <div class="st">FB Ads — Spend & ROAS Daily</div>
+        <div class="st">FB Ads — Spend &amp; ROAS Daily</div>
         <div class="cbox"><div class="ctitle">Facebook Only</div><canvas id="ch-cp-fb-daily" height="200"></canvas></div>
       </div>
       <div>
-        <div class="st">Google Ads — Spend & ROAS Daily</div>
+        <div class="st">Google Ads — Spend &amp; ROAS Daily</div>
         <div class="cbox"><div class="ctitle">Google Ads Only</div><canvas id="ch-cp-gg-daily" height="200"></canvas></div>
       </div>
     </div>
 
-    <!-- Product Type filter -->
     <div class="section">
       <div class="st">Phân tích theo Product Type — Click để lọc</div>
       <div class="type-pills" id="cp-type-pills"></div>
@@ -403,122 +398,138 @@ tbody tr:hover{background:#181b2e}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 // ═══════════════════════════════════════
+// UTILS (định nghĩa trước để tránh lỗi hoisting)
+// ═══════════════════════════════════════
+function r2(v) { return Math.round((parseFloat(v) || 0) * 100) / 100; }
+
+const nf = function(v, d) {
+  if (v == null || isNaN(v)) return '–';
+  var dec = (d !== undefined) ? d : (Math.abs(v) < 10 ? 1 : 0);
+  return Number(v).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+};
+const cur = function(v) { return '$' + nf(v, 2); };
+const pct = function(v) { return nf(v, 1) + '%'; };
+
+function roasStyle(r, be) {
+  var b = be || 1.63;
+  if (r >= b * 1.15) return 'color:#4ade80;font-weight:700';
+  if (r >= b)        return 'color:#fbbf24;font-weight:700';
+  return 'color:#f87171;font-weight:700';
+}
+function roasCls(r, be) {
+  var b = be || 1.63;
+  if (r >= b * 1.15) return 'green';
+  if (r >= b)        return '';
+  return 'red';
+}
+function kpi(lbl, val, sub, cls, na) {
+  return '<div class="kpi ' + (cls || '') + '">'
+    + (na ? '<span class="na-badge">⚠️ N/A</span>' : '')
+    + '<div class="lbl">' + lbl + '</div>'
+    + '<div class="val">' + val + '</div>'
+    + (sub ? '<div class="sub">' + sub + '</div>' : '')
+    + '</div>';
+}
+function mkTable(heads, rows, extraCls) {
+  return '<table class="' + (extraCls || '') + '">'
+    + '<thead><tr>' + heads.map(function(h) { return '<th>' + h + '</th>'; }).join('') + '</tr></thead>'
+    + '<tbody>' + rows.map(function(r) {
+        return '<tr>' + r.map(function(c) { return '<td>' + c + '</td>'; }).join('') + '</tr>';
+      }).join('') + '</tbody>'
+    + '</table>';
+}
+function mkCh(id, cfg) {
+  if (CH[id]) { CH[id].destroy(); delete CH[id]; }
+  var el = document.getElementById(id);
+  if (el) CH[id] = new Chart(el, cfg);
+}
+var GRID  = { color: '#1e2235' };
+var TICK_Y = { callback: function(v) { return '$' + nf(v); } };
+
+function fd(s)     { if (!s) return ''; var p = s.split('-'); return p[2] + '/' + p[1]; }
+function fdFull(s) { if (!s) return ''; var p = s.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+
+// ═══════════════════════════════════════
 // CONFIG & STATE
 // ═══════════════════════════════════════
-const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxwHVor4Wt61s2RnyXoRWAhuwbpHhA3Gl0NQmr4-ALrZ1cT29D0TLAM6WieTQCfTBY_/exec';
-function getGasUrl(){ return localStorage.getItem('gas_url') || DEFAULT_GAS_URL; }
+var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxwHVor4Wt61s2RnyXoRWAhuwbpHhA3Gl0NQmr4-ALrZ1cT29D0TLAM6WieTQCfTBY_/exec';
+function getGasUrl() { return localStorage.getItem('gas_url') || DEFAULT_GAS_URL; }
 
-Chart.defaults.color        = '#64748b';
-Chart.defaults.font.family  = "'Inter',-apple-system,sans-serif";
-Chart.defaults.font.size    = 11;
+Chart.defaults.color       = '#64748b';
+Chart.defaults.font.family = "'Inter',-apple-system,sans-serif";
+Chart.defaults.font.size   = 11;
 
-let DATA    = null;
-let MD_DATA = null;
-const CH    = {};  // chart instances
+var DATA    = null;
+var MD_DATA = null;
+var CH      = {};  // chart instances
 
 // ═══════════════════════════════════════
 // DATE UTILS
 // ═══════════════════════════════════════
-const today = () => new Date().toISOString().slice(0,10);
-function addDays(s,n){
-  const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);
-  return d.toISOString().slice(0,10);
+function today() { return new Date().toISOString().slice(0, 10); }
+function addDays(s, n) {
+  var d = new Date(s + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
 }
-function fd(s){if(!s)return'';const[,m,d]=s.split('-');return`${d}/${m}`;}
-function fdFull(s){if(!s)return'';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}
+function rangeFrom(r) {
+  var t = today();
+  if (r === 'today')     return { from: t, to: t };
+  if (r === 'yesterday') return { from: addDays(t, -1), to: addDays(t, -1) };
+  if (r === '3')         return { from: addDays(t, -2), to: t };
+  if (r === '7')         return { from: addDays(t, -6), to: t };
+  if (r === '14')        return { from: addDays(t, -13), to: t };
+  if (r === '30')        return { from: addDays(t, -29), to: t };
+  return { from: '2026-01-01', to: t };
+}
 
-function rangeFrom(r){
-  const t=today();
-  if(r==='today')     return{from:t,to:t};
-  if(r==='yesterday') return{from:addDays(t,-1),to:addDays(t,-1)};
-  if(r==='3')         return{from:addDays(t,-2),to:t};
-  if(r==='7')         return{from:addDays(t,-6),to:t};
-  if(r==='14')        return{from:addDays(t,-13),to:t};
-  if(r==='30')        return{from:addDays(t,-29),to:t};
-  return{from:'2026-01-01',to:t};
+// ═══════════════════════════════════════
+// OVERLAY
+// ═══════════════════════════════════════
+function ov(show, msg) {
+  document.getElementById('overlay').classList.toggle('hidden', !show);
+  if (msg) document.getElementById('ov-msg').textContent = msg;
 }
 
 // ═══════════════════════════════════════
 // FETCH
 // ═══════════════════════════════════════
-async function fetchGAS(from,to){
-  const r=await fetch(`${getGasUrl()}?from=${from}&to=${to}`);
-  if(!r.ok) throw new Error('HTTP '+r.status);
+async function fetchGAS(from, to) {
+  var r = await fetch(getGasUrl() + '?from=' + from + '&to=' + to);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
-async function loadAll(from,to){
-  ov(true,'Đang tải dữ liệu...');
-  try{
-    const mdFrom='2026-03-20', mdTo=today();
-    const sameAsMd=(from===mdFrom&&to===mdTo);
-    const[main,md]=await Promise.all([
-      fetchGAS(from,to),
-      sameAsMd?Promise.resolve(null):fetchGAS(mdFrom,mdTo)
+
+async function loadAll(from, to) {
+  ov(true, 'Đang tải dữ liệu...');
+  try {
+    var mdFrom = '2026-03-20';
+    var mdTo   = today();
+    var sameAsMd = (from === mdFrom && to === mdTo);
+    var results = await Promise.all([
+      fetchGAS(from, to),
+      sameAsMd ? Promise.resolve(null) : fetchGAS(mdFrom, mdTo)
     ]);
-    if(!main.ok) throw new Error(main.error||'GAS error');
-    DATA=main; MD_DATA=md||main;
+    var main = results[0];
+    var md   = results[1];
+    if (!main.ok) throw new Error(main.error || 'GAS trả về lỗi');
+    DATA    = main;
+    MD_DATA = md || main;
     renderAll();
-    document.getElementById('st-txt').textContent=
-      `${fdFull(main.fromDate)} → ${fdFull(main.toDate)}  ·  ${new Date(main.generatedAt).toLocaleTimeString('vi-VN')}`;
-  }catch(e){
-    document.getElementById('ov-msg').textContent='❌ '+e.message;return;
+    document.getElementById('st-txt').textContent =
+      fdFull(main.fromDate) + ' → ' + fdFull(main.toDate)
+      + '  ·  ' + new Date(main.generatedAt).toLocaleTimeString('vi-VN');
+  } catch(e) {
+    document.getElementById('ov-msg').textContent = '❌ ' + e.message;
+    return;
   }
   ov(false);
 }
 
 // ═══════════════════════════════════════
-// HELPERS
-// ═══════════════════════════════════════
-function ov(show,msg){
-  document.getElementById('overlay').classList.toggle('hidden',!show);
-  if(msg)document.getElementById('ov-msg').textContent=msg;
-}
-const nf=(v,d)=>{
-  if(v==null||isNaN(v))return'–';
-  const dec=d!==undefined?d:(Math.abs(v)<10?1:0);
-  return Number(v).toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec});
-};
-const cur=v=>'$'+nf(v,2);
-const pct=v=>nf(v,1)+'%';
-
-function roasStyle(r,be){
-  const b=be||1.63;
-  if(r>=b*1.15)return'color:#4ade80;font-weight:700';
-  if(r>=b)     return'color:#fbbf24;font-weight:700';
-  return'color:#f87171;font-weight:700';
-}
-function roasCls(r,be){
-  const b=be||1.63;
-  if(r>=b*1.15)return'green';
-  if(r>=b)     return'';
-  return'red';
-}
-function kpi(lbl,val,sub,cls,na){
-  return`<div class="kpi ${cls||''}">
-    ${na?`<span class="na-badge">⚠️ N/A</span>`:''}
-    <div class="lbl">${lbl}</div>
-    <div class="val">${val}</div>
-    ${sub?`<div class="sub">${sub}</div>`:''}
-  </div>`;
-}
-function mkTable(heads,rows,extraCls){
-  return`<table class="${extraCls||''}">
-    <thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody>
-  </table>`;
-}
-function mkCh(id,cfg){
-  if(CH[id]){CH[id].destroy();delete CH[id];}
-  const el=document.getElementById(id);
-  if(el)CH[id]=new Chart(el,cfg);
-}
-const GRID = { color:'#1e2235' };
-const TICK_Y = { callback:v=>'$'+nf(v) };
-
-// ═══════════════════════════════════════
 // RENDER ALL
 // ═══════════════════════════════════════
-function renderAll(){
+function renderAll() {
   renderOverview(DATA);
   renderStore(DATA);
   renderCampaign(DATA);
@@ -529,601 +540,764 @@ function renderAll(){
 // ═══════════════════════════════════════
 // TAB 1 — BUSINESS OVERVIEW
 // ═══════════════════════════════════════
-function renderOverview(d){
-  const b   = d.blended        || {};
-  const s   = d.shopifyTotals  || {};
-  const bc  = d.blendedByCountry || {};
-  const sm  = d.shopifyByMarket  || {};
+function renderOverview(d) {
+  var b  = d.blended          || {};
+  var s  = d.shopifyTotals    || {};
+  var bc = d.blendedByCountry || {};
+  var sm = d.shopifyByMarket  || {};
 
-  const totalSpend   = b.spend   || 0;
-  const shopifyRev   = s.revenue || 0;
-  const adsRev       = b.revenue || 0;
-  const fulfillment  = r2(shopifyRev * 0.29);
-  const profit       = r2(shopifyRev - totalSpend - fulfillment);
-  const trueROAS     = totalSpend > 0 ? r2(shopifyRev / totalSpend) : 0;
-  const gap          = r2(shopifyRev - adsRev);
+  var totalSpend  = b.spend    || 0;
+  var shopifyRev  = s.revenue  || 0;
+  var adsRev      = b.revenue  || 0;
+  var fulfillment = r2(shopifyRev * 0.29);
+  var profit      = r2(shopifyRev - totalSpend - fulfillment);
+  var trueROAS    = totalSpend > 0 ? r2(shopifyRev / totalSpend) : 0;
+  var gap         = r2(shopifyRev - adsRev);
 
   // KPIs
-  document.getElementById('ov-kpis').innerHTML=[
-    kpi('Total Ads Spend',      cur(totalSpend),  `FB ${cur(b.fb_spend||0)} + GG ${cur(b.gg_spend||0)}`),
-    kpi('Shopify Revenue',      cur(shopifyRev),  'Doanh thu sp (chưa incl. ship)','green'),
-    kpi('True ROAS',            nf(trueROAS,2)+'x','Shopify Rev ÷ Paid Spend',roasCls(trueROAS,1.65)),
-    kpi('Fulfillment (29%)',    cur(fulfillment),  'Revenue × 29%','warn'),
-    kpi('Estimated Profit',     cur(profit),       'Rev − Spend − Fulfillment',profit>=0?'green':'red'),
-    kpi('Tax','⚠️','Chưa có dữ liệu','warn',true),
-    kpi('APP API','⚠️','Chưa có dữ liệu','warn',true),
-    kpi('Orders','⚠️','Cần sheet SHOPIFY_ORDERS','warn',true),
-    kpi('Revenue (incl. ship)','⚠️','Cần sheet order mới','warn',true),
+  document.getElementById('ov-kpis').innerHTML = [
+    kpi('Total Ads Spend',      cur(totalSpend),  'FB ' + cur(b.fb_spend || 0) + ' + GG ' + cur(b.gg_spend || 0)),
+    kpi('Shopify Revenue',      cur(shopifyRev),  'Doanh thu sp (chưa incl. ship)', 'green'),
+    kpi('True ROAS',            nf(trueROAS, 2) + 'x', 'Shopify Rev ÷ Paid Spend', roasCls(trueROAS, 1.65)),
+    kpi('Fulfillment (29%)',    cur(fulfillment), 'Revenue × 29%', 'warn'),
+    kpi('Estimated Profit',     cur(profit),      'Rev − Spend − Fulfillment', profit >= 0 ? 'green' : 'red'),
+    kpi('Tax',                  '⚠️',             'Chưa có dữ liệu', 'warn', true),
+    kpi('APP API',              '⚠️',             'Chưa có dữ liệu', 'warn', true),
+    kpi('Orders',               '⚠️',             'Cần sheet SHOPIFY_ORDERS', 'warn', true),
+    kpi('Revenue (incl. ship)', '⚠️',             'Cần sheet order mới', 'warn', true),
     kpi('Shopify Items Sold',   nf(s.unitsSold),  ''),
-    kpi('AOV (sản phẩm)',       cur(s.aov),       'Rev ÷ Order lines','blue'),
-    kpi('Returning Customer','⚠️','Cần sheet SHOPIFY_ORDERS','warn',true),
+    kpi('AOV (sản phẩm)',       cur(s.aov),       'Rev ÷ Order lines', 'blue'),
+    kpi('Returning Customer',   '⚠️',             'Cần sheet SHOPIFY_ORDERS', 'warn', true),
   ].join('');
 
   // Market comparison table
-  const allMkts = [...new Set([...Object.keys(bc),...Object.keys(sm)])].filter(m=>m!=='Unknown');
-  const mktRows = allMkts.map(mkt=>{
-    const spendM  = bc[mkt] ? (bc[mkt].spend||0) : 0;
-    const revM    = sm[mkt] ? (sm[mkt].revenue||0) : 0;
-    const trueR   = spendM > 0 ? r2(revM/spendM) : 0;
-    const adsRevM = bc[mkt] ? (bc[mkt].revenue||0) : 0;
-    return[
-      `<span class="badge b-${mkt.toLowerCase()}">${mkt}</span>`,
-      `<span class="num">${cur(spendM)}</span>`,
-      `<span class="num">${cur(revM)}</span>`,
-      `<span class="num" style="${roasStyle(trueR,1.65)}">${nf(trueR,2)}x</span>`,
-      `<span class="num" style="color:#475569">${cur(adsRevM)}</span>`,
-      `<span class="num" style="color:#475569">${nf(bc[mkt]?bc[mkt].purchases||0:0,1)}</span>`
+  var allMkts = [];
+  var mktSet  = {};
+  Object.keys(bc).concat(Object.keys(sm)).forEach(function(m) {
+    if (m !== 'Unknown' && !mktSet[m]) { mktSet[m] = 1; allMkts.push(m); }
+  });
+  var mktRows = allMkts.map(function(mkt) {
+    var spendM  = bc[mkt] ? (bc[mkt].spend   || 0) : 0;
+    var revM    = sm[mkt] ? (sm[mkt].revenue  || 0) : 0;
+    var trueR   = spendM > 0 ? r2(revM / spendM) : 0;
+    var adsRevM = bc[mkt] ? (bc[mkt].revenue  || 0) : 0;
+    var purch   = bc[mkt] ? (bc[mkt].purchases || 0) : 0;
+    return [
+      '<span class="badge b-' + mkt.toLowerCase() + '">' + mkt + '</span>',
+      '<span class="num">' + cur(spendM)  + '</span>',
+      '<span class="num">' + cur(revM)    + '</span>',
+      '<span class="num" style="' + roasStyle(trueR, 1.65) + '">' + nf(trueR, 2) + 'x</span>',
+      '<span class="num" style="color:#475569">' + cur(adsRevM) + '</span>',
+      '<span class="num" style="color:#475569">' + nf(purch, 1) + '</span>'
     ];
   });
-  document.getElementById('ov-market-tbl').innerHTML=mkTable(
-    ['Market','Paid Spend','Shopify Revenue (thực)','True ROAS','Ads Attributed Rev','Purchases'],mktRows
+  document.getElementById('ov-market-tbl').innerHTML = mkTable(
+    ['Market', 'Paid Spend', 'Shopify Revenue (thực)', 'True ROAS', 'Ads Attributed Rev', 'Purchases'],
+    mktRows
   );
 
   // Daily trend chart
-  const daily = d.dailyTrend || [];
-  const sd    = d.shopifyDaily || [];
-  const sMap  = {}; sd.forEach(r=>sMap[r.date]=r.revenue);
-  mkCh('ch-ov-daily',{
-    type:'line',
-    data:{
-      labels:daily.map(r=>fd(r.date)),
-      datasets:[
-        {label:'Shopify Revenue',data:daily.map(r=>sMap[r.date]||0),yAxisID:'yR',
-         borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.08)',fill:true,pointRadius:2,tension:.3},
-        {label:'Paid Spend',data:daily.map(r=>r.spend),yAxisID:'yR',
-         borderColor:'#f87171',pointRadius:2,tension:.3},
-        {label:'Est. Profit',data:daily.map(r=>{
-          const rev=sMap[r.date]||0;return r2(rev-r.spend-rev*.29);
-        }),yAxisID:'yR',borderColor:'#a78bfa',borderDash:[4,3],pointRadius:2,tension:.3}
+  var daily = d.dailyTrend  || [];
+  var sd    = d.shopifyDaily || [];
+  var sMap  = {};
+  sd.forEach(function(row) { sMap[row.date] = row.revenue; });
+
+  mkCh('ch-ov-daily', {
+    type: 'line',
+    data: {
+      labels: daily.map(function(r) { return fd(r.date); }),
+      datasets: [
+        {
+          label: 'Shopify Revenue',
+          data: daily.map(function(r) { return sMap[r.date] || 0; }),
+          yAxisID: 'yR', borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.08)',
+          fill: true, pointRadius: 2, tension: .3
+        },
+        {
+          label: 'Paid Spend',
+          data: daily.map(function(r) { return r.spend; }),
+          yAxisID: 'yR', borderColor: '#f87171', pointRadius: 2, tension: .3
+        },
+        {
+          label: 'Est. Profit',
+          data: daily.map(function(r) {
+            var rev = sMap[r.date] || 0;
+            return r2(rev - r.spend - rev * 0.29);
+          }),
+          yAxisID: 'yR', borderColor: '#a78bfa', borderDash: [4, 3], pointRadius: 2, tension: .3
+        }
       ]
     },
-    options:{responsive:true,maintainAspectRatio:false,
-      interaction:{mode:'index',intersect:false},
-      plugins:{legend:{position:'top'}},
-      scales:{yR:{grid:GRID,ticks:TICK_Y}}}
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' } },
+      scales: { yR: { grid: GRID, ticks: TICK_Y } }
+    }
   });
 
   // Cost allocation donut
-  const donutData=[
-    {label:'Paid Ads',val:totalSpend,color:'#6366f1'},
-    {label:'Fulfillment',val:fulfillment,color:'#f59e0b'},
-    {label:'Profit',val:Math.max(0,profit),color:'#22c55e'},
+  var donutData = [
+    { label: 'Paid Ads',    val: totalSpend,         color: '#6366f1' },
+    { label: 'Fulfillment', val: fulfillment,         color: '#f59e0b' },
+    { label: 'Profit',      val: Math.max(0, profit), color: '#22c55e' }
   ];
-  mkCh('ch-ov-donut',{
-    type:'doughnut',
-    data:{
-      labels:donutData.map(x=>x.label),
-      datasets:[{data:donutData.map(x=>x.val),backgroundColor:donutData.map(x=>x.color),borderWidth:0}]
+  mkCh('ch-ov-donut', {
+    type: 'doughnut',
+    data: {
+      labels: donutData.map(function(x) { return x.label; }),
+      datasets: [{
+        data: donutData.map(function(x) { return x.val; }),
+        backgroundColor: donutData.map(function(x) { return x.color; }),
+        borderWidth: 0
+      }]
     },
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'right'},
-        tooltip:{callbacks:{label:ctx=>` ${cur(ctx.raw)}`}}}}
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right' },
+        tooltip: { callbacks: { label: function(ctx) { return ' ' + cur(ctx.raw); } } }
+      }
+    }
   });
 
-  // Gap analysis box
-  const gapColor = gap>=0?'#4ade80':'#f87171';
-  const gapLabel = gap>=0?'Organic / Unattributed':'Double-count (Ads > Shopify)';
-  document.getElementById('ov-gap').innerHTML=`
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;text-align:center;padding:8px 0 16px">
-      <div><div style="font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Shopify Revenue (thực)</div>
-           <div style="font-size:24px;font-weight:800;color:#4ade80">${cur(shopifyRev)}</div></div>
-      <div><div style="font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Ads Attributed (FB+GG)</div>
-           <div style="font-size:24px;font-weight:800;color:#a78bfa">${cur(adsRev)}</div></div>
-      <div><div style="font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Gap</div>
-           <div style="font-size:24px;font-weight:800;color:${gapColor}">${gap>=0?'+':''}${cur(gap)}</div>
-           <div style="font-size:10px;color:${gapColor};margin-top:2px">${gapLabel}</div></div>
-    </div>
-    <div style="border-top:1px solid #252840;padding-top:10px;font-size:11px;color:#475569">
-      ${gap>=0
-        ?`ℹ️ Shopify nhận thêm <strong style="color:#fbbf24">${cur(gap)}</strong> so với Ads claim → mix của organic/direct/email/SEO.`
-        ?`⚠️ Ads claim nhiều hơn Shopify <strong style="color:#f87171">${cur(Math.abs(gap))}</strong> → double-attribution (1 đơn FB+GG cùng claim) hoặc view-through conversion của GG.`
-        :''}
-    </div>`;
+  // Gap analysis box — FIX: dùng if/else thay vì ternary lồng nhau
+  var gapColor, gapLabel, gapNote;
+  if (gap >= 0) {
+    gapColor = '#4ade80';
+    gapLabel = 'Organic / Unattributed';
+    gapNote  = 'ℹ️ Shopify nhận thêm <strong style="color:#fbbf24">' + cur(gap) + '</strong> so với Ads claim → mix của organic / direct / email / SEO.';
+  } else {
+    gapColor = '#f87171';
+    gapLabel = 'Double-count (Ads > Shopify)';
+    gapNote  = '⚠️ Ads claim nhiều hơn Shopify <strong style="color:#f87171">' + cur(Math.abs(gap)) + '</strong> → double-attribution (1 đơn FB+GG cùng claim) hoặc view-through conversion của GG.';
+  }
+
+  document.getElementById('ov-gap').innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;text-align:center;padding:8px 0 16px">'
+    + '<div><div style="font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Shopify Revenue (thực)</div>'
+    + '<div style="font-size:24px;font-weight:800;color:#4ade80">' + cur(shopifyRev) + '</div></div>'
+    + '<div><div style="font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Ads Attributed (FB+GG)</div>'
+    + '<div style="font-size:24px;font-weight:800;color:#a78bfa">' + cur(adsRev) + '</div></div>'
+    + '<div><div style="font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Gap</div>'
+    + '<div style="font-size:24px;font-weight:800;color:' + gapColor + '">' + (gap >= 0 ? '+' : '') + cur(gap) + '</div>'
+    + '<div style="font-size:10px;color:' + gapColor + ';margin-top:2px">' + gapLabel + '</div></div>'
+    + '</div>'
+    + '<div style="border-top:1px solid #252840;padding-top:10px;font-size:11px;color:#475569">' + gapNote + '</div>';
 }
 
 // ═══════════════════════════════════════
 // TAB 2 — STORE
 // ═══════════════════════════════════════
-function renderStore(d){
-  const t = d.shopifyTotals || {};
-  const sm= d.shopifyByMarket || {};
-  const st= d.shopifyByType   || {};
+function renderStore(d) {
+  var t  = d.shopifyTotals   || {};
+  var sm = d.shopifyByMarket || {};
+  var st = d.shopifyByType   || {};
 
-  document.getElementById('st-kpis').innerHTML=[
-    kpi('Revenue (sản phẩm)',cur(t.revenue),'Chưa bao gồm phí ship','green'),
-    kpi('Items Sold',nf(t.unitsSold),'Sản phẩm bán ra'),
-    kpi('Order Lines',nf(t.orderLines),'Số order lines (items, không phải đơn)'),
-    kpi('AOV',cur(t.aov),'Revenue ÷ Order Lines','blue'),
-    kpi('Orders (đơn thực)','⚠️','Cần sheet SHOPIFY_ORDERS','warn',true),
-    kpi('Revenue (incl. ship)','⚠️','Cần sheet SHOPIFY_ORDERS','warn',true),
+  document.getElementById('st-kpis').innerHTML = [
+    kpi('Revenue (sản phẩm)',    cur(t.revenue),    'Chưa bao gồm phí ship', 'green'),
+    kpi('Items Sold',            nf(t.unitsSold),   'Sản phẩm bán ra'),
+    kpi('Order Lines',           nf(t.orderLines),  'Số order lines (items, không phải đơn)'),
+    kpi('AOV',                   cur(t.aov),        'Revenue ÷ Order Lines', 'blue'),
+    kpi('Orders (đơn thực)',     '⚠️',              'Cần sheet SHOPIFY_ORDERS', 'warn', true),
+    kpi('Revenue (incl. ship)',  '⚠️',              'Cần sheet SHOPIFY_ORDERS', 'warn', true),
   ].join('');
 
   // Daily revenue
-  const daily=d.shopifyDaily||[];
-  mkCh('ch-st-daily',{
-    type:'bar',
-    data:{labels:daily.map(r=>fd(r.date)),
-          datasets:[{label:'Revenue ($)',data:daily.map(r=>r.revenue),
-                     backgroundColor:'rgba(34,197,94,.7)',borderRadius:4}]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false}},
-      scales:{y:{grid:GRID,ticks:TICK_Y},x:{grid:{display:false}}}}
+  var daily = d.shopifyDaily || [];
+  mkCh('ch-st-daily', {
+    type: 'bar',
+    data: {
+      labels: daily.map(function(r) { return fd(r.date); }),
+      datasets: [{
+        label: 'Revenue ($)',
+        data: daily.map(function(r) { return r.revenue; }),
+        backgroundColor: 'rgba(34,197,94,.7)', borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { grid: GRID, ticks: TICK_Y }, x: { grid: { display: false } } }
+    }
   });
 
   // Market donut
-  const mktKeys=Object.keys(sm).filter(k=>k!=='Unknown');
-  mkCh('ch-st-market',{
-    type:'doughnut',
-    data:{labels:mktKeys,
-          datasets:[{data:mktKeys.map(k=>sm[k].revenue||0),
-                     backgroundColor:['#f87171','#4ade80'],borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'right'},
-        tooltip:{callbacks:{label:ctx=>` ${cur(ctx.raw)}`}}}}
+  var mktKeys = Object.keys(sm).filter(function(k) { return k !== 'Unknown'; });
+  mkCh('ch-st-market', {
+    type: 'doughnut',
+    data: {
+      labels: mktKeys,
+      datasets: [{
+        data: mktKeys.map(function(k) { return sm[k].revenue || 0; }),
+        backgroundColor: ['#f87171', '#4ade80'], borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right' },
+        tooltip: { callbacks: { label: function(ctx) { return ' ' + cur(ctx.raw); } } }
+      }
+    }
   });
 
   // Type bar
-  const typeKeys=Object.keys(st).filter(k=>k!=='Unknown').sort((a,b)=>(st[b].revenue||0)-(st[a].revenue||0));
-  mkCh('ch-st-type',{
-    type:'bar',
-    data:{labels:typeKeys,
-          datasets:[{label:'Revenue ($)',data:typeKeys.map(k=>st[k].revenue||0),
-                     backgroundColor:'#a78bfa',borderRadius:4}]},
-    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
-      plugins:{legend:{display:false}},
-      scales:{x:{grid:GRID,ticks:TICK_Y},y:{grid:{display:false}}}}
+  var typeKeys = Object.keys(st).filter(function(k) { return k !== 'Unknown'; })
+    .sort(function(a, b) { return (st[b].revenue || 0) - (st[a].revenue || 0); });
+  mkCh('ch-st-type', {
+    type: 'bar',
+    data: {
+      labels: typeKeys,
+      datasets: [{
+        label: 'Revenue ($)',
+        data: typeKeys.map(function(k) { return st[k].revenue || 0; }),
+        backgroundColor: '#a78bfa', borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: { x: { grid: GRID, ticks: TICK_Y }, y: { grid: { display: false } } }
+    }
   });
 
-  // Top products table (with clickable links)
-  const prods=d.shopifyTopProducts||[];
-  const rows=prods.slice(0,25).map((p,i)=>[
-    `<span style="color:#475569">${i+1}</span>`,
-    p.fullUrl
-      ?`<a href="${p.fullUrl}" target="_blank" style="color:#a78bfa;text-decoration:underline;font-size:11px" title="${p.fullUrl}">${(p.title||p.productId||'').slice(0,45)}</a>`
-      :`<span style="font-size:11px">${(p.title||p.productId||'').slice(0,45)}</span>`,
-    `<span style="font-size:10px;color:#a78bfa">${p.type||'–'}</span>`,
-    (p.markets||[]).map(m=>`<span class="badge b-${m.toLowerCase()}">${m}</span>`).join(' ')||'–',
-    `<span class="num">${cur(p.revenue)}</span>`,
-    `<span class="num">${nf(p.unitsSold)}</span>`,
-    `<span class="num">${nf(p.orderLines)}</span>`
-  ]);
-  document.getElementById('st-products').innerHTML=mkTable(
-    ['#','Product','Type','Market','Revenue','Units','Orders'],rows
+  // Top products table
+  var prods = d.shopifyTopProducts || [];
+  var rows = prods.slice(0, 25).map(function(p, i) {
+    var title = (p.title || p.productId || '').slice(0, 45);
+    var nameCell = p.fullUrl
+      ? '<a href="' + p.fullUrl + '" target="_blank" style="color:#a78bfa;text-decoration:underline;font-size:11px">' + title + '</a>'
+      : '<span style="font-size:11px">' + title + '</span>';
+    var markets = (p.markets || []).map(function(m) {
+      return '<span class="badge b-' + m.toLowerCase() + '">' + m + '</span>';
+    }).join(' ') || '–';
+    return [
+      '<span style="color:#475569">' + (i + 1) + '</span>',
+      nameCell,
+      '<span style="font-size:10px;color:#a78bfa">' + (p.type || '–') + '</span>',
+      markets,
+      '<span class="num">' + cur(p.revenue)   + '</span>',
+      '<span class="num">' + nf(p.unitsSold)  + '</span>',
+      '<span class="num">' + nf(p.orderLines) + '</span>'
+    ];
+  });
+  document.getElementById('st-products').innerHTML = mkTable(
+    ['#', 'Product', 'Type', 'Market', 'Revenue', 'Units', 'Orders'], rows
   );
 }
 
 // ═══════════════════════════════════════
 // TAB 3 — CAMPAIGN PERFORMANCE
 // ═══════════════════════════════════════
-function renderCampaign(d){
-  const b  = d.blended || {};
-  const fb = d.fbTotals|| {};
-  const gg = d.ggTotals|| {};
+function renderCampaign(d) {
+  var b  = d.blended  || {};
+  var fb = d.fbTotals || {};
+  var gg = d.ggTotals || {};
 
-  document.getElementById('cp-kpis').innerHTML=[
-    kpi('Blended Spend',    cur(b.spend),       `FB ${cur(b.fb_spend||0)} · GG ${cur(b.gg_spend||0)}`),
-    kpi('Blended Revenue',  cur(b.revenue),     `FB ${cur(b.fb_revenue||0)} · GG ${cur(b.gg_revenue||0)}`),
-    kpi('Blended ROAS',     nf(b.roas,2)+'x',  'Platform-attributed',roasCls(b.roas,1.65)),
-    kpi('Blended CPA',      cur(b.cpa),         `${nf(b.purchases,1)} purchases`),
-    kpi('FB Impressions',   nf(fb.impressions), `CTR ${pct(fb.ctr||0)}`),
-    kpi('FB Clicks',        nf(fb.clicks),      `CPM ${cur(fb.cpm||0)}`),
+  document.getElementById('cp-kpis').innerHTML = [
+    kpi('Blended Spend',    cur(b.spend),       'FB ' + cur(b.fb_spend || 0) + ' · GG ' + cur(b.gg_spend || 0)),
+    kpi('Blended Revenue',  cur(b.revenue),     'FB ' + cur(b.fb_revenue || 0) + ' · GG ' + cur(b.gg_revenue || 0)),
+    kpi('Blended ROAS',     nf(b.roas, 2) + 'x', 'Platform-attributed', roasCls(b.roas, 1.65)),
+    kpi('Blended CPA',      cur(b.cpa),         nf(b.purchases, 1) + ' purchases'),
+    kpi('FB Impressions',   nf(fb.impressions), 'CTR ' + pct(fb.ctr || 0)),
+    kpi('FB Clicks',        nf(fb.clicks),      'CPM ' + cur(fb.cpm || 0)),
     kpi('Add-to-Cart (FB)', nf(b.atc),          ''),
-    d.hasGGData?kpi('GG Purchases',nf(gg.purchases,1),'Modeled attribution','blue'):'',
+    d.hasGGData ? kpi('GG Purchases', nf(gg.purchases, 1), 'Modeled attribution', 'blue') : '',
   ].join('');
 
   // Spend by market donut
-  const bc=d.blendedByCountry||{};
-  const bcKeys=Object.keys(bc).filter(k=>k!=='Unknown');
-  mkCh('ch-cp-mkt-donut',{
-    type:'doughnut',
-    data:{labels:bcKeys,
-          datasets:[{data:bcKeys.map(k=>bc[k].spend||0),
-                     backgroundColor:['#f87171','#4ade80','#60a5fa'],borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'right'},
-        tooltip:{callbacks:{label:ctx=>` ${cur(ctx.raw)} spend`}}}}
+  var bc     = d.blendedByCountry || {};
+  var bcKeys = Object.keys(bc).filter(function(k) { return k !== 'Unknown'; });
+  mkCh('ch-cp-mkt-donut', {
+    type: 'doughnut',
+    data: {
+      labels: bcKeys,
+      datasets: [{
+        data: bcKeys.map(function(k) { return bc[k].spend || 0; }),
+        backgroundColor: ['#f87171', '#4ade80', '#60a5fa'], borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right' },
+        tooltip: { callbacks: { label: function(ctx) { return ' ' + cur(ctx.raw) + ' spend'; } } }
+      }
+    }
   });
 
   // FB daily chart
-  const trend=d.dailyTrend||[];
-  mkCh('ch-cp-fb-daily',{
-    type:'line',
-    data:{labels:trend.map(r=>fd(r.date)),
-          datasets:[
-            {label:'FB ROAS',data:trend.map(r=>r.fb_spend>0?r2(r.fb_revenue/r.fb_spend):0),
-             yAxisID:'yR',borderColor:'#a78bfa',pointRadius:2,tension:.3},
-            {label:'FB Spend',data:trend.map(r=>r.fb_spend||0),
-             yAxisID:'yS',borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,.08)',
-             fill:true,pointRadius:2,tension:.3}
-          ]},
-    options:{responsive:true,maintainAspectRatio:false,
-      interaction:{mode:'index',intersect:false},
-      plugins:{legend:{position:'top'}},
-      scales:{
-        yR:{position:'right',grid:GRID,min:0,title:{display:true,text:'ROAS'}},
-        yS:{position:'left', grid:GRID,ticks:TICK_Y,title:{display:true,text:'Spend'}}
-      }}
+  var trend = d.dailyTrend || [];
+  mkCh('ch-cp-fb-daily', {
+    type: 'line',
+    data: {
+      labels: trend.map(function(r) { return fd(r.date); }),
+      datasets: [
+        {
+          label: 'FB ROAS',
+          data: trend.map(function(r) { return r.fb_spend > 0 ? r2(r.fb_revenue / r.fb_spend) : 0; }),
+          yAxisID: 'yR', borderColor: '#a78bfa', pointRadius: 2, tension: .3
+        },
+        {
+          label: 'FB Spend',
+          data: trend.map(function(r) { return r.fb_spend || 0; }),
+          yAxisID: 'yS', borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,.08)',
+          fill: true, pointRadius: 2, tension: .3
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        yR: { position: 'right', grid: GRID, min: 0, title: { display: true, text: 'ROAS' } },
+        yS: { position: 'left',  grid: GRID, ticks: TICK_Y, title: { display: true, text: 'Spend' } }
+      }
+    }
   });
 
   // GG daily chart
-  mkCh('ch-cp-gg-daily',{
-    type:'line',
-    data:{labels:trend.map(r=>fd(r.date)),
-          datasets:[
-            {label:'GG ROAS',data:trend.map(r=>r.gg_spend>0?r2(r.gg_revenue/r.gg_spend):0),
-             yAxisID:'yR',borderColor:'#4ade80',pointRadius:2,tension:.3},
-            {label:'GG Spend',data:trend.map(r=>r.gg_spend||0),
-             yAxisID:'yS',borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.08)',
-             fill:true,pointRadius:2,tension:.3}
-          ]},
-    options:{responsive:true,maintainAspectRatio:false,
-      interaction:{mode:'index',intersect:false},
-      plugins:{legend:{position:'top'}},
-      scales:{
-        yR:{position:'right',grid:GRID,min:0,title:{display:true,text:'ROAS'}},
-        yS:{position:'left', grid:GRID,ticks:TICK_Y,title:{display:true,text:'Spend'}}
-      }}
+  mkCh('ch-cp-gg-daily', {
+    type: 'line',
+    data: {
+      labels: trend.map(function(r) { return fd(r.date); }),
+      datasets: [
+        {
+          label: 'GG ROAS',
+          data: trend.map(function(r) { return r.gg_spend > 0 ? r2(r.gg_revenue / r.gg_spend) : 0; }),
+          yAxisID: 'yR', borderColor: '#4ade80', pointRadius: 2, tension: .3
+        },
+        {
+          label: 'GG Spend',
+          data: trend.map(function(r) { return r.gg_spend || 0; }),
+          yAxisID: 'yS', borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.08)',
+          fill: true, pointRadius: 2, tension: .3
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        yR: { position: 'right', grid: GRID, min: 0, title: { display: true, text: 'ROAS' } },
+        yS: { position: 'left',  grid: GRID, ticks: TICK_Y, title: { display: true, text: 'Spend' } }
+      }
+    }
   });
 
   // Product type pills + table
-  const types=d.byProductType||{};
-  const typeList=Object.entries(types).sort((a,b)=>b[1].spend-a[1].spend);
-  const pillsEl=document.getElementById('cp-type-pills');
-  pillsEl.innerHTML=typeList.map(([t])=>
-    `<button class="type-pill" data-type="${t}">${t}</button>`
-  ).join('');
-  pillsEl.querySelectorAll('.type-pill').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      pillsEl.querySelectorAll('.type-pill').forEach(b=>b.classList.remove('active'));
+  var types    = d.byProductType || {};
+  var typeList = Object.entries(types).sort(function(a, b) { return b[1].spend - a[1].spend; });
+  var pillsEl  = document.getElementById('cp-type-pills');
+  pillsEl.innerHTML = typeList.map(function(item) {
+    return '<button class="type-pill" data-type="' + item[0] + '">' + item[0] + '</button>';
+  }).join('');
+  pillsEl.querySelectorAll('.type-pill').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      pillsEl.querySelectorAll('.type-pill').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.toggle('active');
-      const active=pillsEl.querySelector('.type-pill.active');
-      if(active) showTypeDetail(active.dataset.type, d);
-      else document.getElementById('cp-type-chart-box').style.display='none';
+      var active = pillsEl.querySelector('.type-pill.active');
+      if (active) showTypeDetail(active.dataset.type, d);
+      else document.getElementById('cp-type-chart-box').style.display = 'none';
     });
   });
 
-  const typeRows=typeList.map(([type,m])=>{
-    const be=m.beRoas||1.63;
-    return[
-      `<strong>${type}</strong><span class="be">BE ${nf(be,2)}x</span>`,
-      `<span class="num">${cur(m.spend)}</span>`,
-      `<span class="num">${cur(m.revenue)}</span>`,
-      `<span class="num" style="${roasStyle(m.roas,be)}">${nf(m.roas,2)}x</span>`,
-      `<span class="num">${cur(m.cpa)}</span>`,
-      `<span class="num">${nf(m.purchases,1)}</span>`,
-      `<span style="font-size:10px"><span style="color:#60a5fa">FB ${cur(m.fb_spend||0)}</span> / <span style="color:#4ade80">GG ${cur(m.gg_spend||0)}</span></span>`
+  var typeRows = typeList.map(function(item) {
+    var type = item[0], m = item[1];
+    var be = m.beRoas || 1.63;
+    return [
+      '<strong>' + type + '</strong><span class="be">BE ' + nf(be, 2) + 'x</span>',
+      '<span class="num">' + cur(m.spend)   + '</span>',
+      '<span class="num">' + cur(m.revenue) + '</span>',
+      '<span class="num" style="' + roasStyle(m.roas, be) + '">' + nf(m.roas, 2) + 'x</span>',
+      '<span class="num">' + cur(m.cpa)     + '</span>',
+      '<span class="num">' + nf(m.purchases, 1) + '</span>',
+      '<span style="font-size:10px"><span style="color:#60a5fa">FB ' + cur(m.fb_spend || 0) + '</span>'
+        + ' / <span style="color:#4ade80">GG ' + cur(m.gg_spend || 0) + '</span></span>'
     ];
   });
-  document.getElementById('cp-types-tbl').innerHTML=mkTable(
-    ['Product Type','Spend','Revenue Attr.','ROAS','CPA','Purchases','FB / GG'],typeRows
+  document.getElementById('cp-types-tbl').innerHTML = mkTable(
+    ['Product Type', 'Spend', 'Revenue Attr.', 'ROAS', 'CPA', 'Purchases', 'FB / GG'], typeRows
   );
 
   // Accounts table
-  const accts=d.byAccount||{};
-  const acctRows=Object.entries(accts).sort((a,b)=>b[1].spend-a[1].spend).map(([name,m])=>[
-    `<strong>${name}</strong>`,
-    `<span class="num">${cur(m.spend)}</span>`,
-    `<span class="num">${cur(m.revenue)}</span>`,
-    `<span class="num" style="${roasStyle(m.roas,1.65)}">${nf(m.roas,2)}x</span>`,
-    `<span class="num">${cur(m.cpa)}</span>`,
-    `<span class="num">${nf(m.purchases,1)}</span>`,
-  ]);
-  document.getElementById('cp-accounts-tbl').innerHTML=mkTable(
-    ['Account','Spend','Revenue','ROAS','CPA','Purchases'],acctRows
+  var accts    = d.byAccount || {};
+  var acctRows = Object.entries(accts).sort(function(a, b) { return b[1].spend - a[1].spend; })
+    .map(function(item) {
+      var name = item[0], m = item[1];
+      return [
+        '<strong>' + name + '</strong>',
+        '<span class="num">' + cur(m.spend)   + '</span>',
+        '<span class="num">' + cur(m.revenue) + '</span>',
+        '<span class="num" style="' + roasStyle(m.roas, 1.65) + '">' + nf(m.roas, 2) + 'x</span>',
+        '<span class="num">' + cur(m.cpa)     + '</span>',
+        '<span class="num">' + nf(m.purchases, 1) + '</span>'
+      ];
+    });
+  document.getElementById('cp-accounts-tbl').innerHTML = mkTable(
+    ['Account', 'Spend', 'Revenue', 'ROAS', 'CPA', 'Purchases'], acctRows
   );
 
   // Market table (blended)
-  const mkt=d.byMarket||{};
-  const mktRows=Object.entries(mkt).sort((a,b)=>b[1].spend-a[1].spend).map(([k,m])=>[
-    `<span class="badge b-${k.toLowerCase()}">${k}</span>`,
-    `<span class="num">${cur(m.spend)}</span>`,
-    `<span class="num">${cur(m.revenue)}</span>`,
-    `<span class="num" style="${roasStyle(m.roas,1.65)}">${nf(m.roas,2)}x</span>`,
-    `<span class="num">${nf(m.purchases,1)}</span>`,
-  ]);
-  document.getElementById('cp-mkt-tbl').innerHTML=mkTable(
-    ['Market','Spend','Revenue Attr.','ROAS','Purchases'],mktRows
+  var mkt     = d.byMarket || {};
+  var mktRows = Object.entries(mkt).sort(function(a, b) { return b[1].spend - a[1].spend; })
+    .map(function(item) {
+      var k = item[0], m = item[1];
+      return [
+        '<span class="badge b-' + k.toLowerCase() + '">' + k + '</span>',
+        '<span class="num">' + cur(m.spend)   + '</span>',
+        '<span class="num">' + cur(m.revenue) + '</span>',
+        '<span class="num" style="' + roasStyle(m.roas, 1.65) + '">' + nf(m.roas, 2) + 'x</span>',
+        '<span class="num">' + nf(m.purchases, 1) + '</span>'
+      ];
+    });
+  document.getElementById('cp-mkt-tbl').innerHTML = mkTable(
+    ['Market', 'Spend', 'Revenue Attr.', 'ROAS', 'Purchases'], mktRows
   );
 
   // Top creatives
-  const creas=(d.topCreatives||[]).slice(0,20);
-  const creaRows=creas.map(c=>{
-    const u=c.fullUrl?c.fullUrl.replace(/^https?:\/\/[^/]+/,'').slice(0,48):(c.ad||'').slice(0,48);
-    return[
-      `<span style="font-size:11px;color:#94a3b8" title="${c.fullUrl||''}">${u}</span>`,
-      `<span style="font-size:10px;color:#a78bfa">${c.prodType||'–'}</span>`,
-      `<span class="num">${cur(c.spend)}</span>`,
-      `<span class="num">${cur(c.revenue)}</span>`,
-      `<span class="num" style="${roasStyle(c.roas,c.beRoas||1.63)}">${nf(c.roas,2)}x</span>`,
-      `<span class="num">${nf(c.purchases,1)}</span>`,
-      `<span class="num">${nf(c.impressions)}</span>`,
+  var creas    = (d.topCreatives || []).slice(0, 20);
+  var creaRows = creas.map(function(c) {
+    var u = c.fullUrl
+      ? c.fullUrl.replace(/^https?:\/\/[^/]+/, '').slice(0, 48)
+      : (c.ad || '').slice(0, 48);
+    return [
+      '<span style="font-size:11px;color:#94a3b8" title="' + (c.fullUrl || '') + '">' + u + '</span>',
+      '<span style="font-size:10px;color:#a78bfa">' + (c.prodType || '–') + '</span>',
+      '<span class="num">' + cur(c.spend)   + '</span>',
+      '<span class="num">' + cur(c.revenue) + '</span>',
+      '<span class="num" style="' + roasStyle(c.roas, c.beRoas || 1.63) + '">' + nf(c.roas, 2) + 'x</span>',
+      '<span class="num">' + nf(c.purchases, 1) + '</span>',
+      '<span class="num">' + nf(c.impressions)  + '</span>'
     ];
   });
-  document.getElementById('cp-crea-tbl').innerHTML=mkTable(
-    ['Creative URL','Type','Spend','Revenue','ROAS','Purchases','Impressions'],creaRows
+  document.getElementById('cp-crea-tbl').innerHTML = mkTable(
+    ['Creative URL', 'Type', 'Spend', 'Revenue', 'ROAS', 'Purchases', 'Impressions'], creaRows
   );
 }
 
-// Product type detail chart (trend chưa có daily-by-type từ API → placeholder)
-function showTypeDetail(type, d){
-  const box=document.getElementById('cp-type-chart-box');
-  document.getElementById('cp-type-chart-title').textContent=`${type} — Spend & ROAS Trend (Coming soon)`;
-  box.style.display='block';
-  // Placeholder: Cần GAS trả về daily breakdown theo product type
-  const ctx=document.getElementById('ch-cp-type-trend');
-  if(CH['ch-cp-type-trend']){CH['ch-cp-type-trend'].destroy();}
-  CH['ch-cp-type-trend']=new Chart(ctx,{
-    type:'bar',
-    data:{labels:['Tính năng đang phát triển'],
-          datasets:[{data:[0],backgroundColor:'#334155'}]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},
-        subtitle:{display:true,text:`⚠️ GAS cần trả về daily data theo product type để vẽ chart này`,
-                  color:'#f59e0b',font:{size:11}}}}
+// Product type detail (placeholder)
+function showTypeDetail(type, d) {
+  var box = document.getElementById('cp-type-chart-box');
+  document.getElementById('cp-type-chart-title').textContent = type + ' — Spend & ROAS Trend (Coming soon)';
+  box.style.display = 'block';
+  var ctx = document.getElementById('ch-cp-type-trend');
+  if (CH['ch-cp-type-trend']) { CH['ch-cp-type-trend'].destroy(); }
+  CH['ch-cp-type-trend'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Tính năng đang phát triển'],
+      datasets: [{ data: [0], backgroundColor: '#334155' }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        subtitle: {
+          display: true,
+          text: '⚠️ GAS cần trả về daily data theo product type để vẽ chart này',
+          color: '#f59e0b', font: { size: 11 }
+        }
+      }
+    }
   });
 }
 
 // ═══════════════════════════════════════
 // TAB 4 — PRODUCT INTELLIGENCE
 // ═══════════════════════════════════════
-function renderProducts(d){
-  const types=d.byProductType||{};
-  const top  =d.topProducts  ||[];
-  const typeList=Object.entries(types).sort((a,b)=>b[1].spend-a[1].spend);
+function renderProducts(d) {
+  var types    = d.byProductType || {};
+  var top      = d.topProducts   || [];
+  var typeList = Object.entries(types).sort(function(a, b) { return b[1].spend - a[1].spend; });
 
-  const best =typeList.find(([,m])=>m.spend>0);
-  const worst=[...typeList].reverse().find(([,m])=>m.spend>50);
+  var best  = typeList.find(function(item)    { return item[1].spend > 0; });
+  var worst = typeList.slice().reverse().find(function(item) { return item[1].spend > 50; });
 
-  document.getElementById('pi-kpis').innerHTML=[
-    kpi('Product Types',typeList.length,'Từ SHOPIFY_PRODUCT metafield (cột M)'),
-    kpi('Products w/ Spend',top.length,'Có FB hoặc GG spend'),
-    best ?kpi(`Best: ${best[0]}`,  nf(best[1].roas,2)+'x', cur(best[1].spend), 'green'):'',
-    worst?kpi(`Worst: ${worst[0]}`,nf(worst[1].roas,2)+'x',cur(worst[1].spend),'red'):'',
+  document.getElementById('pi-kpis').innerHTML = [
+    kpi('Product Types',       typeList.length,  'Từ SHOPIFY_PRODUCT metafield (cột M)'),
+    kpi('Products w/ Spend',   top.length,       'Có FB hoặc GG spend'),
+    best  ? kpi('Best: '  + best[0],  nf(best[1].roas,  2) + 'x', cur(best[1].spend),  'green') : '',
+    worst ? kpi('Worst: ' + worst[0], nf(worst[1].roas, 2) + 'x', cur(worst[1].spend), 'red')   : '',
   ].join('');
 
   // Product types table
-  const tRows=typeList.map(([type,m])=>{
-    const be=m.beRoas||1.63;
-    const gap=m.spend>0?(m.roas-be)/be*100:0;
-    return[
-      `<strong>${type}</strong>`,
-      `<span style="font-size:10px;color:#475569">BE ${nf(be,2)}x</span>`,
-      `<span class="num">${cur(m.spend)}</span>`,
-      `<span class="num">${cur(m.revenue)}</span>`,
-      `<span class="num" style="${roasStyle(m.roas,be)}">${nf(m.roas,2)}x</span>`,
-      `<span class="num" style="color:${gap>=0?'#4ade80':'#f87171'}">${gap>=0?'+':''}${nf(gap,1)}%</span>`,
-      `<span class="num">${nf(m.purchases,1)}</span>`,
-      `<span class="num">${cur(m.cpa)}</span>`,
-      `<span style="font-size:10px"><span style="color:#60a5fa">FB ${cur(m.fb_spend||0)}</span>/<span style="color:#4ade80">GG ${cur(m.gg_spend||0)}</span></span>`
+  var tRows = typeList.map(function(item) {
+    var type = item[0], m = item[1];
+    var be  = m.beRoas || 1.63;
+    var gap = m.spend > 0 ? (m.roas - be) / be * 100 : 0;
+    return [
+      '<strong>' + type + '</strong>',
+      '<span style="font-size:10px;color:#475569">BE ' + nf(be, 2) + 'x</span>',
+      '<span class="num">' + cur(m.spend)   + '</span>',
+      '<span class="num">' + cur(m.revenue) + '</span>',
+      '<span class="num" style="' + roasStyle(m.roas, be) + '">' + nf(m.roas, 2) + 'x</span>',
+      '<span class="num" style="color:' + (gap >= 0 ? '#4ade80' : '#f87171') + '">'
+        + (gap >= 0 ? '+' : '') + nf(gap, 1) + '%</span>',
+      '<span class="num">' + nf(m.purchases, 1) + '</span>',
+      '<span class="num">' + cur(m.cpa) + '</span>',
+      '<span style="font-size:10px"><span style="color:#60a5fa">FB ' + cur(m.fb_spend || 0) + '</span>'
+        + '/<span style="color:#4ade80">GG ' + cur(m.gg_spend || 0) + '</span></span>'
     ];
   });
-  document.getElementById('pi-types-tbl').innerHTML=mkTable(
-    ['Type','BE','Spend','Revenue','ROAS','vs BE','Purchases','CPA','FB/GG'],tRows
+  document.getElementById('pi-types-tbl').innerHTML = mkTable(
+    ['Type', 'BE', 'Spend', 'Revenue', 'ROAS', 'vs BE', 'Purchases', 'CPA', 'FB/GG'], tRows
   );
 
   // Bubble chart
-  const sl=top.slice(0,30);
-  mkCh('ch-pi-bubble',{
-    type:'bubble',
-    data:{datasets:[{
-      label:'Products',
-      data:sl.map(p=>({x:p.spend,y:p.roas,r:Math.max(5,Math.min(28,Math.sqrt(p.revenue||0)/7)),
-                       title:p.title,beRoas:p.beRoas})),
-      backgroundColor:sl.map(p=>{
-        const be=p.beRoas||1.63;
-        if(p.roas>=be*1.15)return'rgba(74,222,128,.65)';
-        if(p.roas>=be)     return'rgba(251,191,36,.65)';
-        return'rgba(248,113,113,.65)';
-      }),borderWidth:0
-    }]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},
-        tooltip:{callbacks:{label:ctx=>{
-          const p=ctx.raw;
-          return[`${(p.title||'').slice(0,40)}`,`Spend: ${cur(p.x)}`,`ROAS: ${nf(p.y,2)}x  BE: ${nf(p.beRoas,2)}x`];
-        }}}},
-      scales:{
-        x:{title:{display:true,text:'Spend ($)'},grid:GRID,ticks:TICK_Y},
-        y:{title:{display:true,text:'ROAS'},     grid:GRID,min:0}
-      }}
+  var sl = top.slice(0, 30);
+  mkCh('ch-pi-bubble', {
+    type: 'bubble',
+    data: {
+      datasets: [{
+        label: 'Products',
+        data: sl.map(function(p) {
+          return { x: p.spend, y: p.roas, r: Math.max(5, Math.min(28, Math.sqrt(p.revenue || 0) / 7)),
+                   title: p.title, beRoas: p.beRoas };
+        }),
+        backgroundColor: sl.map(function(p) {
+          var be = p.beRoas || 1.63;
+          if (p.roas >= be * 1.15) return 'rgba(74,222,128,.65)';
+          if (p.roas >= be)        return 'rgba(251,191,36,.65)';
+          return 'rgba(248,113,113,.65)';
+        }),
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              var p = ctx.raw;
+              return [
+                (p.title || '').slice(0, 40),
+                'Spend: ' + cur(p.x),
+                'ROAS: ' + nf(p.y, 2) + 'x  BE: ' + nf(p.beRoas, 2) + 'x'
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Spend ($)' }, grid: GRID, ticks: TICK_Y },
+        y: { title: { display: true, text: 'ROAS' },      grid: GRID, min: 0 }
+      }
+    }
   });
 
   // Top products table
-  const topRows=top.slice(0,30).map((p,i)=>{
-    const be=p.beRoas||1.63;
-    return[
-      `<span style="color:#475569">${i+1}</span>`,
-      `<span style="font-size:11px" title="${p.productId}">${(p.title||p.productId||'').slice(0,42)}</span>`,
-      `<span style="font-size:10px;color:#a78bfa">${p.type||''}</span>`,
-      (p.markets||[]).map(m=>`<span class="badge b-${m.toLowerCase()}">${m}</span>`).join(' ')||'–',
-      `<span class="num">${cur(p.spend)}</span>`,
-      `<span class="num">${cur(p.revenue)}</span>`,
-      `<span class="num" style="${roasStyle(p.roas,be)}">${nf(p.roas,2)}x</span>`,
-      `<span class="num">${nf(p.purchases,1)}</span>`,
-      `<span style="font-size:10px"><span style="color:#60a5fa">${cur(p.fb_spend||0)}</span>/<span style="color:#4ade80">${cur(p.gg_spend||0)}</span></span>`
+  var topRows = top.slice(0, 30).map(function(p, i) {
+    var be = p.beRoas || 1.63;
+    var markets = (p.markets || []).map(function(m) {
+      return '<span class="badge b-' + m.toLowerCase() + '">' + m + '</span>';
+    }).join(' ') || '–';
+    return [
+      '<span style="color:#475569">' + (i + 1) + '</span>',
+      '<span style="font-size:11px" title="' + (p.productId || '') + '">'
+        + (p.title || p.productId || '').slice(0, 42) + '</span>',
+      '<span style="font-size:10px;color:#a78bfa">' + (p.type || '') + '</span>',
+      markets,
+      '<span class="num">' + cur(p.spend)   + '</span>',
+      '<span class="num">' + cur(p.revenue) + '</span>',
+      '<span class="num" style="' + roasStyle(p.roas, be) + '">' + nf(p.roas, 2) + 'x</span>',
+      '<span class="num">' + nf(p.purchases, 1) + '</span>',
+      '<span style="font-size:10px"><span style="color:#60a5fa">' + cur(p.fb_spend || 0) + '</span>'
+        + '/<span style="color:#4ade80">' + cur(p.gg_spend || 0) + '</span></span>'
     ];
   });
-  document.getElementById('pi-top-tbl').innerHTML=mkTable(
-    ['#','Product','Type','Market','Spend','Revenue Attr.','ROAS','Purchases','FB/GG'],topRows
+  document.getElementById('pi-top-tbl').innerHTML = mkTable(
+    ['#', 'Product', 'Type', 'Market', 'Spend', 'Revenue Attr.', 'ROAS', 'Purchases', 'FB/GG'], topRows
   );
 }
 
 // ═══════════════════════════════════════
 // TAB 5 — MOTHER'S DAY
 // ═══════════════════════════════════════
-function renderMD(d){
-  if(!d)return;
-  const b  =d.blended       ||{};
-  const s  =d.shopifyTotals ||{};
-  const bc =d.blendedByCountry||{};
-  const sm =d.shopifyByMarket||{};
-  const trueROAS=b.spend>0?r2((s.revenue||0)/b.spend):0;
+function renderMD(d) {
+  if (!d) return;
+  var b  = d.blended           || {};
+  var s  = d.shopifyTotals     || {};
+  var bc = d.blendedByCountry  || {};
+  var sm = d.shopifyByMarket   || {};
+  var trueROAS = b.spend > 0 ? r2((s.revenue || 0) / b.spend) : 0;
 
-  document.getElementById('md-kpis').innerHTML=[
-    kpi('Spend (từ 20/3)',      cur(b.spend),      `FB ${cur(b.fb_spend||0)} / GG ${cur(b.gg_spend||0)}`),
-    kpi('Revenue Attributed',   cur(b.revenue),    'FB + GG platform'),
-    kpi('Blended ROAS',         nf(b.roas,2)+'x', 'Platform attributed',roasCls(b.roas,1.65)),
-    kpi('Purchases',            nf(b.purchases,1), `CPA ${cur(b.cpa)}`),
-    kpi('Shopify Revenue',      cur(s.revenue),    'Doanh thu sản phẩm thực','green'),
-    kpi('True ROAS',            nf(trueROAS,2)+'x','Shopify ÷ Paid Spend',roasCls(trueROAS,1.65)),
+  document.getElementById('md-kpis').innerHTML = [
+    kpi('Spend (từ 20/3)',     cur(b.spend),          'FB ' + cur(b.fb_spend || 0) + ' / GG ' + cur(b.gg_spend || 0)),
+    kpi('Revenue Attributed',  cur(b.revenue),         'FB + GG platform'),
+    kpi('Blended ROAS',        nf(b.roas, 2) + 'x',   'Platform attributed', roasCls(b.roas, 1.65)),
+    kpi('Purchases',           nf(b.purchases, 1),    'CPA ' + cur(b.cpa)),
+    kpi('Shopify Revenue',     cur(s.revenue),         'Doanh thu sản phẩm thực', 'green'),
+    kpi('True ROAS',           nf(trueROAS, 2) + 'x', 'Shopify ÷ Paid Spend', roasCls(trueROAS, 1.65)),
   ].join('');
 
   // Daily trend
-  const trend=d.dailyTrend||[];
-  mkCh('ch-md-daily',{
-    type:'line',
-    data:{labels:trend.map(r=>fd(r.date)),
-          datasets:[
-            {label:'ROAS',data:trend.map(r=>r.roas),yAxisID:'yR',
-             borderColor:'#e879f9',pointRadius:3,tension:.3},
-            {label:'Spend',data:trend.map(r=>r.spend),yAxisID:'yS',
-             borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.08)',fill:true,pointRadius:2,tension:.3}
-          ]},
-    options:{responsive:true,maintainAspectRatio:false,
-      interaction:{mode:'index',intersect:false},
-      plugins:{legend:{position:'top'}},
-      scales:{
-        yR:{position:'right',grid:GRID,min:0,title:{display:true,text:'ROAS'}},
-        yS:{position:'left', grid:GRID,ticks:TICK_Y}
-      }}
+  var trend = d.dailyTrend || [];
+  mkCh('ch-md-daily', {
+    type: 'line',
+    data: {
+      labels: trend.map(function(r) { return fd(r.date); }),
+      datasets: [
+        {
+          label: 'ROAS',
+          data: trend.map(function(r) { return r.roas; }),
+          yAxisID: 'yR', borderColor: '#e879f9', pointRadius: 3, tension: .3
+        },
+        {
+          label: 'Spend',
+          data: trend.map(function(r) { return r.spend; }),
+          yAxisID: 'yS', borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,.08)',
+          fill: true, pointRadius: 2, tension: .3
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        yR: { position: 'right', grid: GRID, min: 0, title: { display: true, text: 'ROAS' } },
+        yS: { position: 'left',  grid: GRID, ticks: TICK_Y }
+      }
+    }
   });
 
   // Market comparison table
-  const allMkts=[...new Set([...Object.keys(bc),...Object.keys(sm)])].filter(m=>m!=='Unknown');
-  const mktRows=allMkts.map(mkt=>{
-    const sp=bc[mkt]?bc[mkt].spend||0:0;
-    const rv=sm[mkt]?sm[mkt].revenue||0:0;
-    const tr=sp>0?r2(rv/sp):0;
-    return[
-      `<span class="badge b-${mkt.toLowerCase()}">${mkt}</span>`,
-      `<span class="num">${cur(sp)}</span>`,
-      `<span class="num">${cur(rv)}</span>`,
-      `<span class="num" style="${roasStyle(tr,1.65)}">${nf(tr,2)}x</span>`,
-      `<span class="num">${cur(bc[mkt]?bc[mkt].cpa||0:0)}</span>`,
-      `<span class="num">${nf(bc[mkt]?bc[mkt].purchases||0:0,1)}</span>`,
+  var allMkts = [];
+  var mktSet  = {};
+  Object.keys(bc).concat(Object.keys(sm)).forEach(function(m) {
+    if (m !== 'Unknown' && !mktSet[m]) { mktSet[m] = 1; allMkts.push(m); }
+  });
+  var mktRows = allMkts.map(function(mkt) {
+    var sp = bc[mkt] ? (bc[mkt].spend    || 0) : 0;
+    var rv = sm[mkt] ? (sm[mkt].revenue  || 0) : 0;
+    var tr = sp > 0 ? r2(rv / sp) : 0;
+    return [
+      '<span class="badge b-' + mkt.toLowerCase() + '">' + mkt + '</span>',
+      '<span class="num">' + cur(sp) + '</span>',
+      '<span class="num">' + cur(rv) + '</span>',
+      '<span class="num" style="' + roasStyle(tr, 1.65) + '">' + nf(tr, 2) + 'x</span>',
+      '<span class="num">' + cur(bc[mkt] ? bc[mkt].cpa || 0 : 0)       + '</span>',
+      '<span class="num">' + nf(bc[mkt] ? bc[mkt].purchases || 0 : 0, 1) + '</span>'
     ];
   });
-  document.getElementById('md-mkt-tbl').innerHTML=mkTable(
-    ['Market','Spend','Shopify Revenue','True ROAS','CPA','Purchases'],mktRows
+  document.getElementById('md-mkt-tbl').innerHTML = mkTable(
+    ['Market', 'Spend', 'Shopify Revenue', 'True ROAS', 'CPA', 'Purchases'], mktRows
   );
 
   // Market donut
-  mkCh('ch-md-mkt',{
-    type:'doughnut',
-    data:{labels:allMkts,
-          datasets:[{data:allMkts.map(m=>bc[m]?bc[m].spend||0:0),
-                     backgroundColor:['#f87171','#4ade80'],borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'right'},
-        tooltip:{callbacks:{label:ctx=>` Spend: ${cur(ctx.raw)}`}}}}
+  mkCh('ch-md-mkt', {
+    type: 'doughnut',
+    data: {
+      labels: allMkts,
+      datasets: [{
+        data: allMkts.map(function(m) { return bc[m] ? bc[m].spend || 0 : 0; }),
+        backgroundColor: ['#f87171', '#4ade80'], borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right' },
+        tooltip: { callbacks: { label: function(ctx) { return ' Spend: ' + cur(ctx.raw); } } }
+      }
+    }
   });
 
   // Top products
-  const prods=(d.topProducts||[]).slice(0,20);
-  const pRows=prods.map((p,i)=>{
-    const be=p.beRoas||1.63;
-    return[
-      `<span style="color:#475569">${i+1}</span>`,
-      `<span style="font-size:11px">${(p.title||p.productId||'').slice(0,45)}</span>`,
-      `<span style="font-size:10px;color:#a78bfa">${p.type||''}</span>`,
-      (p.markets||[]).map(m=>`<span class="badge b-${m.toLowerCase()}">${m}</span>`).join(' ')||'–',
-      `<span class="num">${cur(p.spend)}</span>`,
-      `<span class="num">${cur(p.revenue)}</span>`,
-      `<span class="num" style="${roasStyle(p.roas,be)}">${nf(p.roas,2)}x</span>`,
-      `<span class="num">${nf(p.purchases,1)}</span>`,
+  var prods = (d.topProducts || []).slice(0, 20);
+  var pRows = prods.map(function(p, i) {
+    var be = p.beRoas || 1.63;
+    var markets = (p.markets || []).map(function(m) {
+      return '<span class="badge b-' + m.toLowerCase() + '">' + m + '</span>';
+    }).join(' ') || '–';
+    return [
+      '<span style="color:#475569">' + (i + 1) + '</span>',
+      '<span style="font-size:11px">' + (p.title || p.productId || '').slice(0, 45) + '</span>',
+      '<span style="font-size:10px;color:#a78bfa">' + (p.type || '') + '</span>',
+      markets,
+      '<span class="num">' + cur(p.spend)   + '</span>',
+      '<span class="num">' + cur(p.revenue) + '</span>',
+      '<span class="num" style="' + roasStyle(p.roas, be) + '">' + nf(p.roas, 2) + 'x</span>',
+      '<span class="num">' + nf(p.purchases, 1) + '</span>'
     ];
   });
-  document.getElementById('md-prod-tbl').innerHTML=mkTable(
-    ['#','Product','Type','Market','Spend','Revenue','ROAS','Purchases'],pRows
+  document.getElementById('md-prod-tbl').innerHTML = mkTable(
+    ['#', 'Product', 'Type', 'Market', 'Spend', 'Revenue', 'ROAS', 'Purchases'], pRows
   );
 }
 
 // ═══════════════════════════════════════
 // SETTINGS
 // ═══════════════════════════════════════
-function openSettings(){
-  document.getElementById('inp-url').value=getGasUrl();
+function openSettings() {
+  document.getElementById('inp-url').value = getGasUrl();
   document.getElementById('settings-modal').classList.add('open');
 }
-function closeSettings(){document.getElementById('settings-modal').classList.remove('open');}
-function saveSettings(){
-  const v=document.getElementById('inp-url').value.trim();
-  if(v){localStorage.setItem('gas_url',v);}
+function closeSettings() {
+  document.getElementById('settings-modal').classList.remove('open');
+}
+function saveSettings() {
+  var v = document.getElementById('inp-url').value.trim();
+  if (v) { localStorage.setItem('gas_url', v); }
   closeSettings();
-  const{from,to}=rangeFrom(document.querySelector('.dp.active')?.dataset.r||'7');
-  loadAll(from,to);
+  var activeBtn = document.querySelector('.dp.active');
+  var range = rangeFrom(activeBtn ? activeBtn.dataset.r : '7');
+  loadAll(range.from, range.to);
 }
 
 // ═══════════════════════════════════════
 // DATE PILL EVENTS
 // ═══════════════════════════════════════
-document.querySelectorAll('.dp').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    document.querySelectorAll('.dp').forEach(b=>b.classList.remove('active'));
+document.querySelectorAll('.dp').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.dp').forEach(function(b) { b.classList.remove('active'); });
     btn.classList.add('active');
-    const{from,to}=rangeFrom(btn.dataset.r);
-    document.getElementById('cf').value=from;
-    document.getElementById('ct').value=to;
-    loadAll(from,to);
+    var range = rangeFrom(btn.dataset.r);
+    document.getElementById('cf').value = range.from;
+    document.getElementById('ct').value = range.to;
+    loadAll(range.from, range.to);
   });
 });
 
-function applyCustom(){
-  const from=document.getElementById('cf').value;
-  const to  =document.getElementById('ct').value;
-  if(!from||!to){alert('Chọn đủ ngày');return;}
-  if(from>to)   {alert('Từ ngày phải ≤ đến ngày');return;}
-  document.querySelectorAll('.dp').forEach(b=>b.classList.remove('active'));
-  loadAll(from,to);
+function applyCustom() {
+  var from = document.getElementById('cf').value;
+  var to   = document.getElementById('ct').value;
+  if (!from || !to) { alert('Chọn đủ ngày'); return; }
+  if (from > to)    { alert('Từ ngày phải ≤ đến ngày'); return; }
+  document.querySelectorAll('.dp').forEach(function(b) { b.classList.remove('active'); });
+  loadAll(from, to);
 }
 
 // ═══════════════════════════════════════
 // TAB EVENTS
 // ═══════════════════════════════════════
-document.querySelectorAll('.tab-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+document.querySelectorAll('.tab-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.tab-btn').forEach(function(b)   { b.classList.remove('active'); });
+    document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
     btn.classList.add('active');
-    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
-    setTimeout(()=>Object.values(CH).forEach(c=>{try{c.resize()}catch(e){}}),50);
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    setTimeout(function() {
+      Object.values(CH).forEach(function(c) { try { c.resize(); } catch(e) {} });
+    }, 50);
   });
 });
 
 // ═══════════════════════════════════════
-// UTILS
-// ═══════════════════════════════════════
-function r2(v){return Math.round((parseFloat(v)||0)*100)/100;}
-
-// ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
-(function(){
-  const t=today();
-  const f=addDays(t,-6);
-  document.getElementById('cf').value=f;
-  document.getElementById('ct').value=t;
-  loadAll(f,t);
+(function() {
+  var t = today();
+  var f = addDays(t, -6);
+  document.getElementById('cf').value = f;
+  document.getElementById('ct').value = t;
+  loadAll(f, t);
 })();
 </script>
 </body>
