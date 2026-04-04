@@ -201,14 +201,14 @@ tbody tr:hover{background:#181b2e}
     <div id="ov-kpis" class="kpi-grid"></div>
     <div class="section">
       <div class="st">Hiệu quả theo Market — ES vs IT</div>
-      <div class="infobox">💱 <strong>Lưu ý currency:</strong> Shopify Revenue = <strong>EUR (€)</strong> · Ads Spend = currency của tài khoản FB/GG (thường USD hoặc EUR tùy cài đặt billing). True ROAS chỉ chính xác 100% khi cả 2 cùng EUR.</div>
+      <div class="infobox">💱 <strong>Currency:</strong> Toàn bộ hiển thị <strong>USD ($)</strong>. Shopify Revenue đã convert EUR × 1.1 → USD. True ROAS chính xác khi Ads Spend cũng là USD.</div>
       <div id="ov-market-tbl" class="twrap"></div>
     </div>
     <div class="g2">
       <div>
         <div class="st">Spend / Revenue / Profit theo ngày</div>
         <div class="cbox">
-          <div class="ctitle">Daily Trend — Revenue (€) vs Spend</div>
+          <div class="ctitle">Daily Trend — Revenue ($) vs Spend ($)</div>
           <div class="chart-container"><canvas id="ch-ov-daily"></canvas></div>
         </div>
       </div>
@@ -230,8 +230,8 @@ tbody tr:hover{background:#181b2e}
   <div class="tab-panel" id="tab-store">
     <div class="disclaimer">
       <div class="di">🛒</div>
-      <p><strong>Dữ liệu thuần Shopify — Cấp độ Order &amp; Sản phẩm · Currency: EUR (€)</strong>
-      Đã tích hợp doanh thu Shipping. AOV và Retention được tính dựa trên số lượng đơn hàng thực.</p>
+      <p><strong>Dữ liệu thuần Shopify — Cấp độ Order &amp; Sản phẩm · Currency: USD ($)</strong>
+      Revenue Shopify đã convert EUR × 1.1 → USD. Items Sold đã loại trừ sản phẩm dịch vụ (Shipping Protection). AOV và Retention tính trên số đơn hàng thực.</p>
     </div>
     <div id="st-kpis" class="kpi-grid"></div>
     <div class="g2">
@@ -246,13 +246,13 @@ tbody tr:hover{background:#181b2e}
     </div>
     <div class="g2">
       <div>
-        <div class="st">Revenue theo Product Type</div>
+        <div class="st">Revenue &amp; Items by Product Type</div>
         <div class="cbox"><div class="chart-container"><canvas id="ch-st-type"></canvas></div></div>
       </div>
       <div>
         <div class="st">Order Trend theo ngày</div>
         <div class="cbox">
-          <div class="ctitle">Orders &amp; AOV Trend</div>
+          <div class="ctitle">Orders (Bar) &amp; AOV (Line)</div>
           <div class="chart-container"><canvas id="ch-st-orders"></canvas></div>
         </div>
       </div>
@@ -280,14 +280,14 @@ tbody tr:hover{background:#181b2e}
         </div>
       </div>
       <div>
-        <div class="st">FB Ads — Spend &amp; ROAS Daily</div>
+        <div class="st">FB Ads — ROAS (Bar) &amp; Spend (Line)</div>
         <div class="cbox">
           <div class="ctitle">Facebook Only</div>
           <div class="chart-container-sm"><canvas id="ch-cp-fb-daily"></canvas></div>
         </div>
       </div>
       <div>
-        <div class="st">Google Ads — Spend &amp; ROAS Daily</div>
+        <div class="st">Google Ads — ROAS (Bar) &amp; Spend (Line)</div>
         <div class="cbox">
           <div class="ctitle">Google Ads Only</div>
           <div class="chart-container-sm"><canvas id="ch-cp-gg-daily"></canvas></div>
@@ -368,6 +368,13 @@ tbody tr:hover{background:#181b2e}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 // ═══════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════
+// Shipping Protection product ID — excluded from Items Sold count
+var SERVICE_PRODUCT_ID = '15693224345981';
+var SERVICE_TYPES = ['service', 'shipping protection'];
+
+// ═══════════════════════════════════════
 // UTILS
 // ═══════════════════════════════════════
 function r2(v) { return Math.round((parseFloat(v) || 0) * 100) / 100; }
@@ -378,10 +385,9 @@ var nf = function(v, d) {
   return Number(v).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 };
 
-// cur() = Ads currency (USD hoặc EUR tùy billing account — hiển thị không ký hiệu để tránh nhầm)
-// curEur() = Shopify EUR — luôn là €
-var cur    = function(v) { return '$' + nf(v, 2); };   // Ads spend/revenue
-var curEur = function(v) { return '€' + nf(v, 2); };  // Shopify revenue (EUR)
+// FIX #2: Toàn bộ currency về USD — curEur alias sang cur
+var cur    = function(v) { return '$' + nf(v, 2); };
+var curEur = cur; // Shopify data đã convert EUR×1.1→USD trong sync script
 var pct    = function(v) { return nf(v, 1) + '%'; };
 
 function roasStyle(r, be) {
@@ -418,15 +424,19 @@ function mkCh(id, cfg) {
   if (el) CH[id] = new Chart(el, cfg);
 }
 var GRID   = { color: '#1e2235' };
-var TICK_Y = { callback: function(v) { return nf(v); } };  // No $ prefix — ambiguous currency
+var TICK_Y = { callback: function(v) { return nf(v); } };
 
 function fd(s)     { if (!s) return ''; var p = s.split('-'); return p[2] + '/' + p[1]; }
 function fdFull(s) { if (!s) return ''; var p = s.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
 
+function isServiceType(t) {
+  return SERVICE_TYPES.indexOf((t || '').toLowerCase()) !== -1;
+}
+
 // ═══════════════════════════════════════
 // CONFIG & STATE
 // ═══════════════════════════════════════
-var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyZWfUotH7ComzoY5h9EwukWUqrCVxVHnEHEQIEQy-idc2ATnhJcNlJTYMxGSvsGXSX/exec';
+var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbydu1ER-ylBKgOidDp0ZITuuXQktUAVVLiTUp-WUBsBt0FjtnpJuezQ3tQ2fjFEu2o/exec';
 function getGasUrl() { return localStorage.getItem('gas_url') || DEFAULT_GAS_URL; }
 
 Chart.defaults.color       = '#64748b';
@@ -438,31 +448,30 @@ var MD_DATA = null;
 var CH      = {};
 
 // ═══════════════════════════════════════
-// DATE UTILS — FIX #1: TIMEZONE UTC+1/UTC+2 (Europe/Madrid)
-// Shopify & FB/GG Ads đều segment theo Spain time (CET=UTC+1 mùa đông, CEST=UTC+2 mùa hè)
-// Dùng Intl.DateTimeFormat để lấy ngày đúng timezone, xử lý DST tự động
+// DATE UTILS
 // ═══════════════════════════════════════
 function today() {
-  // 'en-CA' locale trả về format YYYY-MM-DD — chuẩn để dùng làm date string
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date());
 }
 
-// FIX #2: addDays dùng noon UTC (12:00Z) để tránh lỗi DST khi chuyển sang toISOString()
 function addDays(s, n) {
-  var d = new Date(s + 'T12:00:00Z'); // Noon UTC — tránh edge case DST ±1h
+  var d = new Date(s + 'T12:00:00Z');
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
 
+// FIX #3: Last N days = N ngày ĐÃ QUA, không tính hôm nay
+// VD: hôm nay 5/4, Last 3N → 2/4–4/4
 function rangeFrom(r) {
-  var t = today(); // Luôn là ngày tại Spain
+  var t = today();
+  var y = addDays(t, -1); // hôm qua = ngày cuối của mọi N-day range
   if (r === 'today')     return { from: t, to: t };
-  if (r === 'yesterday') return { from: addDays(t, -1), to: addDays(t, -1) };
-  if (r === '3')         return { from: addDays(t, -2), to: t };
-  if (r === '7')         return { from: addDays(t, -6), to: t };
-  if (r === '14')        return { from: addDays(t, -13), to: t };
-  if (r === '30')        return { from: addDays(t, -29), to: t };
-  return { from: '2026-01-01', to: t };
+  if (r === 'yesterday') return { from: y, to: y };
+  if (r === '3')         return { from: addDays(y, -2),  to: y };
+  if (r === '7')         return { from: addDays(y, -6),  to: y };
+  if (r === '14')        return { from: addDays(y, -13), to: y };
+  if (r === '30')        return { from: addDays(y, -29), to: y };
+  return { from: '2026-01-01', to: t }; // Tất cả: dùng today
 }
 
 function ov(show, msg) {
@@ -516,7 +525,8 @@ function renderAll() {
 
 // ═══════════════════════════════════════
 // TAB 1 — BUSINESS OVERVIEW
-// Revenue Shopify = EUR (€) · Ads Spend = currency tài khoản ($)
+// FIX #5: Profit = Rev - Ads - FF(29%) - Gateway(7%) - AppAPI(2.8%) - TaxAds(TXG07×12%)
+// FIX #4: Donut chart hiển thị % từng khoản
 // ═══════════════════════════════════════
 function renderOverview(d) {
   var b  = d.blended            || {};
@@ -527,21 +537,22 @@ function renderOverview(d) {
 
   var totalSpend  = b.spend    || 0;
   var productRev  = s.revenue  || 0;
-  var totalRevInp = o.totalRevenue || productRev || 0; // EUR
+  var totalRevInp = o.totalRevenue || productRev || 0; // USD (đã convert)
 
-  // Chi phí — tính theo EUR (Shopify revenue)
-  var fulfillment = r2(productRev  * 0.29);   // 29% Product Rev
-  var appApiCost  = r2(totalRevInp * 0.028);  // 2.8% Total Rev
-  var taxCost     = r2(totalRevInp * 0.012);  // 1.2% Total Rev
+  // FIX #5: Profit formula mới
+  var fulfillment  = r2(totalRevInp * 0.29);   // 29% Total Rev
+  var gatewayFee   = r2(totalRevInp * 0.07);   // 7% Payment gateway
+  var appApiCost   = r2(totalRevInp * 0.028);  // 2.8% App API
+  var txg07Spend   = (d.byAccount && d.byAccount['TXG07']) ? (d.byAccount['TXG07'].spend || 0) : 0;
+  var taxAds       = r2(txg07Spend * 0.12);    // TXG07 spend × 12%
+  var totalCost    = totalSpend + fulfillment + gatewayFee + appApiCost + taxAds;
+  var profit       = r2(totalRevInp - totalCost);
+  var trueROAS     = totalSpend > 0 ? r2(totalRevInp / totalSpend) : 0;
+  var gap          = r2(totalRevInp - (b.revenue || 0));
 
-  // NOTE: totalSpend là Ads (USD/EUR tùy acc) → totalCost trộn currency
-  // Profit ước tính: chấp nhận sai số FX cho đến khi xác định được billing currency
-  var totalCost = totalSpend + fulfillment + appApiCost + taxCost;
-  var profit    = r2(totalRevInp - totalCost);
-  var trueROAS  = totalSpend > 0 ? r2(totalRevInp / totalSpend) : 0;
-  var gap       = r2(totalRevInp - (b.revenue || 0)); // EUR vs Ads attributed
+  // txg07Ratio dùng cho daily profit estimate
+  var txg07Ratio   = totalSpend > 0 ? txg07Spend / totalSpend : 0;
 
-  // UX: Cảnh báo khi không có data (thường gặp khi chọn "Hôm nay" sớm buổi sáng)
   var noDataBanner = '';
   if (totalSpend === 0 && totalRevInp === 0 && (o.orders || 0) === 0) {
     noDataBanner = '<div style="background:#1c1000;border:1.5px solid #d97706;border-radius:10px;'
@@ -552,22 +563,21 @@ function renderOverview(d) {
   }
 
   document.getElementById('ov-kpis').innerHTML = noDataBanner + [
-    kpi('Total Ads Spend',      cur(totalSpend),       'FB ' + cur(b.fb_spend || 0) + ' + GG ' + cur(b.gg_spend || 0)),
-    kpi('Total Revenue (€)',    curEur(totalRevInp),   'Doanh thu THỰC · Shopify EUR', 'green'),
-    kpi('True ROAS',            nf(trueROAS, 2) + 'x', 'Total Rev € ÷ Paid Spend', roasCls(trueROAS, 1.65)),
-    kpi('Est. Profit',          curEur(profit),        'Rev − Spend − FF − Tax − App', profit >= 0 ? 'green' : 'red'),
-    kpi('Fulfillment (29%)',    curEur(fulfillment),   'Product Rev × 29%', 'warn'),
-    kpi('APP API (2.8%)',       curEur(appApiCost),    'Total Rev × 2.8%', 'pink'),
-    kpi('Tax (1.2%)',           curEur(taxCost),       'Total Rev × 1.2%', 'pink'),
-    kpi('Shopify Orders',       nf(o.orders || 0),     'Số đơn hàng thực tế', 'blue'),
-    kpi('Shipping Revenue',     curEur(o.shipping || 0), 'Tiền khách trả ship', 'blue'),
-    kpi('AOV',                  curEur(o.aov || 0),    'Total Rev ÷ Orders', 'blue'),
-    kpi('Retention Rate',       pct(o.retentionRate || 0), 'Tỷ lệ khách cũ', (o.retentionRate > 15 ? 'green' : 'warn')),
-    kpi('Items Sold',           nf(s.unitsSold || 0),  ''),
+    kpi('Total Ads Spend',     cur(totalSpend),          'FB ' + cur(b.fb_spend || 0) + ' + GG ' + cur(b.gg_spend || 0)),
+    kpi('Total Revenue ($)',   cur(totalRevInp),          'Doanh thu THỰC · USD', 'green'),
+    kpi('True ROAS',           nf(trueROAS, 2) + 'x',    'Total Rev ÷ Paid Spend', roasCls(trueROAS, 1.65)),
+    kpi('Est. Profit',         cur(profit),               'Rev − Ads − FF − GW − App − TaxAds', profit >= 0 ? 'green' : 'red'),
+    kpi('Fulfillment (29%)',   cur(fulfillment),          'Total Rev × 29%', 'warn'),
+    kpi('Gateway Fee (7%)',    cur(gatewayFee),           'Total Rev × 7%', 'pink'),
+    kpi('APP API (2.8%)',      cur(appApiCost),           'Total Rev × 2.8%', 'pink'),
+    kpi('TaxAds TXG07 (12%)', cur(taxAds),               'TXG07 Spend × 12%', 'pink'),
+    kpi('Shopify Orders',      nf(o.orders || 0),         'Số đơn hàng thực tế', 'blue'),
+    kpi('Shipping Revenue',    cur(o.shipping || 0),      'Tiền khách trả ship', 'blue'),
+    kpi('AOV',                 cur(o.aov || 0),           'Total Rev ÷ Orders', 'blue'),
+    kpi('Retention Rate',      pct(o.retentionRate || 0), 'Tỷ lệ khách cũ', (o.retentionRate > 15 ? 'green' : 'warn')),
   ].join('');
 
-  // Market table — Shopify Revenue cột = EUR
-  // FIX: normalize "UNKNOWN"/"Unknown"/"unknown" → loại bỏ case-insensitive
+  // Market table
   var allMkts = []; var mktSet = {};
   Object.keys(bc).concat(Object.keys(sm)).forEach(function(m) {
     if (m.toLowerCase() !== 'unknown' && !mktSet[m]) { mktSet[m] = 1; allMkts.push(m); }
@@ -580,20 +590,18 @@ function renderOverview(d) {
     var purch   = bc[mkt] ? (bc[mkt].purchases || 0) : 0;
     return [
       '<span class="badge b-' + mkt.toLowerCase() + '">' + mkt + '</span>',
-      '<span class="num">' + cur(spendM)    + '</span>',
-      '<span class="num">' + curEur(revM)   + '</span>',
+      '<span class="num">' + cur(spendM)  + '</span>',
+      '<span class="num">' + cur(revM)    + '</span>',
       '<span class="num" style="' + roasStyle(trueR, 1.65) + '">' + nf(trueR, 2) + 'x</span>',
       '<span class="num" style="color:#475569">' + cur(adsRevM) + '</span>',
       '<span class="num" style="color:#475569">' + nf(purch, 1) + '</span>'
     ];
   });
   document.getElementById('ov-market-tbl').innerHTML = mkTable(
-    ['Market', 'Paid Spend ($)', 'Shopify Revenue (€)', 'True ROAS', 'Ads Attributed ($)', 'Purchases'], mktRows
+    ['Market', 'Paid Spend ($)', 'Shopify Revenue ($)', 'True ROAS', 'Ads Attributed ($)', 'Purchases'], mktRows
   );
 
-  // Daily trend — Y axis không dùng $ hay €, để số thuần
-  // FIX: Union dates từ dailyTrend (Ads) VÀ shopifyOrderDaily (Shopify)
-  // → Trục X hiển thị đầy đủ ngày dù 1 nguồn có data mà nguồn kia không có
+  // Daily trend
   var dtAds = d.dailyTrend       || [];
   var dtO   = d.shopifyOrderDaily || [];
   var revMap = {}, spendMap = {};
@@ -610,26 +618,21 @@ function renderOverview(d) {
     data: {
       labels: allDates.map(fd),
       datasets: [
-        {
-          label: 'Total Revenue (€)',
+        { label: 'Total Revenue ($)',
           data: allDates.map(function(dt) { return revMap[dt] || 0; }),
           yAxisID: 'yR', borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.08)',
-          fill: true, pointRadius: 2, tension: .3
-        },
-        {
-          label: 'Paid Spend ($)',
+          fill: true, pointRadius: 2, tension: .3 },
+        { label: 'Paid Spend ($)',
           data: allDates.map(function(dt) { return spendMap[dt] ? spendMap[dt].spend : 0; }),
-          yAxisID: 'yR', borderColor: '#f87171', pointRadius: 2, tension: .3
-        },
-        {
-          label: 'Est. Profit',
+          yAxisID: 'yR', borderColor: '#f87171', pointRadius: 2, tension: .3 },
+        { label: 'Est. Profit',
           data: allDates.map(function(dt) {
             var trv = revMap[dt] || 0;
             var sp  = spendMap[dt] ? spendMap[dt].spend : 0;
-            return r2(trv - sp - (trv * 0.33)); // 29%FF+2.8%App+1.2%Tax ≈ 33%
+            // Rev - Ads - FF(29%) - GW(7%) - App(2.8%) - TaxAds(txg07Ratio×12% of sp)
+            return r2(trv - sp - trv * 0.388 - sp * txg07Ratio * 0.12);
           }),
-          yAxisID: 'yR', borderColor: '#a78bfa', borderDash: [4, 3], pointRadius: 2, tension: .3
-        }
+          yAxisID: 'yR', borderColor: '#a78bfa', borderDash: [4, 3], pointRadius: 2, tension: .3 }
       ]
     },
     options: {
@@ -640,57 +643,89 @@ function renderOverview(d) {
     }
   });
 
-  // Donut cost breakdown — dùng EUR values
-  var donutData = [
-    { label: 'Paid Ads',    val: totalSpend,          color: '#3b82f6' },
-    { label: 'Fulfillment', val: fulfillment,          color: '#f59e0b' },
-    { label: 'APP API',     val: appApiCost,           color: '#ec4899' },
-    { label: 'Tax',         val: taxCost,              color: '#8b5cf6' },
-    { label: 'Profit',      val: Math.max(0, profit),  color: '#22c55e' }
+  // FIX #4: Donut với % trong tooltip và legend
+  var donutItems = [
+    { label: 'Paid Ads',      val: totalSpend,         color: '#3b82f6' },
+    { label: 'Fulfillment',   val: fulfillment,         color: '#f59e0b' },
+    { label: 'Gateway Fee',   val: gatewayFee,          color: '#8b5cf6' },
+    { label: 'APP API',       val: appApiCost,          color: '#ec4899' },
+    { label: 'TaxAds TXG07', val: taxAds,              color: '#06b6d4' },
+    { label: 'Profit',        val: Math.max(0, profit), color: '#22c55e' }
   ];
+  var donutTotal = donutItems.reduce(function(s, x) { return s + x.val; }, 0);
   mkCh('ch-ov-donut', {
     type: 'doughnut',
     data: {
-      labels: donutData.map(function(x) { return x.label; }),
-      datasets: [{ data: donutData.map(function(x) { return x.val; }),
-                   backgroundColor: donutData.map(function(x) { return x.color; }), borderWidth: 0 }]
+      labels: donutItems.map(function(x) { return x.label; }),
+      datasets: [{ data: donutItems.map(function(x) { return x.val; }),
+                   backgroundColor: donutItems.map(function(x) { return x.color; }), borderWidth: 0 }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { position: 'right' },
-        tooltip: { callbacks: { label: function(ctx) { return ' ' + nf(ctx.raw, 2); } } }
+        legend: {
+          position: 'right',
+          labels: {
+            generateLabels: function(chart) {
+              var ds = chart.data.datasets[0];
+              return chart.data.labels.map(function(lbl, i) {
+                var val = ds.data[i] || 0;
+                var p   = donutTotal > 0 ? r2(val / donutTotal * 100) : 0;
+                return {
+                  text:            lbl + '  ' + p + '%',
+                  fillStyle:       ds.backgroundColor[i],
+                  strokeStyle:     ds.backgroundColor[i],
+                  lineWidth:       0,
+                  hidden:          false,
+                  index:           i
+                };
+              });
+            }
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              var val  = ctx.raw || 0;
+              var p    = donutTotal > 0 ? r2(val / donutTotal * 100) : 0;
+              return ' ' + cur(val) + '  (' + p + '%)';
+            }
+          }
+        }
       }
     }
   });
 
-  // Gap analysis — note currency difference
+  // Gap analysis
   var gapColor, gapLabel, gapNote;
   if (gap >= 0) {
     gapColor = '#4ade80';
     gapLabel = 'Organic / Shipping / Unattributed';
-    gapNote  = 'ℹ️ Shopify thu thêm <strong style="color:#fbbf24">' + curEur(gap) + '</strong> so với Ads claim → organic / ship / direct.';
+    gapNote  = 'ℹ️ Shopify thu thêm <strong style="color:#fbbf24">' + cur(gap) + '</strong> so với Ads claim → organic / ship / direct.';
   } else {
     gapColor = '#f87171';
-    gapLabel = 'Double-count hoặc currency gap';
-    gapNote  = '⚠️ Ads claim nhiều hơn Shopify <strong style="color:#f87171">' + curEur(Math.abs(gap)) + '</strong> → double-attribution hoặc FX mismatch (Ads $ vs Shopify €).';
+    gapLabel = 'Double-count hoặc FX gap';
+    gapNote  = '⚠️ Ads claim nhiều hơn Shopify <strong style="color:#f87171">' + cur(Math.abs(gap)) + '</strong> → double-attribution hoặc tỷ giá cố định 1.1 vs thị trường.';
   }
 
   document.getElementById('ov-gap').innerHTML =
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;text-align:center;padding:8px 0 16px">'
     + '<div><div style="font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Shopify Total Revenue</div>'
-    + '<div style="font-size:24px;font-weight:800;color:#4ade80">' + curEur(totalRevInp) + '</div></div>'
+    + '<div style="font-size:24px;font-weight:800;color:#4ade80">' + cur(totalRevInp) + '</div></div>'
     + '<div><div style="font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Ads Attributed (FB+GG)</div>'
     + '<div style="font-size:24px;font-weight:800;color:#a78bfa">' + cur(b.revenue || 0) + '</div></div>'
-    + '<div><div style="font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Gap (€ vs $)</div>'
-    + '<div style="font-size:24px;font-weight:800;color:' + gapColor + '">' + (gap >= 0 ? '+' : '') + curEur(gap) + '</div>'
+    + '<div><div style="font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Gap ($)</div>'
+    + '<div style="font-size:24px;font-weight:800;color:' + gapColor + '">' + (gap >= 0 ? '+' : '') + cur(gap) + '</div>'
     + '<div style="font-size:10px;color:' + gapColor + ';margin-top:2px">' + gapLabel + '</div></div>'
     + '</div>'
     + '<div style="border-top:1px solid #252840;padding-top:10px;font-size:11px;color:#475569">' + gapNote + '</div>';
 }
 
 // ═══════════════════════════════════════
-// TAB 2 — STORE (all Shopify = EUR)
+// TAB 2 — STORE
+// FIX #6: Revenue chart → line | Orders chart → bar
+// FIX #6: Product Type → dual chart (bar=items, line=revenue)
+// FIX #7: Loại trừ Service/Shipping Protection khỏi items
 // ═══════════════════════════════════════
 function renderStore(d) {
   var o  = d.shopifyOrderTotals || {};
@@ -699,28 +734,38 @@ function renderStore(d) {
   var sm = d.shopifyByMarket    || {};
   var st = d.shopifyByType      || {};
 
+  // FIX #7: Tính items đã loại trừ service types
+  var serviceUnits = 0, serviceRev = 0;
+  Object.keys(st).forEach(function(k) {
+    if (isServiceType(k)) {
+      serviceUnits += st[k].unitsSold || 0;
+      serviceRev   += st[k].revenue   || 0;
+    }
+  });
+  var displayUnits = Math.max(0, (t.unitsSold || 0) - serviceUnits);
+
   document.getElementById('st-kpis').innerHTML = [
-    kpi('Total Revenue',    curEur(o.totalRevenue || t.revenue || 0), 'Bao gồm ship · EUR', 'green'),
-    kpi('Product Revenue',  curEur(t.revenue || 0),   'Chỉ tiền sản phẩm'),
-    kpi('Shipping',         curEur(o.shipping  || 0), 'Tiền ship thu của khách', 'blue'),
-    kpi('Orders',           nf(o.orders || 0),        'Số đơn thực tế', 'blue'),
-    kpi('Items Sold',       nf(t.unitsSold || 0),     'Tổng sản phẩm xuất kho'),
-    kpi('AOV',              curEur(o.aov || 0),       'Giá trị TB đơn', 'blue'),
-    kpi('AOQ',              nf(o.aoq || 0, 1) + ' items', 'Số sản phẩm / đơn', 'blue'),
-    kpi('Retention',        pct(o.retentionRate || 0), 'Tỷ lệ khách quay lại', (o.retentionRate > 15 ? 'green' : 'warn')),
+    kpi('Total Revenue',    cur(o.totalRevenue || t.revenue || 0), 'Bao gồm ship · USD', 'green'),
+    kpi('Product Revenue',  cur((t.revenue || 0) - serviceRev),    'Chỉ tiền sản phẩm (excl. service)'),
+    kpi('Shipping',         cur(o.shipping  || 0),                 'Tiền ship thu của khách', 'blue'),
+    kpi('Orders',           nf(o.orders || 0),                     'Số đơn thực tế', 'blue'),
+    kpi('Items Sold',       nf(displayUnits),                      'Excl. Shipping Protection'),
+    kpi('AOV',              cur(o.aov || 0),                       'Giá trị TB đơn', 'blue'),
+    kpi('AOQ',              nf(o.aoq || 0, 1) + ' items',          'Số sản phẩm / đơn', 'blue'),
+    kpi('Retention',        pct(o.retentionRate || 0),             'Tỷ lệ khách quay lại', (o.retentionRate > 15 ? 'green' : 'warn')),
   ].join('');
 
-  // FIX: dùng shopifyOrderDaily (total incl. shipping) → Revenue thực tế
-  // fallback sang shopifyDaily (product-level) nếu shopifyOrderDaily trống
-  var odDly  = d.shopifyOrderDaily || [];
-  var prDly  = d.shopifyDaily      || [];
-  var stDly  = odDly.length ? odDly : prDly;
+  // FIX #6: Revenue chart → LINE
+  var odDly = d.shopifyOrderDaily || [];
+  var prDly = d.shopifyDaily      || [];
+  var stDly = odDly.length ? odDly : prDly;
   mkCh('ch-st-daily', {
-    type: 'bar',
+    type: 'line',
     data: {
       labels: stDly.map(function(r) { return fd(r.date); }),
-      datasets: [{ label: 'Total Revenue (€)', data: stDly.map(function(r) { return r.totalRevenue || r.revenue || 0; }),
-                   backgroundColor: 'rgba(34,197,94,.7)', borderRadius: 4 }]
+      datasets: [{ label: 'Total Revenue ($)', data: stDly.map(function(r) { return r.totalRevenue || r.revenue || 0; }),
+                   borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.08)',
+                   fill: true, pointRadius: 2, tension: .3 }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
@@ -729,6 +774,7 @@ function renderStore(d) {
     }
   });
 
+  // Market donut
   var mktKeys = Object.keys(sm).filter(function(k) { return k !== 'Unknown'; });
   mkCh('ch-st-market', {
     type: 'doughnut',
@@ -738,33 +784,50 @@ function renderStore(d) {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'right' },
-        tooltip: { callbacks: { label: function(ctx) { return ' €' + nf(ctx.raw, 2); } } } }
+        tooltip: { callbacks: { label: function(ctx) { return ' ' + cur(ctx.raw); } } } }
     }
   });
 
-  var typeKeys = Object.keys(st).filter(function(k) { return k !== 'Unknown'; })
+  // FIX #6: Product Type → dual chart bar(items) + line(revenue)
+  // FIX #7: Lọc service types khỏi chart
+  var typeKeys = Object.keys(st)
+    .filter(function(k) { return k !== 'Unknown' && !isServiceType(k); })
     .sort(function(a, b) { return (st[b].revenue || 0) - (st[a].revenue || 0); });
   mkCh('ch-st-type', {
     type: 'bar',
-    data: { labels: typeKeys,
-            datasets: [{ label: 'Revenue (€)', data: typeKeys.map(function(k) { return st[k].revenue || 0; }),
-                         backgroundColor: '#a78bfa', borderRadius: 4 }] },
+    data: {
+      labels: typeKeys,
+      datasets: [
+        { type: 'bar',  label: 'Items Sold',
+          data: typeKeys.map(function(k) { return st[k].unitsSold || 0; }),
+          yAxisID: 'yI', backgroundColor: 'rgba(167,139,250,.6)', borderRadius: 3 },
+        { type: 'line', label: 'Revenue ($)',
+          data: typeKeys.map(function(k) { return st[k].revenue || 0; }),
+          yAxisID: 'yR', borderColor: '#22c55e', pointRadius: 3, tension: .3 }
+      ]
+    },
     options: {
       responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-      plugins: { legend: { display: false } },
-      scales: { x: { grid: GRID, ticks: TICK_Y }, y: { grid: { display: false } } }
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        yI: { display: false },
+        yR: { position: 'top', grid: GRID, ticks: TICK_Y, title: { display: true, text: 'Revenue ($)' } },
+        x:  { grid: GRID, ticks: TICK_Y }
+      }
     }
   });
 
+  // FIX #6: Orders chart → BAR (Orders), AOV → LINE
   mkCh('ch-st-orders', {
-    type: 'line',
+    type: 'bar',
     data: {
       labels: od.map(function(r) { return fd(r.date); }),
       datasets: [
-        { label: 'Orders', data: od.map(function(r) { return r.orders; }),
-          yAxisID: 'yO', borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,.2)', fill: true, tension: .3 },
-        { label: 'AOV (€)', data: od.map(function(r) { return r.aov; }),
-          yAxisID: 'yA', borderColor: '#f59e0b', borderDash: [5, 5], tension: .3 }
+        { type: 'bar',  label: 'Orders', data: od.map(function(r) { return r.orders; }),
+          yAxisID: 'yO', backgroundColor: 'rgba(96,165,250,.55)', borderRadius: 3 },
+        { type: 'line', label: 'AOV ($)', data: od.map(function(r) { return r.aov; }),
+          yAxisID: 'yA', borderColor: '#f59e0b', pointRadius: 2, tension: .3 }
       ]
     },
     options: {
@@ -772,12 +835,13 @@ function renderStore(d) {
       interaction: { mode: 'index', intersect: false },
       scales: {
         yO: { position: 'left',  grid: GRID, title: { display: true, text: 'Orders' } },
-        yA: { position: 'right', grid: { display: false }, ticks: TICK_Y, title: { display: true, text: 'AOV (€)' } }
+        yA: { position: 'right', grid: { display: false }, ticks: TICK_Y, title: { display: true, text: 'AOV ($)' } }
       }
     }
   });
 
-  var prods = d.shopifyTopProducts || [];
+  // Top products table — FIX #7: lọc service
+  var prods = (d.shopifyTopProducts || []).filter(function(p) { return !isServiceType(p.type); });
   var rows  = prods.slice(0, 25).map(function(p, i) {
     var title    = (p.title || p.productId || '').slice(0, 45);
     var nameCell = p.fullUrl
@@ -791,18 +855,21 @@ function renderStore(d) {
       nameCell,
       '<span style="font-size:10px;color:#a78bfa">' + (p.type || '–') + '</span>',
       markets,
-      '<span class="num">' + curEur(p.revenue)  + '</span>',
-      '<span class="num">' + nf(p.unitsSold)    + '</span>',
-      '<span class="num">' + nf(p.orderLines)   + '</span>'
+      '<span class="num">' + cur(p.revenue)   + '</span>',
+      '<span class="num">' + nf(p.unitsSold)  + '</span>',
+      '<span class="num">' + nf(p.orderLines) + '</span>'
     ];
   });
   document.getElementById('st-products').innerHTML = mkTable(
-    ['#', 'Product', 'Type', 'Market', 'Revenue (€)', 'Units', 'Order Lines'], rows
+    ['#', 'Product', 'Type', 'Market', 'Revenue ($)', 'Units', 'Order Lines'], rows
   );
 }
 
 // ═══════════════════════════════════════
 // TAB 3 — CAMPAIGN PERFORMANCE
+// FIX #8: % ES/IT trong market table
+// FIX #8: Chart Spend=line, ROAS=bar (mixed type)
+// FIX #10: showTypeDetail dùng dailyByType thực
 // ═══════════════════════════════════════
 function renderCampaign(d) {
   var b  = d.blended  || {};
@@ -821,7 +888,6 @@ function renderCampaign(d) {
   ].join('');
 
   var bc     = d.blendedByCountry || {};
-  // FIX: case-insensitive filter để loại bỏ cả "Unknown" lẫn "UNKNOWN"
   var bcKeys = Object.keys(bc).filter(function(k) { return k.toLowerCase() !== 'unknown'; });
   mkCh('ch-cp-mkt-donut', {
     type: 'doughnut',
@@ -835,15 +901,18 @@ function renderCampaign(d) {
     }
   });
 
+  // FIX #8: FB daily — ROAS=bar, Spend=line (mixed)
   var trend = d.dailyTrend || [];
   mkCh('ch-cp-fb-daily', {
-    type: 'line',
+    type: 'bar',
     data: {
       labels: trend.map(function(r) { return fd(r.date); }),
       datasets: [
-        { label: 'FB ROAS', data: trend.map(function(r) { return r.fb_spend > 0 ? r2(r.fb_revenue / r.fb_spend) : 0; }),
-          yAxisID: 'yR', borderColor: '#a78bfa', pointRadius: 2, tension: .3 },
-        { label: 'FB Spend', data: trend.map(function(r) { return r.fb_spend || 0; }),
+        { type: 'bar',  label: 'FB ROAS',
+          data: trend.map(function(r) { return r.fb_spend > 0 ? r2(r.fb_revenue / r.fb_spend) : 0; }),
+          yAxisID: 'yR', backgroundColor: 'rgba(167,139,250,.55)', borderRadius: 2 },
+        { type: 'line', label: 'FB Spend ($)',
+          data: trend.map(function(r) { return r.fb_spend || 0; }),
           yAxisID: 'yS', borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,.08)',
           fill: true, pointRadius: 2, tension: .3 }
       ]
@@ -853,19 +922,22 @@ function renderCampaign(d) {
       interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top' } },
       scales: {
         yR: { position: 'right', grid: GRID, min: 0, title: { display: true, text: 'ROAS' } },
-        yS: { position: 'left',  grid: GRID, ticks: TICK_Y, title: { display: true, text: 'Spend' } }
+        yS: { position: 'left',  grid: GRID, ticks: TICK_Y, title: { display: true, text: 'Spend ($)' } }
       }
     }
   });
 
+  // FIX #8: GG daily — ROAS=bar, Spend=line (mixed)
   mkCh('ch-cp-gg-daily', {
-    type: 'line',
+    type: 'bar',
     data: {
       labels: trend.map(function(r) { return fd(r.date); }),
       datasets: [
-        { label: 'GG ROAS', data: trend.map(function(r) { return r.gg_spend > 0 ? r2(r.gg_revenue / r.gg_spend) : 0; }),
-          yAxisID: 'yR', borderColor: '#4ade80', pointRadius: 2, tension: .3 },
-        { label: 'GG Spend', data: trend.map(function(r) { return r.gg_spend || 0; }),
+        { type: 'bar',  label: 'GG ROAS',
+          data: trend.map(function(r) { return r.gg_spend > 0 ? r2(r.gg_revenue / r.gg_spend) : 0; }),
+          yAxisID: 'yR', backgroundColor: 'rgba(34,197,94,.5)', borderRadius: 2 },
+        { type: 'line', label: 'GG Spend ($)',
+          data: trend.map(function(r) { return r.gg_spend || 0; }),
           yAxisID: 'yS', borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.08)',
           fill: true, pointRadius: 2, tension: .3 }
       ]
@@ -875,11 +947,12 @@ function renderCampaign(d) {
       interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top' } },
       scales: {
         yR: { position: 'right', grid: GRID, min: 0, title: { display: true, text: 'ROAS' } },
-        yS: { position: 'left',  grid: GRID, ticks: TICK_Y, title: { display: true, text: 'Spend' } }
+        yS: { position: 'left',  grid: GRID, ticks: TICK_Y, title: { display: true, text: 'Spend ($)' } }
       }
     }
   });
 
+  // Product type pills + table
   var types    = d.byProductType || {};
   var typeList = Object.entries(types).sort(function(a, b) { return b[1].spend - a[1].spend; });
   var pillsEl  = document.getElementById('cp-type-pills');
@@ -913,6 +986,7 @@ function renderCampaign(d) {
     ['Product Type', 'Spend', 'Revenue Attr.', 'ROAS', 'CPA', 'Purchases', 'FB / GG'], typeRows
   );
 
+  // Account table
   var accts    = d.byAccount || {};
   var acctRows = Object.entries(accts).sort(function(a, b) { return b[1].spend - a[1].spend; })
     .map(function(item) {
@@ -930,25 +1004,26 @@ function renderCampaign(d) {
     ['Account', 'Spend', 'Revenue', 'ROAS', 'CPA', 'Purchases'], acctRows
   );
 
-  // FIX: dùng blendedByCountry (FB country + GG product ID prefix = actual targeting)
-  // byMarket = product metadata (cột P) → nhiều "Unknown" vì GG không có product metadata
-  // blendedByCountry = thực tế target quốc gia nào → chính xác hơn
-  var cpMkt     = d.blendedByCountry || {};
-  var cpMktRows = Object.entries(cpMkt)
+  // FIX #8: Market table với % Spend
+  var cpMkt      = d.blendedByCountry || {};
+  var cpMktList  = Object.entries(cpMkt)
     .filter(function(item) { return item[0].toLowerCase() !== 'unknown'; })
-    .sort(function(a, b) { return b[1].spend - a[1].spend; })
-    .map(function(item) {
-      var k = item[0], m = item[1];
-      return [
-        '<span class="badge b-' + k.toLowerCase() + '">' + k + '</span>',
-        '<span class="num">' + cur(m.spend)   + '</span>',
-        '<span class="num">' + cur(m.revenue) + '</span>',
-        '<span class="num" style="' + roasStyle(m.roas, 1.65) + '">' + nf(m.roas, 2) + 'x</span>',
-        '<span class="num">' + nf(m.purchases, 1) + '</span>'
-      ];
-    });
+    .sort(function(a, b) { return b[1].spend - a[1].spend; });
+  var totalMktSpend = cpMktList.reduce(function(s, item) { return s + (item[1].spend || 0); }, 0);
+  var cpMktRows  = cpMktList.map(function(item) {
+    var k = item[0], m = item[1];
+    var spendPct = totalMktSpend > 0 ? r2(m.spend / totalMktSpend * 100) : 0;
+    return [
+      '<span class="badge b-' + k.toLowerCase() + '">' + k + '</span>',
+      '<span class="num">' + cur(m.spend) + '</span>',
+      '<span class="num" style="color:#94a3b8;font-size:11px">' + pct(spendPct) + '</span>',
+      '<span class="num">' + cur(m.revenue) + '</span>',
+      '<span class="num" style="' + roasStyle(m.roas, 1.65) + '">' + nf(m.roas, 2) + 'x</span>',
+      '<span class="num">' + nf(m.purchases, 1) + '</span>'
+    ];
+  });
   document.getElementById('cp-mkt-tbl').innerHTML = mkTable(
-    ['Market', 'Spend', 'Revenue Attr.', 'ROAS', 'Purchases'], cpMktRows
+    ['Market', 'Spend', '% Spend', 'Revenue Attr.', 'ROAS', 'Purchases'], cpMktRows
   );
 
   var creas    = (d.topCreatives || []).slice(0, 20);
@@ -971,19 +1046,60 @@ function renderCampaign(d) {
   );
 }
 
+// FIX #10: showTypeDetail — dùng dailyByType từ WebApp v4.3
 function showTypeDetail(type, d) {
-  var box = document.getElementById('cp-type-chart-box');
-  document.getElementById('cp-type-chart-title').textContent = type + ' — Spend & ROAS Trend (Coming soon)';
+  var box   = document.getElementById('cp-type-chart-box');
+  var title = document.getElementById('cp-type-chart-title');
+  title.textContent = type + ' — Spend ($) & ROAS Daily';
   box.style.display = 'block';
-  if (CH['ch-cp-type-trend']) { CH['ch-cp-type-trend'].destroy(); }
-  CH['ch-cp-type-trend'] = new Chart(document.getElementById('ch-cp-type-trend'), {
+
+  var dbt   = d.dailyByType || {};
+  var dates = Object.keys(dbt).sort();
+
+  if (dates.length === 0) {
+    // Fallback nếu WebApp chưa có dailyByType (v4.2 trở về trước)
+    if (CH['ch-cp-type-trend']) { CH['ch-cp-type-trend'].destroy(); }
+    CH['ch-cp-type-trend'] = new Chart(document.getElementById('ch-cp-type-trend'), {
+      type: 'bar',
+      data: { labels: ['Cần deploy WebApp v4.3'], datasets: [{ data: [0], backgroundColor: '#334155' }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    });
+    return;
+  }
+
+  var spendData = dates.map(function(dt) { return dbt[dt][type] ? dbt[dt][type].spend : 0; });
+  var roasData  = dates.map(function(dt) { return dbt[dt][type] ? dbt[dt][type].roas  : 0; });
+  var be        = (d.byProductType && d.byProductType[type]) ? (d.byProductType[type].beRoas || 1.63) : 1.63;
+
+  mkCh('ch-cp-type-trend', {
     type: 'bar',
-    data: { labels: ['Tính năng đang phát triển'], datasets: [{ data: [0], backgroundColor: '#334155' }] },
+    data: {
+      labels: dates.map(fd),
+      datasets: [
+        { type: 'bar',  label: 'ROAS',
+          data: roasData, yAxisID: 'yR',
+          backgroundColor: roasData.map(function(v) {
+            if (v >= be * 1.15) return 'rgba(74,222,128,.65)';
+            if (v >= be)        return 'rgba(251,191,36,.65)';
+            return 'rgba(248,113,113,.6)';
+          }), borderRadius: 2 },
+        { type: 'line', label: 'Spend ($)',
+          data: spendData, yAxisID: 'yS',
+          borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,.08)',
+          fill: true, pointRadius: 2, tension: .3 }
+      ]
+    },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false },
-        subtitle: { display: true, text: '⚠️ GAS cần trả về daily data theo product type',
-                    color: '#f59e0b', font: { size: 11 } } }
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top' },
+        annotation: {}
+      },
+      scales: {
+        yR: { position: 'right', grid: GRID, min: 0, title: { display: true, text: 'ROAS' } },
+        yS: { position: 'left',  grid: GRID, ticks: TICK_Y, title: { display: true, text: 'Spend ($)' } }
+      }
     }
   });
 }
@@ -1100,8 +1216,8 @@ function renderMD(d) {
     kpi('Revenue Attributed', cur(b.revenue),         'FB + GG platform'),
     kpi('Blended ROAS',       nf(b.roas, 2) + 'x',   'Platform attributed', roasCls(b.roas, 1.65)),
     kpi('Purchases',          nf(b.purchases, 1),    'CPA ' + cur(b.cpa)),
-    kpi('Shopify Revenue (€)',curEur(totalRevMD),     'Doanh thu thực tế', 'green'),
-    kpi('True ROAS',          nf(trueROAS, 2) + 'x', 'Shopify € ÷ Paid Spend', roasCls(trueROAS, 1.65)),
+    kpi('Shopify Revenue ($)', cur(totalRevMD),       'Doanh thu thực tế · USD', 'green'),
+    kpi('True ROAS',          nf(trueROAS, 2) + 'x', 'Shopify $ ÷ Paid Spend', roasCls(trueROAS, 1.65)),
   ].join('');
 
   var trend = d.dailyTrend || [];
@@ -1112,7 +1228,7 @@ function renderMD(d) {
       datasets: [
         { label: 'ROAS', data: trend.map(function(r) { return r.roas; }),
           yAxisID: 'yR', borderColor: '#e879f9', pointRadius: 3, tension: .3 },
-        { label: 'Spend', data: trend.map(function(r) { return r.spend; }),
+        { label: 'Spend ($)', data: trend.map(function(r) { return r.spend; }),
           yAxisID: 'yS', borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,.08)',
           fill: true, pointRadius: 2, tension: .3 }
       ]
@@ -1127,7 +1243,6 @@ function renderMD(d) {
     }
   });
 
-  // FIX: case-insensitive "unknown" filter
   var allMkts = []; var mktSet = {};
   Object.keys(bc).concat(Object.keys(sm)).forEach(function(m) {
     if (m.toLowerCase() !== 'unknown' && !mktSet[m]) { mktSet[m] = 1; allMkts.push(m); }
@@ -1139,14 +1254,14 @@ function renderMD(d) {
     return [
       '<span class="badge b-' + mkt.toLowerCase() + '">' + mkt + '</span>',
       '<span class="num">' + cur(sp)                + '</span>',
-      '<span class="num">' + curEur(rv)             + '</span>',
+      '<span class="num">' + cur(rv)                + '</span>',
       '<span class="num" style="' + roasStyle(tr, 1.65) + '">' + nf(tr, 2) + 'x</span>',
       '<span class="num">' + cur(bc[mkt] ? bc[mkt].cpa || 0 : 0)        + '</span>',
       '<span class="num">' + nf(bc[mkt] ? bc[mkt].purchases || 0 : 0, 1) + '</span>'
     ];
   });
   document.getElementById('md-mkt-tbl').innerHTML = mkTable(
-    ['Market', 'Spend ($)', 'Shopify Revenue (€)', 'True ROAS', 'CPA', 'Purchases'], mktRows
+    ['Market', 'Spend ($)', 'Shopify Revenue ($)', 'True ROAS', 'CPA', 'Purchases'], mktRows
   );
 
   mkCh('ch-md-mkt', {
@@ -1178,7 +1293,6 @@ function renderMD(d) {
       '<span class="num">' + nf(p.purchases, 1) + '</span>'
     ];
   });
-  // FIX: header 'Revenue ($)' → 'Revenue (Ads Attr.)' — đây là ads-attributed, không phải Shopify
   document.getElementById('md-prod-tbl').innerHTML = mkTable(
     ['#', 'Product', 'Type', 'Market', 'Spend ($)', 'Revenue (Ads Attr.)', 'ROAS', 'Purchases'], pRows
   );
@@ -1242,14 +1356,13 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
 });
 
 // ═══════════════════════════════════════
-// INIT — dùng today() đã fix timezone Spain
+// INIT
 // ═══════════════════════════════════════
 (function() {
-  var t = today();             // Ngày hiện tại theo Spain time
-  var f = addDays(t, -6);     // 7N range
-  document.getElementById('cf').value = f;
-  document.getElementById('ct').value = t;
-  loadAll(f, t);
+  var range = rangeFrom('7'); // Last 7 ngày đã qua (exclude today)
+  document.getElementById('cf').value = range.from;
+  document.getElementById('ct').value = range.to;
+  loadAll(range.from, range.to);
 })();
 </script>
 </body>
