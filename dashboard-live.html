@@ -541,7 +541,17 @@ function renderOverview(d) {
   var trueROAS  = totalSpend > 0 ? r2(totalRevInp / totalSpend) : 0;
   var gap       = r2(totalRevInp - (b.revenue || 0)); // EUR vs Ads attributed
 
-  document.getElementById('ov-kpis').innerHTML = [
+  // UX: Cảnh báo khi không có data (thường gặp khi chọn "Hôm nay" sớm buổi sáng)
+  var noDataBanner = '';
+  if (totalSpend === 0 && totalRevInp === 0 && (o.orders || 0) === 0) {
+    noDataBanner = '<div style="background:#1c1000;border:1.5px solid #d97706;border-radius:10px;'
+      + 'padding:11px 15px;margin-bottom:14px;font-size:12px;color:#fde68a;">'
+      + '⏳ <strong style="color:#fbbf24">Chưa có dữ liệu cho khoảng thời gian này.</strong> '
+      + 'Dữ liệu từ Triple Whale thường cập nhật sau 1-3 giờ kể từ đầu ngày Spain time. '
+      + 'Thử chọn <strong>Hôm qua</strong> hoặc <strong>7N</strong> để xem dữ liệu gần nhất.</div>';
+  }
+
+  document.getElementById('ov-kpis').innerHTML = noDataBanner + [
     kpi('Total Ads Spend',      cur(totalSpend),       'FB ' + cur(b.fb_spend || 0) + ' + GG ' + cur(b.gg_spend || 0)),
     kpi('Total Revenue (€)',    curEur(totalRevInp),   'Doanh thu THỰC · Shopify EUR', 'green'),
     kpi('True ROAS',            nf(trueROAS, 2) + 'x', 'Total Rev € ÷ Paid Spend', roasCls(trueROAS, 1.65)),
@@ -557,9 +567,10 @@ function renderOverview(d) {
   ].join('');
 
   // Market table — Shopify Revenue cột = EUR
+  // FIX: normalize "UNKNOWN"/"Unknown"/"unknown" → loại bỏ case-insensitive
   var allMkts = []; var mktSet = {};
   Object.keys(bc).concat(Object.keys(sm)).forEach(function(m) {
-    if (m !== 'Unknown' && !mktSet[m]) { mktSet[m] = 1; allMkts.push(m); }
+    if (m.toLowerCase() !== 'unknown' && !mktSet[m]) { mktSet[m] = 1; allMkts.push(m); }
   });
   var mktRows = allMkts.map(function(mkt) {
     var spendM  = bc[mkt] ? (bc[mkt].spend    || 0) : 0;
@@ -581,32 +592,41 @@ function renderOverview(d) {
   );
 
   // Daily trend — Y axis không dùng $ hay €, để số thuần
-  var daily = d.dailyTrend       || [];
+  // FIX: Union dates từ dailyTrend (Ads) VÀ shopifyOrderDaily (Shopify)
+  // → Trục X hiển thị đầy đủ ngày dù 1 nguồn có data mà nguồn kia không có
+  var dtAds = d.dailyTrend       || [];
   var dtO   = d.shopifyOrderDaily || [];
-  var revMap = {};
-  dtO.forEach(function(row) { revMap[row.date] = row.totalRevenue; });
+  var revMap = {}, spendMap = {};
+  dtO.forEach(function(row)   { revMap[row.date]   = row.totalRevenue; });
+  dtAds.forEach(function(row) { spendMap[row.date] = row; });
+  var allDates = []; var dateSet = {};
+  dtAds.concat(dtO).forEach(function(r) {
+    if (!dateSet[r.date]) { dateSet[r.date] = 1; allDates.push(r.date); }
+  });
+  allDates.sort();
 
   mkCh('ch-ov-daily', {
     type: 'line',
     data: {
-      labels: daily.map(function(r) { return fd(r.date); }),
+      labels: allDates.map(fd),
       datasets: [
         {
           label: 'Total Revenue (€)',
-          data: daily.map(function(r) { return revMap[r.date] || 0; }),
+          data: allDates.map(function(dt) { return revMap[dt] || 0; }),
           yAxisID: 'yR', borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.08)',
           fill: true, pointRadius: 2, tension: .3
         },
         {
           label: 'Paid Spend ($)',
-          data: daily.map(function(r) { return r.spend; }),
+          data: allDates.map(function(dt) { return spendMap[dt] ? spendMap[dt].spend : 0; }),
           yAxisID: 'yR', borderColor: '#f87171', pointRadius: 2, tension: .3
         },
         {
           label: 'Est. Profit',
-          data: daily.map(function(r) {
-            var trv = revMap[r.date] || 0;
-            return r2(trv - r.spend - (trv * 0.33)); // 29%FF+2.8%App+1.2%Tax ≈ 33%
+          data: allDates.map(function(dt) {
+            var trv = revMap[dt] || 0;
+            var sp  = spendMap[dt] ? spendMap[dt].spend : 0;
+            return r2(trv - sp - (trv * 0.33)); // 29%FF+2.8%App+1.2%Tax ≈ 33%
           }),
           yAxisID: 'yR', borderColor: '#a78bfa', borderDash: [4, 3], pointRadius: 2, tension: .3
         }
@@ -690,12 +710,16 @@ function renderStore(d) {
     kpi('Retention',        pct(o.retentionRate || 0), 'Tỷ lệ khách quay lại', (o.retentionRate > 15 ? 'green' : 'warn')),
   ].join('');
 
-  var daily = d.shopifyDaily || [];
+  // FIX: dùng shopifyOrderDaily (total incl. shipping) → Revenue thực tế
+  // fallback sang shopifyDaily (product-level) nếu shopifyOrderDaily trống
+  var odDly  = d.shopifyOrderDaily || [];
+  var prDly  = d.shopifyDaily      || [];
+  var stDly  = odDly.length ? odDly : prDly;
   mkCh('ch-st-daily', {
     type: 'bar',
     data: {
-      labels: daily.map(function(r) { return fd(r.date); }),
-      datasets: [{ label: 'Product Revenue (€)', data: daily.map(function(r) { return r.revenue; }),
+      labels: stDly.map(function(r) { return fd(r.date); }),
+      datasets: [{ label: 'Total Revenue (€)', data: stDly.map(function(r) { return r.totalRevenue || r.revenue || 0; }),
                    backgroundColor: 'rgba(34,197,94,.7)', borderRadius: 4 }]
     },
     options: {
@@ -797,7 +821,8 @@ function renderCampaign(d) {
   ].join('');
 
   var bc     = d.blendedByCountry || {};
-  var bcKeys = Object.keys(bc).filter(function(k) { return k !== 'Unknown'; });
+  // FIX: case-insensitive filter để loại bỏ cả "Unknown" lẫn "UNKNOWN"
+  var bcKeys = Object.keys(bc).filter(function(k) { return k.toLowerCase() !== 'unknown'; });
   mkCh('ch-cp-mkt-donut', {
     type: 'doughnut',
     data: { labels: bcKeys,
@@ -905,8 +930,13 @@ function renderCampaign(d) {
     ['Account', 'Spend', 'Revenue', 'ROAS', 'CPA', 'Purchases'], acctRows
   );
 
-  var mkt     = d.byMarket || {};
-  var mktRows = Object.entries(mkt).sort(function(a, b) { return b[1].spend - a[1].spend; })
+  // FIX: dùng blendedByCountry (FB country + GG product ID prefix = actual targeting)
+  // byMarket = product metadata (cột P) → nhiều "Unknown" vì GG không có product metadata
+  // blendedByCountry = thực tế target quốc gia nào → chính xác hơn
+  var cpMkt     = d.blendedByCountry || {};
+  var cpMktRows = Object.entries(cpMkt)
+    .filter(function(item) { return item[0].toLowerCase() !== 'unknown'; })
+    .sort(function(a, b) { return b[1].spend - a[1].spend; })
     .map(function(item) {
       var k = item[0], m = item[1];
       return [
@@ -918,7 +948,7 @@ function renderCampaign(d) {
       ];
     });
   document.getElementById('cp-mkt-tbl').innerHTML = mkTable(
-    ['Market', 'Spend', 'Revenue Attr.', 'ROAS', 'Purchases'], mktRows
+    ['Market', 'Spend', 'Revenue Attr.', 'ROAS', 'Purchases'], cpMktRows
   );
 
   var creas    = (d.topCreatives || []).slice(0, 20);
@@ -1097,9 +1127,10 @@ function renderMD(d) {
     }
   });
 
+  // FIX: case-insensitive "unknown" filter
   var allMkts = []; var mktSet = {};
   Object.keys(bc).concat(Object.keys(sm)).forEach(function(m) {
-    if (m !== 'Unknown' && !mktSet[m]) { mktSet[m] = 1; allMkts.push(m); }
+    if (m.toLowerCase() !== 'unknown' && !mktSet[m]) { mktSet[m] = 1; allMkts.push(m); }
   });
   var mktRows = allMkts.map(function(mkt) {
     var sp = bc[mkt] ? (bc[mkt].spend    || 0) : 0;
@@ -1147,8 +1178,9 @@ function renderMD(d) {
       '<span class="num">' + nf(p.purchases, 1) + '</span>'
     ];
   });
+  // FIX: header 'Revenue ($)' → 'Revenue (Ads Attr.)' — đây là ads-attributed, không phải Shopify
   document.getElementById('md-prod-tbl').innerHTML = mkTable(
-    ['#', 'Product', 'Type', 'Market', 'Spend ($)', 'Revenue ($)', 'ROAS', 'Purchases'], pRows
+    ['#', 'Product', 'Type', 'Market', 'Spend ($)', 'Revenue (Ads Attr.)', 'ROAS', 'Purchases'], pRows
   );
 }
 
