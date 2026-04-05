@@ -570,7 +570,7 @@ function renderOverview(d) {
     kpi('Fulfillment (29%)',   cur(fulfillment),          'Total Rev × 29%', 'warn'),
     kpi('Gateway Fee (7%)',    cur(gatewayFee),           'Total Rev × 7%', 'pink'),
     kpi('APP API (2.8%)',      cur(appApiCost),           'Total Rev × 2.8%', 'pink'),
-    kpi('TaxAds TXG07 (12%)', cur(taxAds),               'TXG07 Spend × 12%', 'pink'),
+    kpi('TaxAds TXG 07 (12%)', cur(taxAds),               'TXG 07 Spend × 12%', 'pink'),
     kpi('Shopify Orders',      nf(o.orders || 0),         'Số đơn hàng thực tế', 'blue'),
     kpi('Shipping Revenue',    cur(o.shipping || 0),      'Tiền khách trả ship', 'blue'),
     kpi('AOV',                 cur(o.aov || 0),           'Total Rev ÷ Orders', 'blue'),
@@ -790,9 +790,11 @@ function renderStore(d) {
 
   // FIX #6: Product Type → dual chart bar(items) + line(revenue)
   // FIX #7: Lọc service types khỏi chart
+// FIX: Đổi yAxisID thành xAxisID vì đây là biểu đồ ngang (Horizontal)
   var typeKeys = Object.keys(st)
     .filter(function(k) { return k !== 'Unknown' && !isServiceType(k); })
     .sort(function(a, b) { return (st[b].revenue || 0) - (st[a].revenue || 0); });
+    
   mkCh('ch-st-type', {
     type: 'bar',
     data: {
@@ -800,10 +802,10 @@ function renderStore(d) {
       datasets: [
         { type: 'bar',  label: 'Items Sold',
           data: typeKeys.map(function(k) { return st[k].unitsSold || 0; }),
-          yAxisID: 'yI', backgroundColor: 'rgba(167,139,250,.6)', borderRadius: 3 },
+          xAxisID: 'xI', backgroundColor: 'rgba(167,139,250,.6)', borderRadius: 3 },
         { type: 'line', label: 'Revenue ($)',
           data: typeKeys.map(function(k) { return st[k].revenue || 0; }),
-          yAxisID: 'yR', borderColor: '#22c55e', pointRadius: 3, tension: .3 }
+          xAxisID: 'xR', borderColor: '#22c55e', pointRadius: 3, tension: .3 }
       ]
     },
     options: {
@@ -811,9 +813,9 @@ function renderStore(d) {
       interaction: { mode: 'index', intersect: false },
       plugins: { legend: { position: 'top' } },
       scales: {
-        yI: { display: false },
-        yR: { position: 'top', grid: GRID, ticks: TICK_Y, title: { display: true, text: 'Revenue ($)' } },
-        x:  { grid: GRID, ticks: TICK_Y }
+        xI: { position: 'bottom', grid: { display: false }, title: { display: true, text: 'Items Sold' } },
+        xR: { position: 'top', grid: GRID, ticks: TICK_Y, title: { display: true, text: 'Revenue ($)' } },
+        y:  { grid: { display: false } }
       }
     }
   });
@@ -840,16 +842,24 @@ function renderStore(d) {
     }
   });
 
-  // Top products table — FIX #7: lọc service
+// Top products table — FIX #7: lọc service & FIX Link Sản Phẩm
   var prods = (d.shopifyTopProducts || []).filter(function(p) { return !isServiceType(p.type); });
   var rows  = prods.slice(0, 25).map(function(p, i) {
     var title    = (p.title || p.productId || '').slice(0, 45);
+    
+    // Nối đúng domain Amor1970s
+    var finalUrl = (p.fullUrl && p.fullUrl.indexOf('http') === 0) 
+                    ? p.fullUrl 
+                    : 'https://amor1970s.com/products/' + (p.fullUrl || p.productId || '');
+                    
     var nameCell = p.fullUrl
-      ? '<a href="' + p.fullUrl + '" target="_blank" style="color:#a78bfa;text-decoration:underline;font-size:11px">' + title + '</a>'
+      ? '<a href="' + finalUrl + '" target="_blank" style="color:#a78bfa;text-decoration:underline;font-size:11px">' + title + '</a>'
       : '<span style="font-size:11px">' + title + '</span>';
+      
     var markets  = (p.markets || []).map(function(m) {
       return '<span class="badge b-' + m.toLowerCase() + '">' + m + '</span>';
     }).join(' ') || '–';
+    
     return [
       '<span style="color:#475569">' + (i + 1) + '</span>',
       nameCell,
