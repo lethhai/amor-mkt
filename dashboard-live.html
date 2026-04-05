@@ -543,7 +543,7 @@ function renderOverview(d) {
   var fulfillment  = r2(totalRevInp * 0.29);   // 29% Total Rev
   var gatewayFee   = r2(totalRevInp * 0.07);   // 7% Payment gateway
   var appApiCost   = r2(totalRevInp * 0.028);  // 2.8% App API
-  var txg07Spend   = (d.byAccount && d.byAccount['TXG07']) ? (d.byAccount['TXG07'].spend || 0) : 0;
+  var txg07Spend   = (d.byAccount && d.byAccount['TXG 07']) ? (d.byAccount['TXG 07'].spend || 0) : 0;
   var taxAds       = r2(txg07Spend * 0.12);    // TXG07 spend × 12%
   var totalCost    = totalSpend + fulfillment + gatewayFee + appApiCost + taxAds;
   var profit       = r2(totalRevInp - totalCost);
