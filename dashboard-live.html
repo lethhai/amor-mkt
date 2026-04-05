@@ -533,7 +533,7 @@ function renderOverview(d) {
   var s  = d.shopifyTotals      || {};
   var o  = d.shopifyOrderTotals || {};
   var bc = d.blendedByCountry   || {};
-  var sm = d.shopifyByMarket    || {};
+  var sm = d.shopifyOrderByCountry || {};
 
   var totalSpend  = b.spend    || 0;
   var productRev  = s.revenue  || 0;
@@ -584,7 +584,7 @@ function renderOverview(d) {
   });
   var mktRows = allMkts.map(function(mkt) {
     var spendM  = bc[mkt] ? (bc[mkt].spend    || 0) : 0;
-    var revM    = sm[mkt] ? (sm[mkt].revenue  || 0) : 0;
+    var revM    = sm[mkt] ? (sm[mkt].totalRevenue  || 0) : 0;
     var trueR   = spendM > 0 ? r2(revM / spendM) : 0;
     var adsRevM = bc[mkt] ? (bc[mkt].revenue  || 0) : 0;
     var purch   = bc[mkt] ? (bc[mkt].purchases || 0) : 0;
