@@ -532,7 +532,7 @@ function renderOverview(d) {
   var b  = d.blended            || {};
   var s  = d.shopifyTotals      || {};
   var o  = d.shopifyOrderTotals || {};
-  var bc = d.blendedByCountry   || {};
+  var bc = d.byMarket   || {};
   var sm = d.shopifyOrderByCountry || {};
 
   var totalSpend  = b.spend    || 0;
@@ -897,7 +897,7 @@ function renderCampaign(d) {
     d.hasGGData ? kpi('GG Purchases', nf(gg.purchases, 1), 'Modeled attribution', 'blue') : '',
   ].join('');
 
-  var bc     = d.blendedByCountry || {};
+  var bc     = d.byMarket || {};
   var bcKeys = Object.keys(bc).filter(function(k) { return k.toLowerCase() !== 'unknown'; });
   mkCh('ch-cp-mkt-donut', {
     type: 'doughnut',
@@ -1015,7 +1015,7 @@ function renderCampaign(d) {
   );
 
   // FIX #8: Market table với % Spend
-  var cpMkt      = d.blendedByCountry || {};
+  var cpMkt      = d.byMarket || {};
   var cpMktList  = Object.entries(cpMkt)
     .filter(function(item) { return item[0].toLowerCase() !== 'unknown'; })
     .sort(function(a, b) { return b[1].spend - a[1].spend; });
@@ -1215,7 +1215,7 @@ function renderMD(d) {
   var b  = d.blended            || {};
   var s  = d.shopifyTotals      || {};
   var o  = d.shopifyOrderTotals || {};
-  var bc = d.blendedByCountry   || {};
+  var bc = d.byMarket   || {};
   var sm = d.shopifyByMarket    || {};
 
   var totalRevMD = o.totalRevenue || s.revenue || 0;
