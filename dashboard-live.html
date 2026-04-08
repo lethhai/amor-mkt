@@ -1115,7 +1115,7 @@ function showTypeDetail(type, d) {
 }
 
 // ═══════════════════════════════════════
-// TAB 4 — PRODUCT INTELLIGENCE
+// TAB 4 — PRODUCT INTELLIGENCE (DÙNG TRUE REVENUE TỪ SHOPIFY)
 // ═══════════════════════════════════════
 function renderProducts(d) {
   var types    = d.byProductType || {};
@@ -1127,29 +1127,29 @@ function renderProducts(d) {
   document.getElementById('pi-kpis').innerHTML = [
     kpi('Product Types',     typeList.length, 'Từ SHOPIFY_PRODUCT metafield (cột M)'),
     kpi('Products w/ Spend', top.length,      'Có FB hoặc GG spend'),
-    best  ? kpi('Best: '  + best[0],  nf(best[1].roas,  2) + 'x', cur(best[1].spend),  'green') : '',
-    worst ? kpi('Worst: ' + worst[0], nf(worst[1].roas, 2) + 'x', cur(worst[1].spend), 'red')   : '',
+    best  ? kpi('Best: '  + best[0],  nf(best[1].true_roas,  2) + 'x', cur(best[1].spend),  'green') : '',
+    worst ? kpi('Worst: ' + worst[0], nf(worst[1].true_roas, 2) + 'x', cur(worst[1].spend), 'red')   : '',
   ].join('');
 
   var tRows = typeList.map(function(item) {
     var type = item[0], m = item[1], be = m.beRoas || 1.63;
-    var gap  = m.spend > 0 ? (m.roas - be) / be * 100 : 0;
+    var gap  = m.spend > 0 ? (m.true_roas - be) / be * 100 : 0;
     return [
       '<strong>' + type + '</strong>',
       '<span style="font-size:10px;color:#475569">BE ' + nf(be, 2) + 'x</span>',
       '<span class="num">' + cur(m.spend)   + '</span>',
-      '<span class="num">' + cur(m.revenue) + '</span>',
-      '<span class="num" style="' + roasStyle(m.roas, be) + '">' + nf(m.roas, 2) + 'x</span>',
+      '<span class="num" style="color:#4ade80">' + cur(m.true_revenue) + '</span>', // Lấy True Rev
+      '<span class="num" style="' + roasStyle(m.true_roas, be) + '">' + nf(m.true_roas, 2) + 'x</span>',
       '<span class="num" style="color:' + (gap >= 0 ? '#4ade80' : '#f87171') + '">'
         + (gap >= 0 ? '+' : '') + nf(gap, 1) + '%</span>',
-      '<span class="num">' + nf(m.purchases, 1) + '</span>',
-      '<span class="num">' + cur(m.cpa) + '</span>',
+      '<span class="num">' + nf(m.true_purchases, 1) + '</span>',
+      '<span class="num">' + cur(m.true_cpa) + '</span>',
       '<span style="font-size:10px"><span style="color:#60a5fa">FB ' + cur(m.fb_spend || 0) + '</span>'
         + '/<span style="color:#4ade80">GG ' + cur(m.gg_spend || 0) + '</span></span>'
     ];
   });
   document.getElementById('pi-types-tbl').innerHTML = mkTable(
-    ['Type', 'BE', 'Spend', 'Revenue', 'ROAS', 'vs BE', 'Purchases', 'CPA', 'FB/GG'], tRows
+    ['Type', 'BE', 'Spend', 'True Revenue ($)', 'True ROAS', 'vs BE', 'True Purch', 'True CPA', 'FB/GG'], tRows
   );
 
   var sl = top.slice(0, 30);
@@ -1158,13 +1158,14 @@ function renderProducts(d) {
     data: { datasets: [{
       label: 'Products',
       data: sl.map(function(p) {
-        return { x: p.spend, y: p.roas, r: Math.max(5, Math.min(28, Math.sqrt(p.revenue || 0) / 7)),
+        // Vẽ bong bóng theo true_roas và true_revenue
+        return { x: p.spend, y: p.true_roas, r: Math.max(5, Math.min(28, Math.sqrt(p.true_revenue || 0) / 7)),
                  title: p.title, beRoas: p.beRoas };
       }),
       backgroundColor: sl.map(function(p) {
         var be = p.beRoas || 1.63;
-        if (p.roas >= be * 1.15) return 'rgba(74,222,128,.65)';
-        if (p.roas >= be)        return 'rgba(251,191,36,.65)';
+        if (p.true_roas >= be * 1.15) return 'rgba(74,222,128,.65)';
+        if (p.true_roas >= be)        return 'rgba(251,191,36,.65)';
         return 'rgba(248,113,113,.65)';
       }), borderWidth: 0
     }] },
@@ -1174,11 +1175,11 @@ function renderProducts(d) {
         tooltip: { callbacks: { label: function(ctx) {
           var p = ctx.raw;
           return [(p.title || '').slice(0, 40), 'Spend: ' + cur(p.x),
-                  'ROAS: ' + nf(p.y, 2) + 'x  BE: ' + nf(p.beRoas, 2) + 'x'];
+                  'True ROAS: ' + nf(p.y, 2) + 'x  BE: ' + nf(p.beRoas, 2) + 'x'];
         }}}},
       scales: {
         x: { title: { display: true, text: 'Spend ($)' }, grid: GRID, ticks: TICK_Y },
-        y: { title: { display: true, text: 'ROAS' },      grid: GRID, min: 0 }
+        y: { title: { display: true, text: 'True ROAS' },      grid: GRID, min: 0 }
       }
     }
   });
@@ -1195,17 +1196,18 @@ function renderProducts(d) {
       '<span style="font-size:10px;color:#a78bfa">' + (p.type || '') + '</span>',
       markets,
       '<span class="num">' + cur(p.spend)   + '</span>',
-      '<span class="num">' + cur(p.revenue) + '</span>',
-      '<span class="num" style="' + roasStyle(p.roas, be) + '">' + nf(p.roas, 2) + 'x</span>',
-      '<span class="num">' + nf(p.purchases, 1) + '</span>',
+      '<span class="num" style="color:#4ade80">' + cur(p.true_revenue) + '</span>', // Lấy True Rev
+      '<span class="num" style="' + roasStyle(p.true_roas, be) + '">' + nf(p.true_roas, 2) + 'x</span>',
+      '<span class="num">' + nf(p.true_purchases, 1) + '</span>',
       '<span style="font-size:10px"><span style="color:#60a5fa">' + cur(p.fb_spend || 0) + '</span>'
         + '/<span style="color:#4ade80">' + cur(p.gg_spend || 0) + '</span></span>'
     ];
   });
   document.getElementById('pi-top-tbl').innerHTML = mkTable(
-    ['#', 'Product', 'Type', 'Market', 'Spend', 'Revenue Attr.', 'ROAS', 'Purchases', 'FB/GG'], topRows
+    ['#', 'Product', 'Type', 'Market', 'Spend', 'True Revenue ($)', 'True ROAS', 'True Purch', 'FB/GG'], topRows
   );
 }
+     
 
 // ═══════════════════════════════════════
 // TAB 5 — MOTHER'S DAY
