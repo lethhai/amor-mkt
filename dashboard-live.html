@@ -1115,7 +1115,7 @@ function showTypeDetail(type, d) {
 }
 
 // ═══════════════════════════════════════
-// TAB 4 — PRODUCT INTELLIGENCE (DÙNG TRUE REVENUE TỪ SHOPIFY)
+// TAB 4 — PRODUCT INTELLIGENCE (UPDATE: ADDED PRODUCT ID COLUMN)
 // ═══════════════════════════════════════
 function renderProducts(d) {
   var types    = d.byProductType || {};
@@ -1138,7 +1138,7 @@ function renderProducts(d) {
       '<strong>' + type + '</strong>',
       '<span style="font-size:10px;color:#475569">BE ' + nf(be, 2) + 'x</span>',
       '<span class="num">' + cur(m.spend)   + '</span>',
-      '<span class="num" style="color:#4ade80">' + cur(m.true_revenue) + '</span>', // Lấy True Rev
+      '<span class="num" style="color:#4ade80">' + cur(m.true_revenue) + '</span>',
       '<span class="num" style="' + roasStyle(m.true_roas, be) + '">' + nf(m.true_roas, 2) + 'x</span>',
       '<span class="num" style="color:' + (gap >= 0 ? '#4ade80' : '#f87171') + '">'
         + (gap >= 0 ? '+' : '') + nf(gap, 1) + '%</span>',
@@ -1158,7 +1158,6 @@ function renderProducts(d) {
     data: { datasets: [{
       label: 'Products',
       data: sl.map(function(p) {
-        // Vẽ bong bóng theo true_roas và true_revenue
         return { x: p.spend, y: p.true_roas, r: Math.max(5, Math.min(28, Math.sqrt(p.true_revenue || 0) / 7)),
                  title: p.title, beRoas: p.beRoas };
       }),
@@ -1189,22 +1188,26 @@ function renderProducts(d) {
     var markets = (p.markets || []).map(function(m) {
       return '<span class="badge b-' + m.toLowerCase() + '">' + m + '</span>';
     }).join(' ') || '–';
+    
     return [
       '<span style="color:#475569">' + (i + 1) + '</span>',
+      '<span style="font-size:10px;color:#94a3b8">' + (p.productId || '–') + '</span>', // CỘT ID MỚI
       '<span style="font-size:11px" title="' + (p.productId || '') + '">'
         + (p.title || p.productId || '').slice(0, 42) + '</span>',
       '<span style="font-size:10px;color:#a78bfa">' + (p.type || '') + '</span>',
       markets,
       '<span class="num">' + cur(p.spend)   + '</span>',
-      '<span class="num" style="color:#4ade80">' + cur(p.true_revenue) + '</span>', // Lấy True Rev
+      '<span class="num" style="color:#4ade80">' + cur(p.true_revenue) + '</span>',
       '<span class="num" style="' + roasStyle(p.true_roas, be) + '">' + nf(p.true_roas, 2) + 'x</span>',
       '<span class="num">' + nf(p.true_purchases, 1) + '</span>',
       '<span style="font-size:10px"><span style="color:#60a5fa">' + cur(p.fb_spend || 0) + '</span>'
         + '/<span style="color:#4ade80">' + cur(p.gg_spend || 0) + '</span></span>'
     ];
   });
+  
+  // Update header thêm 'ID'
   document.getElementById('pi-top-tbl').innerHTML = mkTable(
-    ['#', 'Product', 'Type', 'Market', 'Spend', 'True Revenue ($)', 'True ROAS', 'True Purch', 'FB/GG'], topRows
+    ['#', 'ID', 'Product', 'Type', 'Market', 'Spend', 'True Revenue ($)', 'True ROAS', 'True Purch', 'FB/GG'], topRows
   );
 }
      
