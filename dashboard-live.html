@@ -478,7 +478,7 @@ function isServiceType(t) {
 // ═══════════════════════════════════════
 // CONFIG & STATE
 // ═══════════════════════════════════════
-var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyt4hPfIfE3vsjHI_X9ChNpZOFni4uY9d3Vl8OcyaWsfKPu2pknQAALCeu-J95CbmQ/exec';
+var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwRByd1QorYl_hZ7p78d_RhJUkksjlPkIB9-cI7VoJLSWkXQdGJFK2zuTN9xPr57sjK/exec';
 function getGasUrl() { return localStorage.getItem('gas_url') || DEFAULT_GAS_URL; }
 
 Chart.defaults.color       = '#64748b';
@@ -1351,7 +1351,8 @@ function renderPITable() {
     return '<tr>'
       + '<td><span style="color:#475569">' + (i + 1) + '</span></td>'
       + '<td><span style="font-size:10px;color:#94a3b8">' + (p.productId || '–') + '</span></td>'
-
+         
+ // Nối đúng domain Amor1970s
       + '<td>' + (function() {
           var t = p.title.slice(0, 42);
           if (!p.fullUrl) return '<span style="font-size:11px">' + t + '</span>';
@@ -1362,7 +1363,6 @@ function renderPITable() {
             + 'style="color:#a78bfa;text-decoration:underline;font-size:11px">' + t + '</a>';
         })()
       + '</td>'
-
          
       + '<td><span style="font-size:10px;color:#a78bfa">' + p.type + '</span></td>'
       + '<td>' + mkts + '</td>'
