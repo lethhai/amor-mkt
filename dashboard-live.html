@@ -1904,7 +1904,9 @@ function fcBuildDays(d) {
           : '🌾 Wind-down ×' + FC_WIND_DOWN_FACTOR;
       } else {
         var delta2 = fcCalcDelta(date, pctAdsHist);
-        var rule2  = fcGetRule(delta2, FC_PLAN);
+        var prevDate2   = addDays(date, -1);
+        var prevPctAds2 = pctAdsHist[prevDate2] || 0;
+        var rule2       = fcGetRule(delta2, FC_PLAN, prevPctAds2);
         scaleFactor = rule2.factor;
         scaleRule   = rule2.label + ' (Δ' + (delta2 >= 0 ? '+' : '') + nf(delta2, 1) + '%)';
       }
@@ -1955,17 +1957,20 @@ function fcCalcDelta(date, hist) {
 }
 
 // ── Rule theo Plan ────────────────────────────────
-function fcGetRule(delta, plan) {
+function fcGetRule(delta, plan, prevPctAds) {
   if (plan === 'A') {
     if (delta >= 6) return { factor: 1.00, label: 'Lỗ gắt ×1.00' };
     if (delta >= 3) return { factor: 1.05, label: 'Lỗ nhẹ ×1.05' };
     if (delta >= 1) return { factor: 1.10, label: 'Đi ngang ×1.10' };
     return            { factor: 1.15, label: '🔥 Lãi ×1.15' };
   }
-  if (delta >= 4)  return { factor: 0.90, label: '⬇️ Rớt ×0.90' };
-  if (delta >= 1)  return { factor: 1.00, label: 'Hơi rớt ×1.00' };
-  if (delta >= -2) return { factor: 1.05, label: 'Tốt ×1.05' };
-  return              { factor: 1.10, label: '✅ Rất lãi ×1.10' };
+
+  // Plan B — rule mới dựa trên %Ads hôm qua
+  var be = FC_BE_PCT; // 61
+  if (prevPctAds > be + 10) return { factor: 0.90, label: '🔴 >BE+10% ×0.90' };
+  if (prevPctAds > be)      return { factor: 1.00, label: '⚠️ >BE ×1.00' };
+  if (prevPctAds < 40)      return { factor: 1.10, label: '💰 <40% ×1.10' };
+  return                    { factor: 1.05, label: '✅ Ổn ×1.05' };
 }
 
 // ── %Ads badge ────────────────────────────────────
