@@ -1287,6 +1287,7 @@ function renderProducts(d) {
       idx:       i + 1,
       productId: p.productId || '',
       title:     p.title || p.productId || '',
+      fullUrl:   p.fullUrl || '',   
       type:      p.type || '',
       markets:   p.markets || [],
       spend:     p.spend || 0,
@@ -1350,7 +1351,24 @@ function renderPITable() {
     return '<tr>'
       + '<td><span style="color:#475569">' + (i + 1) + '</span></td>'
       + '<td><span style="font-size:10px;color:#94a3b8">' + (p.productId || '–') + '</span></td>'
-      + '<td><span style="font-size:11px">' + p.title.slice(0, 42) + '</span></td>'
+
+      // Thay bằng:
+      + '<td>' + (function() {
+          var t = p.title.slice(0, 42);
+          if (!p.productId) return '<span style="font-size:11px">' + t + '</span>';
+          // Build full URL từ productId — đây là Shopify numeric ID
+          // Cần map về handle qua fullUrl nếu có, fallback về search Shopify
+          var handle = PI_URL_MAP[p.productId] || '';
+          if (!handle) return '<span style="font-size:11px">' + t + '</span>';
+          var url = handle.indexOf('http') === 0
+            ? handle
+            : 'https://amor1970s.com/products/' + handle;
+          return '<a href="' + url + '" target="_blank" '
+            + 'style="color:#a78bfa;text-decoration:underline;font-size:11px">' + t + '</a>';
+        })()
+      + '</td>'    
+
+         
       + '<td><span style="font-size:10px;color:#a78bfa">' + p.type + '</span></td>'
       + '<td>' + mkts + '</td>'
       + '<td class="num">' + cur(p.spend) + '</td>'
