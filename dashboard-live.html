@@ -1199,6 +1199,8 @@ function showTypeDetail(type, d) {
 // v2: Unknown ⚠️ | ROAS anomaly flag | Sort/Filter/Search
 // ═══════════════════════════════════════
 var PI_DATA       = [];   // raw product rows for filter/sort
+var PI_TYPES_DATA  = [];   // raw type rows for sort
+var PI_TYPES_SORT  = { col: 2, dir: -1 };
 var PI_MKT_FILTER = 'all';
 var PI_ROAS_FILTER= null;
 var PI_SORT       = { col: 5, dir: -1 }; // default: sort by Spend desc
@@ -1245,9 +1247,10 @@ function renderProducts(d) {
         + '/<span style="color:#4ade80">GG ' + cur(m.gg_spend || 0) + '</span></span>'
     ];
   });
-  document.getElementById('pi-types-tbl').innerHTML = mkTable(
-    ['Type', 'BE', 'Spend', 'True Revenue ($)', 'True ROAS', 'vs BE', 'True Purch', 'True CPA', 'FB/GG'], tRows
-  );
+  // Lưu data types để sort
+  PI_TYPES_DATA = typeList.map(function(item) { return { key: item[0], m: item[1] }; });
+  PI_TYPES_SORT = { col: 2, dir: -1 }; // default sort by Spend desc
+  renderPITypesTable();
 
   // ── Bubble chart ──
   var sl = top.slice(0, 30);
@@ -1406,7 +1409,67 @@ function setRoasFilter(btn, val) {
   }
   renderPITable();
 }
-     
+
+function renderPITypesTable() {
+  var colKeys = ['key','be','spend','trueRev','trueRoas','gap','truePurch','trueCpa'];
+  var sorted  = PI_TYPES_DATA.slice().sort(function(a, b) {
+    var col = PI_TYPES_SORT.col, dir = PI_TYPES_SORT.dir;
+    var av, bv;
+    if (col === 0) { av = a.key; bv = b.key; return dir * av.localeCompare(bv); }
+    if (col === 1) { av = a.m.beRoas||1.63; bv = b.m.beRoas||1.63; }
+    if (col === 2) { av = a.m.spend||0;     bv = b.m.spend||0; }
+    if (col === 3) { av = a.m.true_revenue||0; bv = b.m.true_revenue||0; }
+    if (col === 4) { av = a.m.true_roas||0; bv = b.m.true_roas||0; }
+    if (col === 5) { av = a.m.spend>0?(a.m.true_roas-(a.m.beRoas||1.63))/(a.m.beRoas||1.63)*100:0;
+                     bv = b.m.spend>0?(b.m.true_roas-(b.m.beRoas||1.63))/(b.m.beRoas||1.63)*100:0; }
+    if (col === 6) { av = a.m.true_purchases||0; bv = b.m.true_purchases||0; }
+    if (col === 7) { av = a.m.true_cpa||0; bv = b.m.true_cpa||0; }
+    return dir * ((av||0) - (bv||0));
+  });
+
+  var heads = ['Type','BE','Spend','True Revenue ($)','True ROAS','vs BE','True Purch','True CPA','FB/GG'];
+  var sortableCols = [2,3,4,5,6,7];
+  var headerHtml = '<thead><tr>' + heads.map(function(h, i) {
+    if (sortableCols.indexOf(i) === -1) return '<th>' + h + '</th>';
+    var ind = PI_TYPES_SORT.col === i ? (PI_TYPES_SORT.dir === 1 ? ' ▲' : ' ▼') : '';
+    return '<th class="sortable" onclick="sortPITypes(' + i + ')">'
+      + h + '<span class="sort-indicator">' + ind + '</span></th>';
+  }).join('') + '</tr></thead>';
+
+  var bodyHtml = '<tbody>' + sorted.map(function(item) {
+    var type = item.key, m = item.m, be = m.beRoas || 1.63;
+    var gap  = m.spend > 0 ? (m.true_roas - be) / be * 100 : 0;
+    var isUnk = type === 'Unknown';
+    var typeCell = isUnk
+      ? '<strong style="color:#94a3b8">' + type + '</strong>'
+        + '<span class="unknown-badge">⚠️ Review</span>'
+        + '<div style="font-size:10px;color:#78350f;margin-top:2px">Ads chưa map được URL sản phẩm</div>'
+      : '<strong>' + type + '</strong>';
+    return '<tr>'
+      + '<td>' + typeCell + '</td>'
+      + '<td><span style="font-size:10px;color:#475569">BE ' + nf(be,2) + 'x</span></td>'
+      + '<td class="num">' + cur(m.spend) + '</td>'
+      + '<td class="num" style="color:#4ade80">' + cur(m.true_revenue) + '</td>'
+      + '<td class="num" style="' + roasStyle(m.true_roas,be) + '">' + nf(m.true_roas,2) + 'x'
+        + (m.true_roas > 10 && m.spend < 50 ? '<span class="roas-anomaly" title="ROAS cao bất thường">⚠️</span>' : '')
+        + '</td>'
+      + '<td class="num" style="color:' + (gap>=0?'#4ade80':'#f87171') + '">'
+        + (gap>=0?'+':'') + nf(gap,1) + '%</td>'
+      + '<td class="num">' + nf(m.true_purchases,1) + '</td>'
+      + '<td class="num">' + cur(m.true_cpa) + '</td>'
+      + '<td style="font-size:10px"><span style="color:#60a5fa">FB ' + cur(m.fb_spend||0) + '</span>'
+        + '/<span style="color:#4ade80">GG ' + cur(m.gg_spend||0) + '</span></td>'
+      + '</tr>';
+  }).join('') + '</tbody>';
+
+  document.getElementById('pi-types-tbl').innerHTML = '<table>' + headerHtml + bodyHtml + '</table>';
+}
+
+function sortPITypes(colIdx) {
+  if (PI_TYPES_SORT.col === colIdx) PI_TYPES_SORT.dir *= -1;
+  else { PI_TYPES_SORT.col = colIdx; PI_TYPES_SORT.dir = -1; }
+  renderPITypesTable();
+}     
 
 // ═══════════════════════════════════════
 // TAB 5 — MOTHER'S DAY
