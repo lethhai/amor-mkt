@@ -137,6 +137,26 @@ tbody tr:hover{background:#181b2e}
 .type-pill:hover{border-color:#a78bfa;color:#c4b5fd}
 .type-pill.active{background:#4338ca;border-color:#6366f1;color:#fff}
 .be{font-size:10px;color:#475569;margin-left:4px}
+
+/* ── FORECAST TAB ── */
+.fc-config{background:#131626;border:1px solid #252840;border-radius:10px;
+  padding:13px 16px;margin-bottom:16px;display:flex;align-items:center;
+  gap:16px;flex-wrap:wrap}
+.fc-plan-btn{padding:5px 13px;border-radius:20px;border:1px solid #2d3154;
+  background:transparent;color:#94a3b8;font-size:11px;font-weight:600;
+  cursor:pointer;transition:all .15s;white-space:nowrap}
+.fc-plan-btn:hover{border-color:#a78bfa;color:#c4b5fd}
+.fc-plan-btn.active{background:#4338ca;border-color:#6366f1;color:#fff}
+.fc-input{width:70px;background:#1a1d30;border:1px solid #2d3154;
+  color:#e2e8f0;border-radius:4px;padding:2px 5px;font-size:11px;text-align:right}
+.fc-input-ord{width:55px}
+.fc-row-today{background:#1e1a3a;border-left:2px solid #a78bfa}
+.fc-row-harvest{background:#1a0e00}
+.fc-row-past{opacity:.85}
+
+/* ── Kết thúc style ── */
+
+     
 /* ── SEARCH / FILTER BAR ── */
 .filter-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
 .filter-bar input[type=text]{background:#1a1d30;border:1px solid #2d3154;color:#e2e8f0;
@@ -225,6 +245,7 @@ thead th.sortable:hover{color:#a78bfa}
   <button class="tab-btn" data-tab="campaign">📊 Campaign</button>
   <button class="tab-btn" data-tab="products">🔬 Products</button>
   <button class="tab-btn" data-tab="mothers">🌸 Mother's Day</button>
+  <button class="tab-btn" data-tab="forecast">🎯 MD Forecast</button>   
 </div>
 
 <div id="main">
@@ -404,7 +425,69 @@ thead th.sortable:hover{color:#a78bfa}
       <div id="md-prod-tbl" class="twrap"></div>
     </div>
   </div>
+<!-- Kết thúc — MD2026 -->
 
+     
+<!-- TAB 6 — MD FORECAST -->
+<div class="tab-panel" id="tab-forecast">
+
+  <!-- Config bar -->
+  <div class="fc-config">
+    <div style="font-size:11px;font-weight:700;color:#a78bfa;
+      text-transform:uppercase;letter-spacing:.8px">🎯 MD Forecast Engine</div>
+
+    <div style="display:flex;gap:6px;align-items:center">
+      <span style="font-size:11px;color:#475569">Plan:</span>
+      <button class="fc-plan-btn active" id="fc-plan-a" onclick="setFCPlan('A')">
+        🎯 Plan A — Push Volume
+      </button>
+      <button class="fc-plan-btn" id="fc-plan-b" onclick="setFCPlan('B')">
+        🛡️ Plan B — Optimize Profit
+      </button>
+    </div>
+
+    <div style="display:flex;gap:6px;align-items:center">
+      <span style="font-size:11px;color:#475569">AOV:</span>
+      <span id="fc-aov-display"
+        style="font-size:11px;color:#60a5fa;font-weight:700">$42.00</span>
+      <span style="font-size:10px;color:#475569">(auto last 7d)</span>
+      <input type="number" placeholder="Override..."
+        style="width:80px;background:#1a1d30;border:1px solid #2d3154;
+          color:#e2e8f0;border-radius:6px;padding:3px 7px;font-size:11px"
+        onchange="setFCAov(this.value)">
+    </div>
+
+    <div style="font-size:11px;color:#475569">
+      BE: <span style="color:#fbbf24;font-weight:700">61% %Ads</span>
+      = <span style="color:#fbbf24;font-weight:700">1.62x ROAS</span>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div id="fc-kpis" class="kpi-grid"></div>
+
+  <!-- Chart -->
+  <div class="section">
+    <div class="st">Revenue vs Spend vs Profit — 6/4 → 3/5</div>
+    <div class="cbox">
+      <div style="font-size:10px;color:#475569;margin-bottom:8px">
+        Nét liền = Thực tế &nbsp;|&nbsp; Nét đứt = Dự phóng &nbsp;|&nbsp;
+        <span style="color:#ef4444">│ Cut-off 22/4</span> &nbsp;|&nbsp;
+        <span style="color:#a78bfa">│ Hôm nay</span>
+      </div>
+      <div id="fc-chart-box" style="overflow-x:auto"></div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="section">
+    <div class="st">Bảng Forecast Chi tiết</div>
+    <div id="fc-table-wrap" class="twrap"></div>
+  </div>
+
+</div>
+<!-- Kết thúc — MD FORECAST -->
+     
 </div><!-- /#main -->
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -587,6 +670,7 @@ function renderAll() {
   renderCampaign(DATA);
   renderProducts(DATA);
   renderMD(MD_DATA);
+  renderForecast(DATA); // ← thêm dòng này   
 }
 
 // ═══════════════════════════════════════
@@ -1641,6 +1725,386 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
   document.getElementById('ct').value = range.to;
   loadAll(range.from, range.to);
 })();
+
+// ═══════════════════════════════════════
+// TAB 6 — MD FORECAST ENGINE
+// Scale: %Ads(N-1) vs AVG(%Ads N-2,N-3,N-4)
+// Harvesting: hardcode từ 21/4
+// ═══════════════════════════════════════
+
+var FC_PLAN         = 'A';
+var FC_AOV_OVERRIDE = null;
+var FC_MANUAL       = {}; // { 'YYYY-MM-DD': { spend, orders } }
+
+var FC_START  = '2026-04-06';
+var FC_END_ES = '2026-05-03';
+var FC_BE_PCT = 61;
+var FC_MARGIN = 0.61;
+
+// Harvesting hardcode
+var FC_HARVEST = {
+  '2026-04-21': 0.95,
+  '2026-04-22': 0.95,
+  '2026-04-23': 0.65,
+  '2026-04-24': 0.60
+};
+var FC_HARVEST_START    = '2026-04-21';
+var FC_WIND_DOWN_FACTOR = 0.80; // 25/4→3/5: -20%/ngày
+
+// ── AOV từ last 7 days Shopify ──────────────────
+function fcGetAov(d) {
+  var rows  = (d.shopifyOrderDaily || []).slice(-7);
+  if (!rows.length) return 42;
+  var rev = rows.reduce(function(s, r) { return s + (r.totalRevenue || 0); }, 0);
+  var ord = rows.reduce(function(s, r) { return s + (r.orders       || 0); }, 0);
+  return ord > 0 ? r2(rev / ord) : 42;
+}
+
+// ── Build tất cả ngày trong campaign ─────────────
+function fcBuildDays(d) {
+  var aov      = FC_AOV_OVERRIDE || fcGetAov(d);
+  var todayStr = today();
+
+  // Maps từ GAS
+  var spendMap = {}, orderMap = {}, revMap = {};
+  (d.dailyTrend || []).forEach(function(r) {
+    spendMap[r.date] = r.spend || 0;
+  });
+  (d.shopifyOrderDaily || []).forEach(function(r) {
+    orderMap[r.date] = r.orders       || 0;
+    revMap[r.date]   = r.totalRevenue || 0;
+  });
+
+  // Danh sách ngày
+  var dates = [], cur2 = FC_START;
+  while (cur2 <= FC_END_ES) { dates.push(cur2); cur2 = addDays(cur2, 1); }
+
+  var result      = [];
+  var prevSpend   = null;
+  var pctAdsHist  = {}; // lưu %Ads theo ngày để tính delta
+
+  // Tính avg orders/spend từ lịch sử để forecast
+  function getAvgOrderRate() {
+    var valids = result.filter(function(x) { return x.spend > 0 && x.orders > 0; });
+    if (!valids.length) return 0.08;
+    var rate = valids.reduce(function(s, x) { return s + x.orders / x.spend; }, 0);
+    return rate / valids.length;
+  }
+
+  dates.forEach(function(date) {
+    var isPast      = date < todayStr;
+    var isToday     = date === todayStr;
+    var isFuture    = date > todayStr;
+    var isHarvest   = date >= FC_HARVEST_START;
+    var manual      = FC_MANUAL[date] || {};
+
+    var spend, orders, revenue, pctAds, roas, profit, scaleRule, scaleFactor;
+
+    if (isPast || isToday) {
+      // Data thực từ GAS — không cho sửa (isPast), cho override (isToday/manual)
+      spend   = manual.spend  !== undefined ? manual.spend  : (spendMap[date]  || 0);
+      orders  = manual.orders !== undefined ? manual.orders : (orderMap[date]  || 0);
+      revenue = revMap[date] ? revMap[date] : r2(orders * aov);
+    } else {
+      // Tương lai — tính theo rule
+      var baseSpend = prevSpend || 0;
+
+      if (isHarvest) {
+        if (FC_HARVEST[date]) {
+          scaleFactor = FC_HARVEST[date];
+          scaleRule   = '🌾 ×' + scaleFactor;
+        } else {
+          scaleFactor = FC_WIND_DOWN_FACTOR;
+          scaleRule   = '🌾 Wind-down ×0.80';
+        }
+      } else {
+        // Scale theo %Ads delta
+        var delta  = fcCalcDelta(date, pctAdsHist);
+        var rule   = fcGetRule(delta, FC_PLAN);
+        scaleFactor = rule.factor;
+        scaleRule   = rule.label + ' (Δ' + (delta >= 0 ? '+' : '') + nf(delta, 1) + '%)';
+      }
+
+      spend  = manual.spend !== undefined ? manual.spend : r2(baseSpend * scaleFactor);
+      orders = manual.orders !== undefined
+        ? manual.orders
+        : r2(spend * getAvgOrderRate());
+      revenue = r2(orders * aov);
+    }
+
+    pctAds = revenue > 0 ? r2(spend / revenue * 100) : 0;
+    roas   = spend   > 0 ? r2(revenue / spend)        : 0;
+    profit = r2(revenue * FC_MARGIN - spend);
+
+    pctAdsHist[date] = pctAds;
+    prevSpend        = spend;
+
+    result.push({
+      date, isPast, isToday, isFuture, isHarvest,
+      spend, orders, revenue, aov, pctAds, roas, profit,
+      scaleRule: scaleRule || '–',
+      scaleFactor: scaleFactor || null,
+      isManual: Object.keys(manual).length > 0,
+      isExp: isFuture && Object.keys(manual).length === 0
+    });
+  });
+
+  return result;
+}
+
+// ── Delta: %Ads hôm qua vs AVG 3 ngày trước ──────
+function fcCalcDelta(date, hist) {
+  var d1  = addDays(date, -1);
+  var avg = ['2','3','4'].reduce(function(s, n) {
+    return s + (hist[addDays(date, -parseInt(n))] || 0);
+  }, 0) / 3;
+  return r2((hist[d1] || 0) - avg);
+}
+
+// ── Rule theo Plan ────────────────────────────────
+function fcGetRule(delta, plan) {
+  if (plan === 'A') {
+    if (delta >= 6) return { factor: 1.00, label: 'Lỗ gắt ×1.00' };
+    if (delta >= 3) return { factor: 1.05, label: 'Lỗ nhẹ ×1.05' };
+    if (delta >= 1) return { factor: 1.10, label: 'Đi ngang ×1.10' };
+    return            { factor: 1.15, label: '🔥 Lãi ×1.15' };
+  }
+  if (delta >= 4)  return { factor: 0.90, label: '⬇️ Rớt ×0.90' };
+  if (delta >= 1)  return { factor: 1.00, label: 'Hơi rớt ×1.00' };
+  if (delta >= -2) return { factor: 1.05, label: 'Tốt ×1.05' };
+  return              { factor: 1.10, label: '✅ Rất lãi ×1.10' };
+}
+
+// ── %Ads badge ────────────────────────────────────
+function fcPctBadge(v) {
+  if (!v) return '<span style="color:#475569">–</span>';
+  var color = v <= 55 ? '#4ade80' : v <= 61 ? '#fbbf24' : '#f87171';
+  var icon  = v <= 55 ? '✅' : v <= 61 ? '⚠️' : '🔴';
+  return '<span style="color:' + color + ';font-weight:700">' + icon + ' ' + nf(v, 1) + '%</span>';
+}
+
+// ── Render Chart SVG ──────────────────────────────
+function fcRenderChart(days) {
+  var W=960, H=320, PL=65, PR=20, PT=30, PB=50;
+  var iW=W-PL-PR, iH=H-PT-PB;
+
+  var revs = days.map(function(d){ return d.revenue; });
+  var spds = days.map(function(d){ return d.spend; });
+  var prfs = days.map(function(d){ return d.profit; });
+  var all  = revs.concat(spds).concat(prfs);
+  var minY = Math.min(0, Math.min.apply(null, all));
+  var maxY = Math.max.apply(null, all) || 1;
+  var rng  = maxY - minY || 1;
+
+  var N    = days.length;
+  function xp(i)  { return PL + (i / (N - 1)) * iW; }
+  function yp(v)  { return PT + (1 - (v - minY) / rng) * iH; }
+  function pts(arr, from, to) {
+    var s = '';
+    for (var i = from; i <= to; i++) s += xp(i) + ',' + yp(arr[i]) + ' ';
+    return s.trim();
+  }
+
+  var todayStr = today();
+  var ti = days.findIndex(function(d){ return d.date === todayStr; });
+  if (ti < 0) ti = days.findIndex(function(d){ return d.isFuture; }) - 1;
+  if (ti < 0) ti = N - 1;
+  var cutIdx = days.findIndex(function(d){ return d.date === '2026-04-22'; });
+
+  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg"'
+    + ' style="width:100%;min-width:700px;height:' + H + 'px">';
+
+  // Grid Y
+  for (var g = 0; g <= 4; g++) {
+    var gv = minY + rng * g / 4;
+    var gy = yp(gv);
+    svg += '<line x1="' + PL + '" y1="' + gy + '" x2="' + (W-PR) + '" y2="' + gy
+      + '" stroke="#1e2235" stroke-width="1"/>';
+    svg += '<text x="' + (PL-5) + '" y="' + (gy+4) + '" text-anchor="end"'
+      + ' font-size="10" fill="#475569">$' + nf(gv, 0) + '</text>';
+  }
+
+  // Zero line
+  if (minY < 0) {
+    var zy = yp(0);
+    svg += '<line x1="' + PL + '" y1="' + zy + '" x2="' + (W-PR) + '" y2="' + zy
+      + '" stroke="#334155" stroke-width="1" stroke-dasharray="3,3"/>';
+    svg += '<text x="' + (PL-5) + '" y="' + (zy+4) + '" text-anchor="end"'
+      + ' font-size="10" fill="#334155">$0</text>';
+  }
+
+  // Cut-off line 22/4
+  if (cutIdx >= 0) {
+    var cx2 = xp(cutIdx);
+    svg += '<line x1="' + cx2 + '" y1="' + PT + '" x2="' + cx2 + '" y2="' + (H-PB)
+      + '" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3"/>';
+    svg += '<text x="' + (cx2+3) + '" y="' + (PT+12) + '" font-size="10" fill="#f87171">Cut-off 22/4</text>';
+  }
+
+  // Today line
+  if (ti >= 0 && ti < N) {
+    var tx3 = xp(ti);
+    svg += '<line x1="' + tx3 + '" y1="' + PT + '" x2="' + tx3 + '" y2="' + (H-PB)
+      + '" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3"/>';
+    svg += '<text x="' + (tx3+3) + '" y="' + (PT+24) + '" font-size="10" fill="#a78bfa">Hôm nay</text>';
+  }
+
+  // Lines: past=solid, future=dashed
+  function line(arr, color, from, to, dashed) {
+    if (from > to) return '';
+    return '<polyline points="' + pts(arr, from, to) + '" fill="none" stroke="' + color
+      + '" stroke-width="2"' + (dashed?' stroke-dasharray="6,4"':'') + ' stroke-linejoin="round"/>';
+  }
+  var sp = Math.min(ti, N-1);
+  svg += line(revs, '#22c55e', 0, sp, false);
+  if (sp < N-1) svg += line(revs, '#22c55e', sp, N-1, true);
+  svg += line(spds, '#f87171', 0, sp, false);
+  if (sp < N-1) svg += line(spds, '#f87171', sp, N-1, true);
+  svg += line(prfs, '#a78bfa', 0, sp, false);
+  if (sp < N-1) svg += line(prfs, '#a78bfa', sp, N-1, true);
+
+  // Dots + X labels
+  days.forEach(function(d, i) {
+    var isF = d.isFuture;
+    function dot(v, color) {
+      return '<circle cx="' + xp(i) + '" cy="' + yp(v) + '" r="3"'
+        + ' fill="' + (isF ? 'none' : color) + '" stroke="' + color
+        + '" stroke-width="1.5"/>';
+    }
+    svg += dot(revs[i], '#22c55e') + dot(spds[i], '#f87171') + dot(prfs[i], '#a78bfa');
+    if (i % 3 === 0 || d.date === '2026-04-22' || d.date === todayStr) {
+      var p2 = d.date.split('-');
+      svg += '<text x="' + xp(i) + '" y="' + (H-PB+18) + '" text-anchor="middle"'
+        + ' font-size="10" fill="#475569">' + p2[2] + '/' + p2[1] + '</text>';
+    }
+  });
+
+  // Legend
+  [['Revenue','#22c55e',W-195],['Spend','#f87171',W-130],['Profit','#a78bfa',W-65]]
+    .forEach(function(l) {
+      svg += '<circle cx="' + (l[2]-6) + '" cy="15" r="4" fill="' + l[1] + '"/>';
+      svg += '<text x="' + l[2] + '" y="19" font-size="10" fill="' + l[1] + '">' + l[0] + '</text>';
+    });
+
+  svg += '</svg>';
+  document.getElementById('fc-chart-box').innerHTML = svg;
+}
+
+// ── Render Table ──────────────────────────────────
+function fcRenderTable(days) {
+  var todayStr = today();
+  var heads = ['Ngày','Spend ($)','Orders','AOV','Revenue ($)',
+    '%Ads','ROAS','Profit ($)','Plan','Scale Rule','CPC','CR%'];
+
+  var hHtml = '<thead><tr>' + heads.map(function(h, i) {
+    return '<th' + (i >= 5 && i <= 7 ? ' class="num"' : '') + '>' + h + '</th>';
+  }).join('') + '</tr></thead>';
+
+  var bHtml = '<tbody>' + days.map(function(d) {
+    var p  = d.date.split('-');
+    var dl = p[2] + '/' + p[1];
+    if (d.isToday)              dl += ' <span style="color:#a78bfa;font-size:9px">◀ hôm nay</span>';
+    if (d.date==='2026-04-22')  dl += ' <span style="color:#ef4444;font-size:9px">✂️</span>';
+    if (d.isHarvest && !d.isToday && d.date !== '2026-04-21')
+                                dl += ' <span style="color:#f59e0b;font-size:9px">🌾</span>';
+
+    var rowCls = d.isToday ? 'fc-row-today' : d.isHarvest ? 'fc-row-harvest' : d.isPast ? 'fc-row-past' : '';
+
+    // Spend cell
+    var spendCell;
+    if (d.isPast && !d.isManual) {
+      spendCell = '<span class="num">' + cur(d.spend) + '</span>';
+    } else {
+      spendCell = '<input class="fc-input" type="number" value="' + d.spend.toFixed(2) + '"'
+        + ' onchange="FC_MANUAL[\'' + d.date + '\']=FC_MANUAL[\'' + d.date + '\']||{};'
+        + 'FC_MANUAL[\'' + d.date + '\'].spend=parseFloat(this.value)||0;renderForecast(DATA)">';
+    }
+
+    // Orders cell
+    var ordCell;
+    if (d.isPast && !d.isManual) {
+      ordCell = '<span class="num">' + nf(d.orders, 0) + '</span>';
+    } else {
+      var expNote = d.isExp
+        ? '<div style="font-size:9px;color:#334155">Exp:' + nf(d.orders, 0) + '</div>' : '';
+      ordCell = '<input class="fc-input fc-input-ord" type="number" placeholder="'
+        + nf(d.orders, 0) + '"'
+        + ' onchange="FC_MANUAL[\'' + d.date + '\']=FC_MANUAL[\'' + d.date + '\']||{};'
+        + 'FC_MANUAL[\'' + d.date + '\'].orders=parseFloat(this.value)||0;renderForecast(DATA)">'
+        + expNote;
+    }
+
+    var roasCell = '<span style="' + roasStyle(d.roas, 1.62) + '">' + nf(d.roas, 2) + 'x</span>';
+    var profCell = '<span style="color:' + (d.profit >= 0 ? '#4ade80' : '#f87171')
+      + ';font-weight:700">' + (d.profit >= 0 ? '+' : '') + cur(d.profit) + '</span>';
+
+    return '<tr class="' + rowCls + '">'
+      + '<td style="white-space:nowrap;font-size:11px">' + dl + '</td>'
+      + '<td>' + spendCell + '</td>'
+      + '<td>' + ordCell + '</td>'
+      + '<td class="num" style="color:#64748b;font-size:11px">' + cur(d.aov) + '</td>'
+      + '<td class="num" style="color:#4ade80">' + cur(d.revenue) + '</td>'
+      + '<td class="num">' + fcPctBadge(d.pctAds) + '</td>'
+      + '<td class="num">' + roasCell + '</td>'
+      + '<td class="num">' + profCell + '</td>'
+      + '<td style="font-size:10px;color:#a78bfa">'
+        + (d.isFuture || d.isHarvest ? 'Plan ' + FC_PLAN : '–') + '</td>'
+      + '<td style="font-size:10px;color:#64748b">' + d.scaleRule + '</td>'
+      + '<td class="num" style="color:#334155">–</td>'
+      + '<td class="num" style="color:#334155">–</td>'
+      + '</tr>';
+  }).join('') + '</tbody>';
+
+  document.getElementById('fc-table-wrap').innerHTML = '<table>' + hHtml + bHtml + '</table>';
+}
+
+// ── Main render ───────────────────────────────────
+function renderForecast(d) {
+  if (!d) return;
+  var aov  = FC_AOV_OVERRIDE || fcGetAov(d);
+  var days = fcBuildDays(d);
+
+  document.getElementById('fc-aov-display').textContent = cur(aov);
+
+  // KPIs
+  var tSpend  = r2(days.reduce(function(s,x){ return s+x.spend; }, 0));
+  var tRev    = r2(days.reduce(function(s,x){ return s+x.revenue; }, 0));
+  var tProfit = r2(days.reduce(function(s,x){ return s+x.profit; }, 0));
+  var tOrders = Math.round(days.reduce(function(s,x){ return s+x.orders; }, 0));
+  var avgPct  = tRev > 0 ? r2(tSpend / tRev * 100) : 0;
+  var pastOnly = days.filter(function(x){ return x.isPast || x.isToday; });
+  var realSpend = r2(pastOnly.reduce(function(s,x){ return s+x.spend; }, 0));
+  var realProfit= r2(pastOnly.reduce(function(s,x){ return s+x.profit; }, 0));
+
+  document.getElementById('fc-kpis').innerHTML = [
+    kpi('Total Spend (Forecast)',  cur(tSpend),            '6/4 → 3/5 cả campaign'),
+    kpi('Total Revenue (Forecast)',cur(tRev),              'Orders × AOV', 'green'),
+    kpi('Est. Profit (Forecast)',  cur(tProfit),           'Rev × 61% − Spend', tProfit>=0?'green':'red'),
+    kpi('Total Orders (Forecast)', nf(tOrders),            'Thực tế + Dự phóng', 'blue'),
+    kpi('Avg %Ads',                fcPctBadge(avgPct),     'BE = 61%'),
+    kpi('Spend đã tiêu',           cur(realSpend),         'Thực tế đến hôm nay', 'warn'),
+    kpi('Profit thực tế',          cur(realProfit),        'Đến hôm nay', realProfit>=0?'green':'red'),
+    kpi('AOV hiện tại',            cur(aov),               FC_AOV_OVERRIDE?'Manual':'Last 7d avg', 'blue'),
+  ].join('');
+
+  fcRenderChart(days);
+  fcRenderTable(days);
+}
+
+// ── Controls ──────────────────────────────────────
+function setFCPlan(plan) {
+  FC_PLAN = plan;
+  document.getElementById('fc-plan-a').classList.toggle('active', plan === 'A');
+  document.getElementById('fc-plan-b').classList.toggle('active', plan === 'B');
+  renderForecast(DATA);
+}
+
+function setFCAov(val) {
+  var v = parseFloat(val);
+  FC_AOV_OVERRIDE = (!isNaN(v) && v > 0) ? v : null;
+  renderForecast(DATA);
+}
+     
 </script>
 </body>
 </html>
