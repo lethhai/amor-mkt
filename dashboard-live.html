@@ -1286,16 +1286,22 @@ var PI_TYPES_DATA  = [];   // raw type rows for sort
 var PI_TYPES_SORT  = { col: 2, dir: -1 };
 var PI_MKT_FILTER = 'all';
 var PI_ROAS_FILTER= null;
-var PI_SORT       = { col: 5, dir: -1 }; // default: sort by Spend desc
+var PI_SORT       = { col: 6, dir: -1 }; // default: sort by Spend desc
 
 function renderProducts(d) {
   var types    = d.byProductType || {};
   var top      = d.topProducts   || [];
   var typeList = Object.entries(types).sort(function(a, b) { return b[1].spend - a[1].spend; });
-  var best     = typeList.filter(function(x) { return x[0] !== 'Unknown'; })
-                         .find(function(item) { return item[1].spend > 0; });
-  var worst    = typeList.filter(function(x) { return x[0] !== 'Unknown'; })
-                         .slice().reverse().find(function(item) { return item[1].spend > 50; });
+
+     var qualified = typeList.filter(function(x) {
+  return x[0] !== 'Unknown' && x[1].spend > 50;
+});
+var best  = qualified.slice().sort(function(a,b) {
+  return (b[1].true_roas||0) - (a[1].true_roas||0);
+})[0];
+var worst = qualified.slice().sort(function(a,b) {
+  return (a[1].true_roas||0) - (b[1].true_roas||0);
+})[0];
 
   document.getElementById('pi-kpis').innerHTML = [
     kpi('Product Types',     typeList.length, 'Từ SHOPIFY_PRODUCT metafield (cột M)'),
