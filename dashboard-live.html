@@ -910,7 +910,6 @@ function renderStore(d) {
 
   document.getElementById('st-kpis').innerHTML = [
     kpi('Total Revenue',    cur(o.totalRevenue || t.revenue || 0), 'Bao gồm ship · USD', 'green'),
-    kpi('Product Revenue',  cur((t.revenue || 0) - serviceRev),    'Chỉ tiền sản phẩm (excl. service)'),
     kpi('Shipping',         cur(o.shipping  || 0),                 'Tiền ship thu của khách', 'blue'),
     kpi('Orders',           nf(o.orders || 0),                     'Số đơn thực tế', 'blue'),
     kpi('Items Sold',       nf(displayUnits),                      'Excl. Shipping Protection'),
