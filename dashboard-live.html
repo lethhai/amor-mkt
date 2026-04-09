@@ -1780,9 +1780,20 @@ function fcBuildDays(d) {
   while (cur2 <= FC_END_ES) { dates.push(cur2); cur2 = addDays(cur2, 1); }
 
   var result      = [];
-  var prevSpend   = null;
-  var pctAdsHist  = {}; // lưu %Ads theo ngày để tính delta
+  var pctAdsHist  = {};
+  // Seed prevSpend từ ngày thực tế cuối cùng có data
+  var prevSpend = (function() {
+    var dates2 = [];
+    var c2 = FC_START;
+    while (c2 < todayStr) { dates2.push(c2); c2 = addDays(c2, 1); }
+    for (var i = dates2.length - 1; i >= 0; i--) {
+      var s = spendMap[dates2[i]];
+      if (s && s > 0) return s;
+    }
+    return 500; // fallback nếu không có data nào
+  })();
 
+     
   // Tính avg orders/spend từ lịch sử để forecast
   function getAvgOrderRate() {
     var valids = result.filter(function(x) { return x.spend > 0 && x.orders > 0; });
