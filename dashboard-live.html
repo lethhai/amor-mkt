@@ -1812,10 +1812,16 @@ function fcBuildDays(d) {
     var spend, orders, revenue, pctAds, roas, profit, scaleRule, scaleFactor;
 
     if (isPast || isToday) {
-      // Data thực từ GAS — không cho sửa (isPast), cho override (isToday/manual)
       spend   = manual.spend  !== undefined ? manual.spend  : (spendMap[date]  || 0);
       orders  = manual.orders !== undefined ? manual.orders : (orderMap[date]  || 0);
       revenue = revMap[date] ? revMap[date] : r2(orders * aov);
+      // Nếu hôm nay chưa có data thực → dùng forecast thay vì 0
+      if (isToday && spend === 0 && manual.spend === undefined) {
+        var scaleFactor2 = fcGetRule(fcCalcDelta(date, pctAdsHist), FC_PLAN).factor;
+        spend   = r2(prevSpend * scaleFactor2);
+        orders  = r2(spend * getAvgOrderRate());
+        revenue = r2(orders * aov);
+      }
     } else {
       // Tương lai — tính theo rule
       var baseSpend = prevSpend || 0;
