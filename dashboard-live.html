@@ -1761,14 +1761,81 @@ function fcGetAov(d) {
 }
 
 // ── Build tất cả ngày trong campaign ─────────────
+// ── Helpers CR/CPC ───────────────────────────────
+function fcGetCpcAvg(d) {
+  var trend  = d.dailyTrend || [];
+  var last3  = trend.slice(-3);
+  var spend  = last3.reduce(function(s, r) { return s + (r.spend  || 0); }, 0);
+  var clicks = last3.reduce(function(s, r) { return s + (r.clicks || 0); }, 0);
+  return clicks > 0 ? r2(spend / clicks) : 0.40;
+}
+
+function fcGetCrYesterday(d) {
+  var todayStr = today();
+  var yest     = addDays(todayStr, -1);
+  var trend    = d.dailyTrend || [];
+  var orders   = d.shopifyOrderDaily || [];
+
+  // Clicks hôm qua từ dailyTrend
+  var row  = trend.find(function(r) { return r.date === yest; }) || {};
+  var clk  = row.clicks || 0;
+
+  // Orders hôm qua từ shopifyOrderDaily
+  var oRow = orders.find(function(r) { return r.date === yest; }) || {};
+  var ord  = oRow.orders || 0;
+
+  return (clk > 0 && ord > 0) ? ord / clk : 0.015;
+}
+
+// ── CR theo ngày dựa trên plan ───────────────────
+function fcGetCrForDay(date, cr0, plan) {
+  var start   = FC_START;        // 6/4
+  var peak    = '2026-04-22';    // cut-off
+  var end     = FC_END_ES;       // 3/5
+  var crPeak  = plan === 'A' ? cr0 * 2.0 : cr0 * 1.4;
+
+  // Phase 1: từ start đến peak
+  if (date <= peak) {
+    var totalDays = fcDaysBetween(start, peak);
+    var dayIdx    = fcDaysBetween(start, date);
+    if (plan === 'A') {
+      // Linear tăng đều
+      return cr0 + (crPeak - cr0) * (dayIdx / totalDays);
+    } else {
+      // Flat 6/4→14/4, tăng nhẹ từ 15/4→22/4
+      var flatEnd = '2026-04-14';
+      if (date <= flatEnd) return cr0;
+      var rampDays = fcDaysBetween(flatEnd, peak);
+      var rampIdx  = fcDaysBetween(flatEnd, date);
+      return cr0 + (crPeak - cr0) * (rampIdx / rampDays);
+    }
+  }
+
+  // Phase 2: sau peak → giảm về cr0
+  var downDays = fcDaysBetween(peak, end);
+  var downIdx  = fcDaysBetween(peak, date);
+  var ratio    = Math.max(0, 1 - downIdx / downDays);
+  return cr0 + (crPeak - cr0) * ratio;
+}
+
+function fcDaysBetween(a, b) {
+  var da = new Date(a + 'T12:00:00Z');
+  var db = new Date(b + 'T12:00:00Z');
+  return Math.round((db - da) / 86400000);
+}
+
+// ── Build tất cả ngày trong campaign ─────────────
 function fcBuildDays(d) {
   var aov      = FC_AOV_OVERRIDE || fcGetAov(d);
   var todayStr = today();
+  var cpcAvg   = fcGetCpcAvg(d);
+  var cr0      = fcGetCrYesterday(d);
 
   // Maps từ GAS
-  var spendMap = {}, orderMap = {}, revMap = {};
+  var spendMap  = {}, orderMap = {}, revMap = {}, clickMap = {};
   (d.dailyTrend || []).forEach(function(r) {
-    spendMap[r.date] = r.spend || 0;
+    spendMap[r.date]  = r.spend   || 0;
+    clickMap[r.date]  = r.clicks  || 0;
   });
   (d.shopifyOrderDaily || []).forEach(function(r) {
     orderMap[r.date] = r.orders       || 0;
@@ -1781,94 +1848,87 @@ function fcBuildDays(d) {
 
   var result      = [];
   var pctAdsHist  = {};
-  // Seed prevSpend từ ngày thực tế cuối cùng có data
+
+  // Seed prevSpend từ ngày thực tế cuối cùng
   var prevSpend = (function() {
-    var dates2 = [];
-    var c2 = FC_START;
-    while (c2 < todayStr) { dates2.push(c2); c2 = addDays(c2, 1); }
-    for (var i = dates2.length - 1; i >= 0; i--) {
-      var s = spendMap[dates2[i]];
+    var ds = [];
+    var c3 = FC_START;
+    while (c3 < todayStr) { ds.push(c3); c3 = addDays(c3, 1); }
+    for (var i = ds.length - 1; i >= 0; i--) {
+      var s = spendMap[ds[i]];
       if (s && s > 0) return s;
     }
-    return 500; // fallback nếu không có data nào
+    return 500;
   })();
 
-     
-  // Tính avg orders/spend từ lịch sử để forecast
-  function getAvgOrderRate() {
-    var valids = result.filter(function(x) { return x.spend > 0 && x.orders > 0; });
-    if (!valids.length) return 0.08;
-    var rate = valids.reduce(function(s, x) { return s + x.orders / x.spend; }, 0);
-    return rate / valids.length;
-  }
-
   dates.forEach(function(date) {
-    var isPast      = date < todayStr;
-    var isToday     = date === todayStr;
-    var isFuture    = date > todayStr;
-    var isHarvest   = date >= FC_HARVEST_START;
-    var manual      = FC_MANUAL[date] || {};
+    var isPast    = date < todayStr;
+    var isToday   = date === todayStr;
+    var isFuture  = date > todayStr;
+    var isHarvest = date >= FC_HARVEST_START;
+    var manual    = FC_MANUAL[date] || {};
 
-    var spend, orders, revenue, pctAds, roas, profit, scaleRule, scaleFactor;
+    var spend, orders, revenue, clicks, cr, cpc, scaleRule, scaleFactor;
 
-    if (isPast || isToday) {
-      spend   = manual.spend  !== undefined ? manual.spend  : (spendMap[date]  || 0);
-      orders  = manual.orders !== undefined ? manual.orders : (orderMap[date]  || 0);
-      revenue = revMap[date] ? revMap[date] : r2(orders * aov);
-      // Nếu hôm nay chưa có data thực → dùng forecast thay vì 0
-      if (isToday && spend === 0 && manual.spend === undefined) {
-        var scaleFactor2 = fcGetRule(fcCalcDelta(date, pctAdsHist), FC_PLAN).factor;
-        spend   = r2(prevSpend * scaleFactor2);
-        orders  = r2(spend * getAvgOrderRate());
-        revenue = r2(orders * aov);
-      }
+    if (isPast) {
+      // Data thực từ GAS — không cho edit
+      spend   = spendMap[date]  || 0;
+      orders  = orderMap[date]  || 0;
+      revenue = revMap[date]    || r2(orders * aov);
+      clicks  = clickMap[date]  || (cpcAvg > 0 ? r2(spend / cpcAvg) : 0);
+      cr      = clicks > 0 ? r2(orders / clicks * 100) : 0;
+      cpc     = clicks > 0 ? r2(spend / clicks) : 0;
+
     } else {
-      // Tương lai — tính theo rule
+      // Hôm nay hoặc tương lai — forecast + cho override
       var baseSpend = prevSpend || 0;
 
       if (isHarvest) {
-        if (FC_HARVEST[date]) {
-          scaleFactor = FC_HARVEST[date];
-          scaleRule   = '🌾 ×' + scaleFactor;
-        } else {
-          scaleFactor = FC_WIND_DOWN_FACTOR;
-          scaleRule   = '🌾 Wind-down ×0.80';
-        }
+        scaleFactor = FC_HARVEST[date] || FC_WIND_DOWN_FACTOR;
+        scaleRule   = FC_HARVEST[date]
+          ? '🌾 ×' + scaleFactor
+          : '🌾 Wind-down ×' + FC_WIND_DOWN_FACTOR;
       } else {
-        // Scale theo %Ads delta
-        var delta  = fcCalcDelta(date, pctAdsHist);
-        var rule   = fcGetRule(delta, FC_PLAN);
-        scaleFactor = rule.factor;
-        scaleRule   = rule.label + ' (Δ' + (delta >= 0 ? '+' : '') + nf(delta, 1) + '%)';
+        var delta2 = fcCalcDelta(date, pctAdsHist);
+        var rule2  = fcGetRule(delta2, FC_PLAN);
+        scaleFactor = rule2.factor;
+        scaleRule   = rule2.label + ' (Δ' + (delta2 >= 0 ? '+' : '') + nf(delta2, 1) + '%)';
       }
 
-      spend  = manual.spend !== undefined ? manual.spend : r2(baseSpend * scaleFactor);
-      orders = manual.orders !== undefined
-        ? manual.orders
-        : r2(spend * getAvgOrderRate());
+      spend   = manual.spend  !== undefined ? manual.spend
+              : (isToday && (spendMap[date] || 0) > 0) ? spendMap[date]
+              : r2(baseSpend * scaleFactor);
+
+      // CR theo curve
+      cr      = r2(fcGetCrForDay(date, cr0, FC_PLAN) * 100);
+      clicks  = cpcAvg > 0 ? r2(spend / cpcAvg) : 0;
+      orders  = manual.orders !== undefined ? manual.orders
+              : r2(clicks * (cr / 100));
       revenue = r2(orders * aov);
+      cpc     = cpcAvg;
     }
 
-    pctAds = revenue > 0 ? r2(spend / revenue * 100) : 0;
-    roas   = spend   > 0 ? r2(revenue / spend)        : 0;
-    profit = r2(revenue * FC_MARGIN - spend);
+    var pctAds = revenue > 0 ? r2(spend / revenue * 100) : 0;
+    var roas   = spend   > 0 ? r2(revenue / spend)        : 0;
+    var profit = r2(revenue * FC_MARGIN - spend);
 
     pctAdsHist[date] = pctAds;
     prevSpend        = spend;
 
     result.push({
       date, isPast, isToday, isFuture, isHarvest,
-      spend, orders, revenue, aov, pctAds, roas, profit,
+      spend, orders, revenue, clicks, cr, cpc, aov,
+      pctAds, roas, profit,
       scaleRule: scaleRule || '–',
-      scaleFactor: scaleFactor || null,
-      isManual: Object.keys(manual).length > 0,
-      isExp: isFuture && Object.keys(manual).length === 0
+      isManual:  Object.keys(manual).length > 0,
+      isExp:     isFuture && Object.keys(manual).length === 0
     });
   });
 
   return result;
-}
+}a
 
+     
 // ── Delta: %Ads hôm qua vs AVG 3 ngày trước ──────
 function fcCalcDelta(date, hist) {
   var d1  = addDays(date, -1);
@@ -2067,8 +2127,8 @@ function fcRenderTable(days) {
       + '<td style="font-size:10px;color:#a78bfa">'
         + (d.isFuture || d.isHarvest ? 'Plan ' + FC_PLAN : '–') + '</td>'
       + '<td style="font-size:10px;color:#64748b">' + d.scaleRule + '</td>'
-      + '<td class="num" style="color:#334155">–</td>'
-      + '<td class="num" style="color:#334155">–</td>'
+      + '<td class="num" style="color:#64748b">' + (d.cpc ? cur(d.cpc) : '–') + '</td>'
+      + '<td class="num" style="color:#64748b">' + (d.cr  ? nf(d.cr, 2) + '%' : '–') + '</td>'
       + '</tr>';
   }).join('') + '</tbody>';
 
