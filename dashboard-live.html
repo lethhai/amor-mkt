@@ -1749,7 +1749,7 @@ var FC_HARVEST = {
   '2026-04-24': 0.60
 };
 var FC_HARVEST_START    = '2026-04-21';
-var FC_WIND_DOWN_FACTOR = 0.80; // 25/4→3/5: -20%/ngày
+var FC_WIND_DOWN_FACTOR = 0.7; // 25/4→3/5: -20%/ngày
 
 // ── AOV từ last 7 days Shopify ──────────────────
 function fcGetAov(d) {
@@ -1770,6 +1770,20 @@ function fcGetCpcAvg(d) {
   return clicks > 0 ? r2(spend / clicks) : 0.40;
 }
 
+// ── CPC tăng dần từ CPC_avg → $0.65 tại 22/4, giữ nguyên sau đó ──
+function fcGetCpcForDay(date, cpcStart) {
+  var peak    = '2026-04-22';
+  var cpcPeak = 0.65;
+
+  if (date >= peak) return cpcPeak;
+
+  var totalDays = fcDaysBetween(FC_START, peak);
+  var dayIdx    = fcDaysBetween(FC_START, date);
+  if (totalDays <= 0) return cpcStart;
+
+  return r2(cpcStart + (cpcPeak - cpcStart) * (dayIdx / totalDays));
+}
+     
 function fcGetCrYesterday(d) {
   var todayStr = today();
   var yest     = addDays(todayStr, -1);
@@ -1901,11 +1915,13 @@ function fcBuildDays(d) {
 
       // CR theo curve
       cr      = r2(fcGetCrForDay(date, cr0, FC_PLAN) * 100);
-      clicks  = cpcAvg > 0 ? r2(spend / cpcAvg) : 0;
+      var cpcDay = isPast ? (clickMap[date] > 0 ? r2(spend / clickMap[date]) : cpcAvg)
+                          : fcGetCpcForDay(date, cpcAvg);
+      cpc     = cpcDay;
+      clicks  = cpcDay > 0 ? r2(spend / cpcDay) : 0;
       orders  = manual.orders !== undefined ? manual.orders
               : r2(clicks * (cr / 100));
       revenue = r2(orders * aov);
-      cpc     = cpcAvg;
     }
 
     var pctAds = revenue > 0 ? r2(spend / revenue * 100) : 0;
