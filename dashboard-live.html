@@ -137,6 +137,35 @@ tbody tr:hover{background:#181b2e}
 .type-pill:hover{border-color:#a78bfa;color:#c4b5fd}
 .type-pill.active{background:#4338ca;border-color:#6366f1;color:#fff}
 .be{font-size:10px;color:#475569;margin-left:4px}
+/* ── SEARCH / FILTER BAR ── */
+.filter-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.filter-bar input[type=text]{background:#1a1d30;border:1px solid #2d3154;color:#e2e8f0;
+  border-radius:6px;padding:5px 10px;font-size:11px;outline:none;width:220px}
+.filter-bar input[type=text]:focus{border-color:#6366f1}
+.filter-bar input[type=text]::placeholder{color:#475569}
+.filter-btn{padding:4px 10px;border-radius:20px;border:1px solid #2d3154;
+  background:transparent;color:#94a3b8;font-size:11px;font-weight:600;
+  cursor:pointer;transition:all .15s;white-space:nowrap}
+.filter-btn:hover{border-color:#a78bfa;color:#c4b5fd}
+.filter-btn.active{background:#4338ca;border-color:#6366f1;color:#fff}
+.sort-indicator{font-size:9px;margin-left:3px;color:#6366f1}
+thead th.sortable{cursor:pointer;user-select:none}
+thead th.sortable:hover{color:#a78bfa}
+/* ── WoW TOGGLE ── */
+.wow-toggle{display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;
+  background:#1a1d30;border:1px solid #2d3154;border-radius:6px;
+  padding:4px 10px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.wow-toggle:hover{border-color:#6366f1;color:#a78bfa}
+.wow-toggle.active{border-color:#6366f1;background:#1e1a3a;color:#a78bfa}
+.wow-toggle .toggle-dot{width:10px;height:10px;border-radius:50%;
+  background:#2d3154;transition:background .15s}
+.wow-toggle.active .toggle-dot{background:#6366f1}
+/* ── UNKNOWN BADGE ── */
+.unknown-badge{display:inline-block;padding:1px 5px;border-radius:4px;
+  font-size:9px;font-weight:700;background:#78350f;color:#fbbf24;
+  margin-left:4px;vertical-align:middle}
+/* ── ROAS ANOMALY FLAG ── */
+.roas-anomaly{font-size:9px;color:#f59e0b;margin-left:3px}
 </style>
 </head>
 <body>
@@ -179,6 +208,10 @@ tbody tr:hover{background:#181b2e}
     <input type="date" id="ct">
     <button onclick="applyCustom()">Áp dụng</button>
   </div>
+  <button class="wow-toggle" id="wow-btn" onclick="toggleWoW()" title="So sánh vs kỳ trước">
+    <span class="toggle-dot"></span>
+    vs Kỳ trước
+  </button>
   <div id="status-bar">
     <span class="dot"></span>
     <span id="st-txt">Chờ...</span>
@@ -332,6 +365,15 @@ tbody tr:hover{background:#181b2e}
     </div>
     <div class="section">
       <div class="st">Top 30 Products — Chi tiết</div>
+      <div class="filter-bar">
+        <input type="text" id="pi-search" placeholder="🔍 Tìm tên sản phẩm..." oninput="filterProducts()">
+        <button class="filter-btn active" data-mkt="all" onclick="setMktFilter(this,'all')">Tất cả</button>
+        <button class="filter-btn" data-mkt="ES" onclick="setMktFilter(this,'ES')">ES</button>
+        <button class="filter-btn" data-mkt="IT" onclick="setMktFilter(this,'IT')">IT</button>
+        <button class="filter-btn" data-roas="below" onclick="setRoasFilter(this,'below')">⚠️ Dưới BE</button>
+        <button class="filter-btn" data-roas="above" onclick="setRoasFilter(this,'above')">✅ Trên BE</button>
+        <span style="font-size:11px;color:#475569;margin-left:4px" id="pi-count"></span>
+      </div>
       <div id="pi-top-tbl" class="twrap"></div>
     </div>
   </div>
@@ -446,6 +488,8 @@ Chart.defaults.font.size   = 11;
 var DATA    = null;
 var MD_DATA = null;
 var CH      = {};
+var WOW_ON  = false;   // Week-over-Week toggle state
+var WOW_DATA= null;    // previous period data
 
 // ═══════════════════════════════════════
 // DATE UTILS
@@ -494,25 +538,47 @@ async function loadAll(from, to) {
     var mdFrom   = '2026-03-20';
     var mdTo     = today();
     var sameAsMd = (from === mdFrom && to === mdTo);
-    var results  = await Promise.all([
+
+    // Tính previous period cho WoW
+    var fromDate  = new Date(from + 'T12:00:00Z');
+    var toDate_   = new Date(to   + 'T12:00:00Z');
+    var diffDays  = Math.round((toDate_ - fromDate) / 86400000) + 1;
+    var prevTo    = addDays(from, -1);
+    var prevFrom  = addDays(prevTo, -(diffDays - 1));
+
+    var fetches = [
       fetchGAS(from, to),
-      sameAsMd ? Promise.resolve(null) : fetchGAS(mdFrom, mdTo)
-    ]);
+      sameAsMd ? Promise.resolve(null) : fetchGAS(mdFrom, mdTo),
+      WOW_ON   ? fetchGAS(prevFrom, prevTo) : Promise.resolve(null)
+    ];
+    var results = await Promise.all(fetches);
     var main = results[0];
     var md   = results[1];
+    var prev = results[2];
     if (!main.ok) throw new Error(main.error || 'GAS trả về lỗi');
-    DATA    = main;
-    MD_DATA = md || main;
+    DATA     = main;
+    MD_DATA  = md || main;
+    WOW_DATA = prev;
     renderAll();
     document.getElementById('st-txt').textContent =
       fdFull(main.fromDate) + ' → ' + fdFull(main.toDate)
       + '  ·  ' + new Date(main.generatedAt).toLocaleTimeString('vi-VN')
-      + '  (Spain time)';
+      + '  (Spain time)'
+      + (WOW_ON ? '  |  vs ' + fdFull(prevFrom) + '→' + fdFull(prevTo) : '');
   } catch(e) {
     document.getElementById('ov-msg').textContent = '❌ ' + e.message;
     return;
   }
   ov(false);
+}
+
+function toggleWoW() {
+  WOW_ON = !WOW_ON;
+  var btn = document.getElementById('wow-btn');
+  btn.classList.toggle('active', WOW_ON);
+  var activeBtn = document.querySelector('.dp.active');
+  var range = rangeFrom(activeBtn ? activeBtn.dataset.r : '7');
+  loadAll(range.from, range.to);
 }
 
 function renderAll() {
@@ -537,21 +603,35 @@ function renderOverview(d) {
 
   var totalSpend  = b.spend    || 0;
   var productRev  = s.revenue  || 0;
-  var totalRevInp = o.totalRevenue || productRev || 0; // USD (đã convert)
+  var totalRevInp = o.totalRevenue || productRev || 0;
 
-  // FIX #5: Profit formula mới
-  var fulfillment  = r2(totalRevInp * 0.29);   // 29% Total Rev
-  var gatewayFee   = r2(totalRevInp * 0.07);   // 7% Payment gateway
-  var appApiCost   = r2(totalRevInp * 0.028);  // 2.8% App API
+  var fulfillment  = r2(totalRevInp * 0.29);
+  var gatewayFee   = r2(totalRevInp * 0.07);
+  var appApiCost   = r2(totalRevInp * 0.028);
   var txg07Spend   = (d.byAccount && d.byAccount['TXG 07']) ? (d.byAccount['TXG 07'].spend || 0) : 0;
-  var taxAds       = r2(txg07Spend * 0.12);    // TXG07 spend × 12%
+  var taxAds       = r2(txg07Spend * 0.12);
   var totalCost    = totalSpend + fulfillment + gatewayFee + appApiCost + taxAds;
   var profit       = r2(totalRevInp - totalCost);
   var trueROAS     = totalSpend > 0 ? r2(totalRevInp / totalSpend) : 0;
   var gap          = r2(totalRevInp - (b.revenue || 0));
-
-  // txg07Ratio dùng cho daily profit estimate
   var txg07Ratio   = totalSpend > 0 ? txg07Spend / totalSpend : 0;
+
+  // WoW delta helper
+  function wowDelta(curr, prevKey) {
+    if (!WOW_ON || !WOW_DATA) return '';
+    var pw = WOW_DATA;
+    var prevVal = 0;
+    if (prevKey === 'spend')    prevVal = (pw.blended || {}).spend || 0;
+    if (prevKey === 'revenue')  prevVal = (pw.shopifyOrderTotals || {}).totalRevenue || 0;
+    if (prevKey === 'roas')     { var ps = (pw.blended||{}).spend||0; prevVal = ps>0?r2(((pw.shopifyOrderTotals||{}).totalRevenue||0)/ps):0; }
+    if (prevKey === 'profit')   { var pr=pw.shopifyOrderTotals||{}; var pb=pw.blended||{}; var psp=pb.spend||0; var prv=pr.totalRevenue||0; prevVal=r2(prv-psp-prv*0.388); }
+    if (prevKey === 'orders')   prevVal = (pw.shopifyOrderTotals || {}).orders || 0;
+    if (!prevVal) return '';
+    var delta = r2((curr - prevVal) / prevVal * 100);
+    var color = delta >= 0 ? '#4ade80' : '#f87171';
+    return '<br><span style="font-size:10px;color:' + color + '">'
+      + (delta >= 0 ? '▲' : '▼') + Math.abs(delta) + '% vs kỳ trước</span>';
+  }
 
   var noDataBanner = '';
   if (totalSpend === 0 && totalRevInp === 0 && (o.orders || 0) === 0) {
@@ -563,15 +643,15 @@ function renderOverview(d) {
   }
 
   document.getElementById('ov-kpis').innerHTML = noDataBanner + [
-    kpi('Total Ads Spend',     cur(totalSpend),          'FB ' + cur(b.fb_spend || 0) + ' + GG ' + cur(b.gg_spend || 0)),
-    kpi('Total Revenue ($)',   cur(totalRevInp),          'Doanh thu THỰC · USD', 'green'),
-    kpi('True ROAS',           nf(trueROAS, 2) + 'x',    'Total Rev ÷ Paid Spend', roasCls(trueROAS, 1.65)),
-    kpi('Est. Profit',         cur(profit),               'Rev − Ads − FF − GW − App − TaxAds', profit >= 0 ? 'green' : 'red'),
+    kpi('Total Ads Spend',     cur(totalSpend) + wowDelta(totalSpend,'spend'),   'FB ' + cur(b.fb_spend || 0) + ' + GG ' + cur(b.gg_spend || 0)),
+    kpi('Total Revenue ($)',   cur(totalRevInp) + wowDelta(totalRevInp,'revenue'),'Doanh thu THỰC · USD', 'green'),
+    kpi('True ROAS',           nf(trueROAS,2)+'x'+wowDelta(trueROAS,'roas'),     'Total Rev ÷ Paid Spend', roasCls(trueROAS, 1.65)),
+    kpi('Est. Profit',         cur(profit)+wowDelta(profit,'profit'),             'Rev − Ads − FF − GW − App − TaxAds', profit >= 0 ? 'green' : 'red'),
     kpi('Fulfillment (29%)',   cur(fulfillment),          'Total Rev × 29%', 'warn'),
     kpi('Gateway Fee (7%)',    cur(gatewayFee),           'Total Rev × 7%', 'pink'),
     kpi('APP API (2.8%)',      cur(appApiCost),           'Total Rev × 2.8%', 'pink'),
     kpi('TaxAds TXG 07 (12%)', cur(taxAds),               'TXG 07 Spend × 12%', 'pink'),
-    kpi('Shopify Orders',      nf(o.orders || 0),         'Số đơn hàng thực tế', 'blue'),
+    kpi('Shopify Orders',      nf(o.orders||0)+wowDelta(o.orders||0,'orders'),   'Số đơn hàng thực tế', 'blue'),
     kpi('Shipping Revenue',    cur(o.shipping || 0),      'Tiền khách trả ship', 'blue'),
     kpi('AOV',                 cur(o.aov || 0),           'Total Rev ÷ Orders', 'blue'),
     kpi('Retention Rate',      pct(o.retentionRate || 0), 'Tỷ lệ khách cũ', (o.retentionRate > 15 ? 'green' : 'warn')),
@@ -1115,14 +1195,22 @@ function showTypeDetail(type, d) {
 }
 
 // ═══════════════════════════════════════
-// TAB 4 — PRODUCT INTELLIGENCE (UPDATE: ADDED PRODUCT ID COLUMN)
+// TAB 4 — PRODUCT INTELLIGENCE
+// v2: Unknown ⚠️ | ROAS anomaly flag | Sort/Filter/Search
 // ═══════════════════════════════════════
+var PI_DATA       = [];   // raw product rows for filter/sort
+var PI_MKT_FILTER = 'all';
+var PI_ROAS_FILTER= null;
+var PI_SORT       = { col: 5, dir: -1 }; // default: sort by Spend desc
+
 function renderProducts(d) {
   var types    = d.byProductType || {};
   var top      = d.topProducts   || [];
   var typeList = Object.entries(types).sort(function(a, b) { return b[1].spend - a[1].spend; });
-  var best     = typeList.find(function(item) { return item[1].spend > 0; });
-  var worst    = typeList.slice().reverse().find(function(item) { return item[1].spend > 50; });
+  var best     = typeList.filter(function(x) { return x[0] !== 'Unknown'; })
+                         .find(function(item) { return item[1].spend > 0; });
+  var worst    = typeList.filter(function(x) { return x[0] !== 'Unknown'; })
+                         .slice().reverse().find(function(item) { return item[1].spend > 50; });
 
   document.getElementById('pi-kpis').innerHTML = [
     kpi('Product Types',     typeList.length, 'Từ SHOPIFY_PRODUCT metafield (cột M)'),
@@ -1131,15 +1219,24 @@ function renderProducts(d) {
     worst ? kpi('Worst: ' + worst[0], nf(worst[1].true_roas, 2) + 'x', cur(worst[1].spend), 'red')   : '',
   ].join('');
 
+  // ── Product Types table — Unknown đánh dấu ⚠️ ──
   var tRows = typeList.map(function(item) {
     var type = item[0], m = item[1], be = m.beRoas || 1.63;
     var gap  = m.spend > 0 ? (m.true_roas - be) / be * 100 : 0;
+    var isUnk = type === 'Unknown';
+    var typeCell = isUnk
+      ? '<strong style="color:#94a3b8">' + type + '</strong>'
+        + '<span class="unknown-badge">⚠️ Review</span>'
+        + '<div style="font-size:10px;color:#78350f;margin-top:2px">Ads chưa map được URL sản phẩm</div>'
+      : '<strong>' + type + '</strong>';
     return [
-      '<strong>' + type + '</strong>',
+      typeCell,
       '<span style="font-size:10px;color:#475569">BE ' + nf(be, 2) + 'x</span>',
       '<span class="num">' + cur(m.spend)   + '</span>',
       '<span class="num" style="color:#4ade80">' + cur(m.true_revenue) + '</span>',
-      '<span class="num" style="' + roasStyle(m.true_roas, be) + '">' + nf(m.true_roas, 2) + 'x</span>',
+      '<span class="num" style="' + roasStyle(m.true_roas, be) + '">' + nf(m.true_roas, 2) + 'x'
+        + (m.true_roas > 10 && m.spend < 50 ? '<span class="roas-anomaly" title="ROAS cao bất thường — spend thấp, cần verify">⚠️</span>' : '')
+        + '</span>',
       '<span class="num" style="color:' + (gap >= 0 ? '#4ade80' : '#f87171') + '">'
         + (gap >= 0 ? '+' : '') + nf(gap, 1) + '%</span>',
       '<span class="num">' + nf(m.true_purchases, 1) + '</span>',
@@ -1152,6 +1249,7 @@ function renderProducts(d) {
     ['Type', 'BE', 'Spend', 'True Revenue ($)', 'True ROAS', 'vs BE', 'True Purch', 'True CPA', 'FB/GG'], tRows
   );
 
+  // ── Bubble chart ──
   var sl = top.slice(0, 30);
   mkCh('ch-pi-bubble', {
     type: 'bubble',
@@ -1178,37 +1276,122 @@ function renderProducts(d) {
         }}}},
       scales: {
         x: { title: { display: true, text: 'Spend ($)' }, grid: GRID, ticks: TICK_Y },
-        y: { title: { display: true, text: 'True ROAS' },      grid: GRID, min: 0 }
+        y: { title: { display: true, text: 'True ROAS' }, grid: GRID, min: 0 }
       }
     }
   });
 
-  var topRows = top.slice(0, 30).map(function(p, i) {
-    var be      = p.beRoas || 1.63;
-    var markets = (p.markets || []).map(function(m) {
+  // ── Lưu data gốc để sort/filter ──
+  PI_DATA = top.slice(0, 30).map(function(p, i) {
+    return {
+      idx:       i + 1,
+      productId: p.productId || '',
+      title:     p.title || p.productId || '',
+      type:      p.type || '',
+      markets:   p.markets || [],
+      spend:     p.spend || 0,
+      trueRev:   p.true_revenue || 0,
+      trueRoas:  p.true_roas || 0,
+      truePurch: p.true_purchases || 0,
+      fbSpend:   p.fb_spend || 0,
+      ggSpend:   p.gg_spend || 0,
+      beRoas:    p.beRoas || 1.63
+    };
+  });
+
+  renderPITable();
+}
+
+// ── Render bảng Top Products có sort/filter/search ──
+function renderPITable() {
+  var search   = (document.getElementById('pi-search') || {}).value || '';
+  var filtered = PI_DATA.filter(function(p) {
+    var matchSearch = !search || p.title.toLowerCase().indexOf(search.toLowerCase()) > -1;
+    var matchMkt    = PI_MKT_FILTER === 'all' || p.markets.indexOf(PI_MKT_FILTER) > -1;
+    var matchRoas   = !PI_ROAS_FILTER
+      || (PI_ROAS_FILTER === 'below' && p.trueRoas < p.beRoas)
+      || (PI_ROAS_FILTER === 'above' && p.trueRoas >= p.beRoas);
+    return matchSearch && matchMkt && matchRoas;
+  });
+
+  // Sort
+  var col = PI_SORT.col, dir = PI_SORT.dir;
+  var colKeys = ['idx','productId','title','type','markets','spend','trueRev','trueRoas','truePurch','fbSpend'];
+  filtered.sort(function(a, b) {
+    var av = a[colKeys[col]], bv = b[colKeys[col]];
+    if (typeof av === 'string') return dir * av.localeCompare(bv);
+    return dir * ((av || 0) - (bv || 0));
+  });
+
+  var countEl = document.getElementById('pi-count');
+  if (countEl) countEl.textContent = filtered.length + ' sản phẩm';
+
+  var headers = ['#','ID','Product','Type','Market','Spend','True Revenue ($)','True ROAS','True Purch','FB/GG'];
+  var sortableIdx = [5,6,7,8]; // Spend, True Rev, True ROAS, True Purch
+
+  var headerHtml = '<thead><tr>' + headers.map(function(h, i) {
+    var isSortable = sortableIdx.indexOf(i) > -1;
+    var indicator  = (PI_SORT.col === i) ? (PI_SORT.dir === 1 ? ' ▲' : ' ▼') : '';
+    if (isSortable) {
+      return '<th class="sortable" onclick="sortPI(' + i + ')" title="Sort by ' + h + '">'
+        + h + '<span class="sort-indicator">' + indicator + '</span></th>';
+    }
+    return '<th>' + h + '</th>';
+  }).join('') + '</tr></thead>';
+
+  var bodyHtml = '<tbody>' + filtered.map(function(p, i) {
+    var be       = p.beRoas;
+    var mkts     = p.markets.map(function(m) {
       return '<span class="badge b-' + m.toLowerCase() + '">' + m + '</span>';
     }).join(' ') || '–';
-    
-    return [
-      '<span style="color:#475569">' + (i + 1) + '</span>',
-      '<span style="font-size:10px;color:#94a3b8">' + (p.productId || '–') + '</span>', // CỘT ID MỚI
-      '<span style="font-size:11px" title="' + (p.productId || '') + '">'
-        + (p.title || p.productId || '').slice(0, 42) + '</span>',
-      '<span style="font-size:10px;color:#a78bfa">' + (p.type || '') + '</span>',
-      markets,
-      '<span class="num">' + cur(p.spend)   + '</span>',
-      '<span class="num" style="color:#4ade80">' + cur(p.true_revenue) + '</span>',
-      '<span class="num" style="' + roasStyle(p.true_roas, be) + '">' + nf(p.true_roas, 2) + 'x</span>',
-      '<span class="num">' + nf(p.true_purchases, 1) + '</span>',
-      '<span style="font-size:10px"><span style="color:#60a5fa">' + cur(p.fb_spend || 0) + '</span>'
-        + '/<span style="color:#4ade80">' + cur(p.gg_spend || 0) + '</span></span>'
-    ];
-  });
-  
-  // Update header thêm 'ID'
-  document.getElementById('pi-top-tbl').innerHTML = mkTable(
-    ['#', 'ID', 'Product', 'Type', 'Market', 'Spend', 'True Revenue ($)', 'True ROAS', 'True Purch', 'FB/GG'], topRows
-  );
+    var roasAnomaly = p.trueRoas > 10 && p.spend < 50
+      ? '<span class="roas-anomaly" title="ROAS cao bất thường — spend thấp, cần verify">⚠️</span>'
+      : '';
+    return '<tr>'
+      + '<td><span style="color:#475569">' + (i + 1) + '</span></td>'
+      + '<td><span style="font-size:10px;color:#94a3b8">' + (p.productId || '–') + '</span></td>'
+      + '<td><span style="font-size:11px">' + p.title.slice(0, 42) + '</span></td>'
+      + '<td><span style="font-size:10px;color:#a78bfa">' + p.type + '</span></td>'
+      + '<td>' + mkts + '</td>'
+      + '<td class="num">' + cur(p.spend) + '</td>'
+      + '<td class="num" style="color:#4ade80">' + cur(p.trueRev) + '</td>'
+      + '<td class="num" style="' + roasStyle(p.trueRoas, be) + '">'
+        + nf(p.trueRoas, 2) + 'x' + roasAnomaly + '</td>'
+      + '<td class="num">' + nf(p.truePurch, 1) + '</td>'
+      + '<td style="font-size:10px"><span style="color:#60a5fa">' + cur(p.fbSpend) + '</span>'
+        + '/<span style="color:#4ade80">' + cur(p.ggSpend) + '</span></td>'
+      + '</tr>';
+  }).join('') + '</tbody>';
+
+  document.getElementById('pi-top-tbl').innerHTML =
+    '<table>' + headerHtml + bodyHtml + '</table>';
+}
+
+function sortPI(colIdx) {
+  if (PI_SORT.col === colIdx) PI_SORT.dir *= -1;
+  else { PI_SORT.col = colIdx; PI_SORT.dir = -1; }
+  renderPITable();
+}
+
+function filterProducts() { renderPITable(); }
+
+function setMktFilter(btn, mkt) {
+  PI_MKT_FILTER = mkt;
+  document.querySelectorAll('[data-mkt]').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  renderPITable();
+}
+
+function setRoasFilter(btn, val) {
+  if (PI_ROAS_FILTER === val) {
+    PI_ROAS_FILTER = null;
+    btn.classList.remove('active');
+  } else {
+    PI_ROAS_FILTER = val;
+    document.querySelectorAll('[data-roas]').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+  }
+  renderPITable();
 }
      
 
@@ -1297,19 +1480,22 @@ function renderMD(d) {
     var markets = (p.markets || []).map(function(m) {
       return '<span class="badge b-' + m.toLowerCase() + '">' + m + '</span>';
     }).join(' ') || '–';
+    var trueRoas = p.spend > 0 ? r2((p.true_revenue || 0) / p.spend) : 0;
     return [
       '<span style="color:#475569">' + (i + 1) + '</span>',
       '<span style="font-size:11px">' + (p.title || p.productId || '').slice(0, 45) + '</span>',
       '<span style="font-size:10px;color:#a78bfa">' + (p.type || '') + '</span>',
       markets,
       '<span class="num">' + cur(p.spend)   + '</span>',
-      '<span class="num">' + cur(p.revenue) + '</span>',
+      '<span class="num" style="color:#475569">' + cur(p.revenue) + '</span>',
       '<span class="num" style="' + roasStyle(p.roas, be) + '">' + nf(p.roas, 2) + 'x</span>',
+      '<span class="num" style="color:#4ade80">' + cur(p.true_revenue || 0) + '</span>',
+      '<span class="num" style="' + roasStyle(trueRoas, be) + '">' + nf(trueRoas, 2) + 'x</span>',
       '<span class="num">' + nf(p.purchases, 1) + '</span>'
     ];
   });
   document.getElementById('md-prod-tbl').innerHTML = mkTable(
-    ['#', 'Product', 'Type', 'Market', 'Spend ($)', 'Revenue (Ads Attr.)', 'ROAS', 'Purchases'], pRows
+    ['#', 'Product', 'Type', 'Market', 'Spend ($)', 'Revenue (Ads Attr.)', 'Ads ROAS', 'True Revenue ($)', 'True ROAS', 'Purchases'], pRows
   );
 }
 
