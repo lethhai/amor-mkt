@@ -691,7 +691,7 @@ function renderOverview(d) {
 
   var fulfillment  = r2(totalRevInp * 0.29);
   var gatewayFee   = r2(totalRevInp * 0.07);
-  var appApiCost   = r2(totalRevInp * 0.028);
+  var appApiCost   = r2((DATA.openAI || {}).totalSpend || 0);  // Thực tế từ sheet API
   var txg07Spend   = (d.byAccount && d.byAccount['TXG 07']) ? (d.byAccount['TXG 07'].spend || 0) : 0;
   var taxAds       = r2(txg07Spend * 0.12);
   var totalCost    = totalSpend + fulfillment + gatewayFee + appApiCost + taxAds;
@@ -733,7 +733,9 @@ function renderOverview(d) {
     kpi('Est. Profit',         cur(profit)+wowDelta(profit,'profit'),             'Rev − Ads − FF − GW − App − TaxAds', profit >= 0 ? 'green' : 'red'),
     kpi('Fulfillment (29%)',   cur(fulfillment),          'Total Rev × 29%', 'warn'),
     kpi('Gateway Fee (7%)',    cur(gatewayFee),           'Total Rev × 7%', 'pink'),
-    kpi('APP API (2.8%)',      cur(appApiCost),           'Total Rev × 2.8%', 'pink'),
+    kpi('OpenAI / API',        cur(appApiCost),
+    nf((DATA.openAI || {}).totalItems || 0, 0) + ' items · '
+    + cur((DATA.openAI || {}).spentPerItem || 0) + '/item', 'pink'),
     kpi('TaxAds TXG 07 (12%)', cur(taxAds),               'TXG 07 Spend × 12%', 'pink'),
     kpi('Shopify Orders',      nf(o.orders||0)+wowDelta(o.orders||0,'orders'),   'Số đơn hàng thực tế', 'blue'),
     kpi('Shipping Revenue',    cur(o.shipping || 0),      'Tiền khách trả ship', 'blue'),
