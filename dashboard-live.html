@@ -282,6 +282,12 @@ thead th.sortable:hover{color:#a78bfa}
 
   <!-- TAB 2 — STORE -->
   <div class="tab-panel" id="tab-store">
+    <div class="filter-bar" style="margin-bottom:12px">
+      <span style="font-size:11px;color:#475569;font-weight:600">Market:</span>
+      <button class="filter-btn active" onclick="setStoreMarket(this,'all')">🌍 Tất cả</button>
+      <button class="filter-btn" onclick="setStoreMarket(this,'ES')">🇪🇸 ES</button>
+      <button class="filter-btn" onclick="setStoreMarket(this,'IT')">🇮🇹 IT</button>
+    </div>   
     <div class="disclaimer">
       <div class="di">🛒</div>
       <p><strong>Dữ liệu thuần Shopify — Cấp độ Order &amp; Sản phẩm · Currency: USD ($)</strong>
@@ -900,6 +906,51 @@ function renderStore(d) {
   var sm = d.shopifyByMarket    || {};
   var st = d.shopifyByType      || {};
 
+  // ── Market filter ──
+  var mkt = ST_MARKET;
+  if (mkt !== 'all') {
+    // Filter shopifyOrderDaily theo market từ shopifyOrderByCountry
+    var byC = d.shopifyOrderByCountry || {};
+    var mktData = byC[mkt] || {};
+    // Override totals với data của market đó
+    o = {
+      orders:       mktData.orders       || 0,
+      items:        mktData.items        || 0,
+      totalRevenue: mktData.totalRevenue || 0,
+      shipping:     mktData.shipping     || 0,
+      aov:          mktData.aov          || 0,
+      aoq:          0,
+      retentionRate:0
+    };
+    // Filter daily trend
+    od = (d.shopifyOrderDaily || []).map(function(row) {
+      // Tỷ lệ market trong tổng để ước tính daily
+      var total = d.shopifyOrderTotals || {};
+      var ratio = total.totalRevenue > 0
+        ? (mktData.totalRevenue || 0) / total.totalRevenue : 0;
+      return {
+        date:         row.date,
+        orders:       Math.round(row.orders * ratio),
+        totalRevenue: r2(row.totalRevenue * ratio),
+        shipping:     r2(row.shipping * ratio),
+        aov:          row.aov
+      };
+    });
+    // Filter by type — dùng blendedByCountry để ước tính
+    var bc = d.blendedByCountry || {};
+    var mktRatio = bc[mkt] && d.blended
+      ? (bc[mkt].spend || 0) / (d.blended.spend || 1) : 1;
+    var stFiltered = {};
+    Object.keys(st).forEach(function(k) {
+      stFiltered[k] = {
+        revenue:   r2((st[k].revenue   || 0) * mktRatio),
+        unitsSold: Math.round((st[k].unitsSold || 0) * mktRatio),
+        orderLines:Math.round((st[k].orderLines|| 0) * mktRatio)
+      };
+    });
+    st = stFiltered;
+  }
+
   // FIX #7: Tính items đã loại trừ service types
   var serviceUnits = 0, serviceRev = 0;
   Object.keys(st).forEach(function(k) {
@@ -1031,13 +1082,56 @@ function renderStore(d) {
       '<span style="font-size:10px;color:#a78bfa">' + (p.type || '–') + '</span>',
       markets,
       '<span class="num">' + cur(p.revenue)   + '</span>',
-      '<span class="num">' + nf(p.unitsSold)  + '</span>',
       '<span class="num">' + nf(p.orderLines) + '</span>'
     ];
   });
-  document.getElementById('st-products').innerHTML = mkTable(
-    ['#', 'Product', 'Type', 'Market', 'Revenue ($)', 'Units', 'Order Lines'], rows
-  );
+  // Sort top products
+  var ST_PROD_SORT = window._stProdSort || { col: 4, dir: -1 };
+  var sortedProds = prods.slice().sort(function(a, b) {
+    var keys = ['', '', '', '', 'revenue', 'orderLines'];
+    var av = a[keys[ST_PROD_SORT.col]] || 0;
+    var bv = b[keys[ST_PROD_SORT.col]] || 0;
+    return ST_PROD_SORT.dir * (bv - av);
+  });
+
+  var stHeads = ['#', 'Product', 'Type', 'Market', 'Revenue ($)', 'Order Lines'];
+  var headerHtml = '<thead><tr>' + stHeads.map(function(h, i) {
+    if (i < 4) return '<th>' + h + '</th>';
+    var ind = (ST_PROD_SORT.col === i) ? (ST_PROD_SORT.dir === 1 ? ' ▲' : ' ▼') : '';
+    return '<th class="sortable" onclick="sortStProd(' + i + ')">'
+      + h + '<span class="sort-indicator">' + ind + '</span></th>';
+  }).join('') + '</tr></thead>';
+
+  var bodyHtml = '<tbody>' + sortedProds.slice(0, 25).map(function(p, i) {
+    var title   = (p.title || p.productId || '').slice(0, 45);
+    var finalUrl= (p.fullUrl && p.fullUrl.indexOf('http') === 0)
+                  ? p.fullUrl
+                  : 'https://amor1970s.com/products/' + (p.fullUrl || p.productId || '');
+    var nameCell= p.fullUrl
+      ? '<a href="' + finalUrl + '" target="_blank" style="color:#a78bfa;text-decoration:underline;font-size:11px">' + title + '</a>'
+      : '<span style="font-size:11px">' + title + '</span>';
+    var markets = (p.markets || []).map(function(m) {
+      return '<span class="badge b-' + m.toLowerCase() + '">' + m + '</span>';
+    }).join(' ') || '–';
+    return '<tr>'
+      + '<td><span style="color:#475569">' + (i+1) + '</span></td>'
+      + '<td>' + nameCell + '</td>'
+      + '<td><span style="font-size:10px;color:#a78bfa">' + (p.type||'–') + '</span></td>'
+      + '<td>' + markets + '</td>'
+      + '<td class="num">' + cur(p.revenue) + '</td>'
+      + '<td class="num">' + nf(p.orderLines) + '</td>'
+      + '</tr>';
+  }).join('') + '</tbody>';
+
+ document.getElementById('st-products').innerHTML =
+    '<table>' + headerHtml + bodyHtml + '</table>';
+}
+
+function sortStProd(colIdx) {
+  if (!window._stProdSort) window._stProdSort = { col: 4, dir: -1 };
+  if (window._stProdSort.col === colIdx) window._stProdSort.dir *= -1;
+  else { window._stProdSort.col = colIdx; window._stProdSort.dir = -1; }
+  renderStore(DATA);
 }
 
 // ═══════════════════════════════════════
@@ -1283,6 +1377,7 @@ function showTypeDetail(type, d) {
 // TAB 4 — PRODUCT INTELLIGENCE
 // v2: Unknown ⚠️ | ROAS anomaly flag | Sort/Filter/Search
 // ═══════════════════════════════════════
+var ST_MARKET = 'all'; // Store tab market filter
 var PI_DATA       = [];   // raw product rows for filter/sort
 var PI_TYPES_DATA  = [];   // raw type rows for sort
 var PI_TYPES_SORT  = { col: 2, dir: -1 };
@@ -1499,6 +1594,14 @@ function setRoasFilter(btn, val) {
     btn.classList.add('active');
   }
   renderPITable();
+  function setStoreMarket(btn, mkt) {
+  ST_MARKET = mkt;
+  document.querySelectorAll('#tab-store .filter-btn').forEach(function(b) {
+    b.classList.remove('active');
+  });
+  btn.classList.add('active');
+  renderStore(DATA);
+}   
 }
 
 function renderPITypesTable() {
