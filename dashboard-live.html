@@ -715,7 +715,20 @@ function renderOverview(d) {
     if (prevKey === 'spend')    prevVal = (pw.blended || {}).spend || 0;
     if (prevKey === 'revenue')  prevVal = (pw.shopifyOrderTotals || {}).totalRevenue || 0;
     if (prevKey === 'roas')     { var ps = (pw.blended||{}).spend||0; prevVal = ps>0?r2(((pw.shopifyOrderTotals||{}).totalRevenue||0)/ps):0; }
-    if (prevKey === 'profit')   { var pr=pw.shopifyOrderTotals||{}; var pb=pw.blended||{}; var psp=pb.spend||0; var prv=pr.totalRevenue||0; prevVal=r2(prv-psp-prv*0.388); }
+    if (prevKey === 'profit') { 
+      var pr = pw.shopifyOrderTotals || {}; 
+      var pb = pw.blended || {}; 
+      var psp = pb.spend || 0; 
+      var prv = pr.totalRevenue || 0; 
+      
+      var pFF = prv * 0.29;
+      var pGW = prv * 0.07;
+      var pAPI = (pw.openAI || {}).totalSpend || 0;
+      var pTXG = (pw.byAccount && pw.byAccount['TXG 07']) ? (pw.byAccount['TXG 07'].spend || 0) : 0;
+      var pTax = pTXG * 0.12;
+      
+      prevVal = r2(prv - psp - pFF - pGW - pAPI - pTax); 
+    }  
     if (prevKey === 'orders')   prevVal = (pw.shopifyOrderTotals || {}).orders || 0;
     if (!prevVal) return '';
     var delta = r2((curr - prevVal) / prevVal * 100);
