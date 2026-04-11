@@ -287,7 +287,8 @@ thead th.sortable:hover{color:#a78bfa}
       <button class="filter-btn active" onclick="setStoreMarket(this,'all')">🌍 Tất cả</button>
       <button class="filter-btn" onclick="setStoreMarket(this,'ES')">🇪🇸 ES</button>
       <button class="filter-btn" onclick="setStoreMarket(this,'IT')">🇮🇹 IT</button>
-    </div>   
+    </div> 
+    <div class="filter-bar" style="margin-bottom:12px" id="st-type-pills"></div>   
     <div class="disclaimer">
       <div class="di">🛒</div>
       <p><strong>Dữ liệu thuần Shopify — Cấp độ Order &amp; Sản phẩm · Currency: USD ($)</strong>
@@ -1019,21 +1020,19 @@ function renderStore(d) {
     kpi('Total Revenue',    cur(o.totalRevenue || t.revenue || 0), 'Bao gồm ship · USD', 'green'),
     kpi('Shipping',         cur(o.shipping  || 0),                 'Tiền ship thu của khách', 'blue'),
     kpi('Orders',           nf(o.orders || 0),                     'Số đơn thực tế', 'blue'),
-    kpi('Items Sold',       nf(displayUnits),                      'Excl. Shipping Protection'),
+    kpi('Items Sold',      nf(o.items || displayUnits),            'Excl. Shipping Protection'),
     kpi('AOV',              cur(o.aov || 0),                       'Giá trị TB đơn', 'blue'),
     kpi('AOQ',              nf(o.aoq || 0, 1) + ' items',          'Số sản phẩm / đơn', 'blue'),
     kpi('Retention',        pct(o.retentionRate || 0),             'Tỷ lệ khách quay lại', (o.retentionRate > 15 ? 'green' : 'warn')),
   ].join('');
 
   // FIX #6: Revenue chart → LINE
-  var odDly = d.shopifyOrderDaily || [];
-  var prDly = d.shopifyDaily      || [];
-  var stDly = odDly.length ? odDly : prDly;
   mkCh('ch-st-daily', {
     type: 'line',
     data: {
-      labels: stDly.map(function(r) { return fd(r.date); }),
-      datasets: [{ label: 'Total Revenue ($)', data: stDly.map(function(r) { return r.totalRevenue || r.revenue || 0; }),
+      labels: od.map(function(r) { return fd(r.date); }),
+      datasets: [{ label: 'Total Revenue ($)',
+                   data: od.map(function(r) { return r.totalRevenue || 0; }),
                    borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.08)',
                    fill: true, pointRadius: 2, tension: .3 }]
     },
