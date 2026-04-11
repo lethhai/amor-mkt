@@ -952,10 +952,6 @@ function renderStore(d) {
     st = stType;
   }   
 
-<div class="filter-bar" style="margin-bottom:12px" id="st-type-pills">
-        <!-- Tự động render bởi renderStore -->
-      </div>
-     
   // ── Market filter ──
   var mkt = ST_MARKET;
   if (mkt !== 'all') {
@@ -1004,42 +1000,6 @@ function renderStore(d) {
         revenue:    r2((st[k].revenue    || 0) * ratio),
         unitsSold:  Math.round((st[k].unitsSold  || 0) * ratio),
         orderLines: Math.round((st[k].orderLines || 0) * ratio)
-      };
-    });
-    st = stFiltered;
-  }
-      orders:       mktData.orders       || 0,
-      items:        mktData.items        || 0,
-      totalRevenue: mktData.totalRevenue || 0,
-      shipping:     mktData.shipping     || 0,
-      aov:          mktData.aov          || 0,
-      aoq:          0,
-      retentionRate:0
-    };
-    // Filter daily trend
-    od = (d.shopifyOrderDaily || []).map(function(row) {
-      // Tỷ lệ market trong tổng để ước tính daily
-      var total = d.shopifyOrderTotals || {};
-      var ratio = total.totalRevenue > 0
-        ? (mktData.totalRevenue || 0) / total.totalRevenue : 0;
-      return {
-        date:         row.date,
-        orders:       Math.round(row.orders * ratio),
-        totalRevenue: r2(row.totalRevenue * ratio),
-        shipping:     r2(row.shipping * ratio),
-        aov:          row.aov
-      };
-    });
-    // Filter by type — dùng blendedByCountry để ước tính
-    var bc = d.blendedByCountry || {};
-    var mktRatio = bc[mkt] && d.blended
-      ? (bc[mkt].spend || 0) / (d.blended.spend || 1) : 1;
-    var stFiltered = {};
-    Object.keys(st).forEach(function(k) {
-      stFiltered[k] = {
-        revenue:   r2((st[k].revenue   || 0) * mktRatio),
-        unitsSold: Math.round((st[k].unitsSold || 0) * mktRatio),
-        orderLines:Math.round((st[k].orderLines|| 0) * mktRatio)
       };
     });
     st = stFiltered;
@@ -1681,56 +1641,31 @@ function sortPI(colIdx) {
   renderPITable();
 }
 
-function filterProducts() { renderPITable(); }
-
-function setMktFilter(btn, mkt) {
-  PI_MKT_FILTER = mkt;
-  document.querySelectorAll('[data-mkt]').forEach(function(b) { b.classList.remove('active'); });
-  btn.classList.add('active');
-  renderPITable();
-}
-
-function setRoasFilter(btn, val) {
-  if (PI_ROAS_FILTER === val) {
-    PI_ROAS_FILTER = null;
-    btn.classList.remove('active');
-  } else {
-    PI_ROAS_FILTER = val;
-    document.querySelectorAll('[data-roas]').forEach(function(b) { b.classList.remove('active'); });
-    btn.classList.add('active');
-  }
-  renderPITable();
-     
-  function setStoreMarket(btn, mkt) {
+function setStoreMarket(btn, mkt) {
   ST_MARKET = mkt;
   document.querySelectorAll('#tab-store .filter-btn').forEach(function(b) {
     b.classList.remove('active');
   });
   btn.classList.add('active');
   renderStore(DATA);
-}   
+}
 
-  function setStoreTypes(btn, type) {
+function setStoreTypes(btn, type) {
   if (type === '') {
-    // Reset — chọn tất cả
     ST_TYPES = [];
     document.querySelectorAll('#st-type-pills .filter-btn').forEach(function(b) {
       b.classList.remove('active');
     });
     btn.classList.add('active');
   } else {
-    // Multi-select
     var idx = ST_TYPES.indexOf(type);
     if (idx > -1) ST_TYPES.splice(idx, 1);
     else ST_TYPES.push(type);
-
-    // Bỏ active "Tất cả" nếu có type được chọn
     var allBtn = document.querySelector('#st-type-pills .filter-btn:first-child');
     if (allBtn) allBtn.classList.toggle('active', ST_TYPES.length === 0);
     btn.classList.toggle('active', ST_TYPES.indexOf(type) > -1);
   }
   renderStore(DATA);
-}   
 }
 
 function renderPITypesTable() {
@@ -2183,7 +2118,7 @@ function fcBuildDays(d) {
   });
 
   return result;
-}a
+}
 
      
 // ── Delta: %Ads hôm qua vs AVG 3 ngày trước ──────
