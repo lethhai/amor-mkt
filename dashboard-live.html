@@ -568,7 +568,7 @@ function isServiceType(t) {
 // ═══════════════════════════════════════
 // CONFIG & STATE
 // ═══════════════════════════════════════
-var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxD9B3rBtcctkv25ipva-EBy6kekx_jfn_Qak8OlvZJfMeRUp_1-azmBZniRH1N4uPI/exec';
+var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxe77GsgmOn2D9YfExA7uHwe70g-mZqeIchsfLxeSdHMIIi1iclSip93azgeI6__YI5/exec';
 function getGasUrl() { return localStorage.getItem('gas_url') || DEFAULT_GAS_URL; }
 
 Chart.defaults.color       = '#64748b';
@@ -960,13 +960,21 @@ function renderStore(d) {
     var mktData = byC[mkt] || {};
     var dailyByC = d.shopifyOrderDailyByCountry || {};
 
-    // Override totals
+    // Override totals — trừ service items theo tỷ lệ market
+    var mktRevRatio = (d.shopifyOrderTotals || {}).totalRevenue > 0
+      ? (mktData.totalRevenue || 0) / ((d.shopifyOrderTotals || {}).totalRevenue || 1) : 1;
+    var serviceUnitsInMkt = 0;
+    Object.keys(d.shopifyByType || {}).forEach(function(k) {
+      if (isServiceType(k)) {
+        serviceUnitsInMkt += Math.round(((d.shopifyByType[k].unitsSold || 0)) * mktRevRatio);
+      }
+    });
     o = {
-      orders:        mktData.orders        || 0,
-      items:         mktData.items         || 0,
-      totalRevenue:  mktData.totalRevenue  || 0,
-      shipping:      mktData.shipping      || 0,
-      aov:           mktData.aov           || 0,
+      orders:        mktData.orders                                       || 0,
+      items:         Math.max(0, (mktData.items || 0) - serviceUnitsInMkt),
+      totalRevenue:  mktData.totalRevenue                                 || 0,
+      shipping:      mktData.shipping                                     || 0,
+      aov:           mktData.aov                                          || 0,
       aoq:           0,
       retentionRate: 0
     };
@@ -1092,7 +1100,19 @@ function renderStore(d) {
   // FIX #6: Orders chart → BAR (Orders), AOV → LINE
   // Items chính: lọc từ SHOPIFY_SALES_DAILY — items có revenue > $5
   // Dùng shopifyOrderDaily items field (đã có từ GAS)
-  var itemsData = od.map(function(r) { return r.items || 0; });
+  // Nếu có type filter → dùng shopifyDailyByType thay vì od.items
+  var itemsData;
+  if (ST_TYPES.length > 0) {
+    var sdbt = d.shopifyDailyByType || {};
+    itemsData = od.map(function(r) {
+      var dayData = sdbt[r.date] || {};
+      return ST_TYPES.reduce(function(s, t) {
+        return s + ((dayData[t] || {}).unitsSold || 0);
+      }, 0);
+    });
+  } else {
+    itemsData = od.map(function(r) { return r.items || 0; });
+  }
 
   mkCh('ch-st-orders', {
     type: 'bar',
@@ -1123,7 +1143,11 @@ function renderStore(d) {
   });
 
 // Top products table — FIX #7: lọc service & FIX Link Sản Phẩm
-  var prods = (d.shopifyTopProducts || []).filter(function(p) { return !isServiceType(p.type); });
+  var prods = (d.shopifyTopProducts || []).filter(function(p) {
+  if (isServiceType(p.type)) return false;
+  if (ST_TYPES.length > 0 && ST_TYPES.indexOf(p.type) === -1) return false;
+  return true;
+});
   var rows  = prods.slice(0, 25).map(function(p, i) {
     var title    = (p.title || p.productId || '').slice(0, 45);
     
