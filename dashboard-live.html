@@ -1149,7 +1149,25 @@ function renderStore(d) {
   // Items chính: lọc từ SHOPIFY_SALES_DAILY — items có revenue > $5
   // Dùng shopifyOrderDaily items field (đã có từ GAS)
   // Nếu có type filter → dùng shopifyDailyByType thay vì od.items
-  var itemsData = od.map(function(r) { return r.items || 0; });
+  // Dữ liệu itemsData mới: Đếm từng Type, BỎ QUA Service và Addon (Giữ lại Accessories)
+  var sdbt = d.shopifyDailyByType || {};
+  var itemsData = od.map(function(r) {
+    var dayData = sdbt[r.date] || {};
+    var validItems = 0;
+    
+    Object.keys(dayData).forEach(function(type) {
+      var isService = isServiceType(type);
+      var isAddon   = type.toLowerCase().indexOf('addon') > -1; // Nhận diện chữ addon hoặc add-on
+      var inFilter  = ST_TYPES.length === 0 || ST_TYPES.indexOf(type) > -1;
+      
+      // Chỉ cộng dồn nếu nó KHÔNG phải Service, KHÔNG phải Addon, và thỏa mãn filter
+      if (!isService && !isAddon && inFilter) {
+        validItems += (dayData[type].unitsSold || 0);
+      }
+    });
+    
+    return validItems;
+  });
 
   mkCh('ch-st-orders', {
     type: 'bar',
