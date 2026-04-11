@@ -945,11 +945,6 @@ function renderStore(d) {
     var stType = {};
     filteredKeys.forEach(function(k) { stType[k] = st[k]; });
 
-    // Filter top products
-    var typeFilteredProds = (d.shopifyTopProducts || []).filter(function(p) {
-      return ST_TYPES.indexOf(p.type) > -1;
-    });
-
     // Override totals theo type
     var typeRev   = filteredKeys.reduce(function(s,k){ return s+(st[k].revenue||0); }, 0);
     var typeUnits = filteredKeys.reduce(function(s,k){ return s+(st[k].unitsSold||0); }, 0);
@@ -964,7 +959,42 @@ function renderStore(d) {
       retentionRate: 0
     };
     st = stType;
-  }   
+
+    // FIX MỚI: Cập nhật biến Market (sm) để Donut Chart nhảy theo đúng Type
+    var filteredSm = {};
+    Object.values(d.prodMap || {}).forEach(function(p) {
+      if (ST_TYPES.indexOf(p.type) > -1) {
+        var mShare = p.markets.length > 0 ? 1 / p.markets.length : 1;
+        var mkts = p.markets.length > 0 ? p.markets : ['Unknown'];
+        mkts.forEach(function(m) {
+          if (!filteredSm[m]) filteredSm[m] = { revenue: 0 };
+          filteredSm[m].revenue += (p.revenue || 0) * mShare;
+        });
+      }
+    });
+    sm = filteredSm;
+
+    // FIX MỚI: Cập nhật biến Daily (od) để Line Chart và Bar Chart nhảy theo đúng Type
+    var sdbt = d.shopifyDailyByType || {};
+    od = od.map(function(r) {
+      var dayData = sdbt[r.date] || {};
+      var fRev = 0, fUnits = 0, fOrd = 0;
+      ST_TYPES.forEach(function(t) {
+        if (dayData[t]) {
+          fRev   += dayData[t].revenue || 0;
+          fUnits += dayData[t].unitsSold || 0;
+          fOrd   += dayData[t].orderLines || 0; // Dùng số dòng đơn hàng làm proxy
+        }
+      });
+      return {
+        date: r.date,
+        totalRevenue: fRev,
+        orders: fOrd,
+        items: fUnits,
+        aov: fOrd > 0 ? r2(fRev / fOrd) : 0
+      };
+    });
+  }
 
   // ── Market filter ──
   var mkt = ST_MARKET;
@@ -1114,18 +1144,7 @@ function renderStore(d) {
   // Items chính: lọc từ SHOPIFY_SALES_DAILY — items có revenue > $5
   // Dùng shopifyOrderDaily items field (đã có từ GAS)
   // Nếu có type filter → dùng shopifyDailyByType thay vì od.items
-  var itemsData;
-  if (ST_TYPES.length > 0) {
-    var sdbt = d.shopifyDailyByType || {};
-    itemsData = od.map(function(r) {
-      var dayData = sdbt[r.date] || {};
-      return ST_TYPES.reduce(function(s, t) {
-        return s + ((dayData[t] || {}).unitsSold || 0);
-      }, 0);
-    });
-  } else {
-    itemsData = od.map(function(r) { return r.items || 0; });
-  }
+  var itemsData = od.map(function(r) { return r.items || 0; });
 
   mkCh('ch-st-orders', {
     type: 'bar',
