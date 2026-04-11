@@ -429,9 +429,14 @@ thead th.sortable:hover{color:#a78bfa}
     </div>
     <div class="section">
       <div class="st">Top Products — Mother's Day</div>
+      <div class="filter-bar">
+        <input type="text" id="md-search" placeholder="🔍 Tìm tên sản phẩm..." oninput="renderMDTable()">
+        <button class="filter-btn active" data-mkt="all" onclick="setMDMktFilter(this,'all')">Tất cả</button>
+        <button class="filter-btn" data-mkt="ES" onclick="setMDMktFilter(this,'ES')">🇪🇸 ES</button>
+        <button class="filter-btn" data-mkt="IT" onclick="setMDMktFilter(this,'IT')">🇮🇹 IT</button>
+      </div>
       <div id="md-prod-tbl" class="twrap"></div>
     </div>
-  </div>
 <!-- Kết thúc — MD2026 -->
 
      
@@ -1787,6 +1792,10 @@ function sortPITypes(colIdx) {
 // ═══════════════════════════════════════
 // TAB 5 — MOTHER'S DAY
 // ═══════════════════════════════════════
+var MD_PROD_DATA = [];
+var MD_MKT_FILTER = 'all';
+var MD_SORT = { col: 7, dir: -1 }; // Mặc định sort theo True Revenue
+     
 function renderMD(d) {
   if (!d) return;
   var b  = d.blended            || {};
@@ -1863,29 +1872,95 @@ function renderMD(d) {
     }
   });
 
-  var prods = (d.topProducts || []).slice(0, 20);
-  var pRows = prods.map(function(p, i) {
-    var be      = p.beRoas || 1.63;
-    var markets = (p.markets || []).map(function(m) {
+  // Lấy toàn bộ danh sách để có thể search/sort thay vì chỉ cắt 20 dòng
+  MD_PROD_DATA = d.topProducts || [];
+  renderMDTable(); // Gọi hàm vẽ bảng động
+} // <-- Kết thúc hàm renderMD ở đây
+
+// THÊM 3 HÀM MỚI NÀY ĐỂ XỬ LÝ FILTER & SORT CHO TAB MD
+function setMDMktFilter(btn, mkt) {
+  MD_MKT_FILTER = mkt;
+  document.querySelectorAll('#tab-mothers .filter-btn').forEach(function(b) {
+    b.classList.remove('active');
+  });
+  btn.classList.add('active');
+  renderMDTable();
+}
+
+function sortMDTable(colIdx) {
+  if (MD_SORT.col === colIdx) MD_SORT.dir *= -1;
+  else { MD_SORT.col = colIdx; MD_SORT.dir = -1; }
+  renderMDTable();
+}
+
+function renderMDTable() {
+  var search = (document.getElementById('md-search') || {}).value || '';
+  
+  // 1. Filter
+  var filtered = MD_PROD_DATA.filter(function(p) {
+    var matchSearch = !search || (p.title || '').toLowerCase().indexOf(search.toLowerCase()) > -1;
+    var matchMkt    = MD_MKT_FILTER === 'all' || (p.markets || []).indexOf(MD_MKT_FILTER) > -1;
+    return matchSearch && matchMkt;
+  });
+
+  // 2. Sort
+  var col = MD_SORT.col, dir = MD_SORT.dir;
+  var colKeys = ['idx', 'productId', 'title', 'type', 'markets', 'spend', 'revenue', 'true_revenue', 'true_roas', 'purchases'];
+  
+  filtered.sort(function(a, b) {
+    var av = a[colKeys[col]], bv = b[colKeys[col]];
+    if (col === 8) { // True ROAS custom sort (chia)
+       av = a.spend > 0 ? (a.true_revenue || 0)/a.spend : 0;
+       bv = b.spend > 0 ? (b.true_revenue || 0)/b.spend : 0;
+    }
+    if (typeof av === 'string') return dir * av.localeCompare(bv);
+    return dir * ((av || 0) - (bv || 0));
+  });
+
+  // 3. Header có nút Sort
+  var headers = ['#', 'ID', 'Product', 'Type', 'Market', 'Spend ($)', 'Ads Attr ($)', 'True Rev ($)', 'True ROAS', 'Purch'];
+  var sortableIdx = [5, 6, 7, 8, 9]; // Các cột số cho phép click để sort
+  
+  var headerHtml = '<thead><tr>' + headers.map(function(h, i) {
+    if (sortableIdx.indexOf(i) > -1) {
+      var ind = (MD_SORT.col === i) ? (MD_SORT.dir === 1 ? ' ▲' : ' ▼') : '';
+      return '<th class="sortable" onclick="sortMDTable(' + i + ')">' + h + '<span class="sort-indicator">' + ind + '</span></th>';
+    }
+    return '<th>' + h + '</th>';
+  }).join('') + '</tr></thead>';
+
+  // 4. Render Body
+  var bodyHtml = '<tbody>' + filtered.slice(0, 30).map(function(p, i) {
+    var be = p.beRoas || 1.63;
+    var mkts = (p.markets || []).map(function(m) {
       return '<span class="badge b-' + m.toLowerCase() + '">' + m + '</span>';
     }).join(' ') || '–';
+    
     var trueRoas = p.spend > 0 ? r2((p.true_revenue || 0) / p.spend) : 0;
-    return [
-      '<span style="color:#475569">' + (i + 1) + '</span>',
-      '<span style="font-size:11px">' + (p.title || p.productId || '').slice(0, 45) + '</span>',
-      '<span style="font-size:10px;color:#a78bfa">' + (p.type || '') + '</span>',
-      markets,
-      '<span class="num">' + cur(p.spend)   + '</span>',
-      '<span class="num" style="color:#475569">' + cur(p.revenue) + '</span>',
-      '<span class="num" style="' + roasStyle(p.roas, be) + '">' + nf(p.roas, 2) + 'x</span>',
-      '<span class="num" style="color:#4ade80">' + cur(p.true_revenue || 0) + '</span>',
-      '<span class="num" style="' + roasStyle(trueRoas, be) + '">' + nf(trueRoas, 2) + 'x</span>',
-      '<span class="num">' + nf(p.purchases, 1) + '</span>'
-    ];
-  });
-  document.getElementById('md-prod-tbl').innerHTML = mkTable(
-    ['#', 'Product', 'Type', 'Market', 'Spend ($)', 'Revenue (Ads Attr.)', 'Ads ROAS', 'True Revenue ($)', 'True ROAS', 'Purchases'], pRows
-  );
+    var roasAnomaly = trueRoas > 10 && p.spend < 50 
+      ? '<span class="roas-anomaly" title="ROAS ảo do spend thấp">⚠️</span>' : '';
+
+    var finalUrl = (p.fullUrl && p.fullUrl.indexOf('http') === 0) 
+      ? p.fullUrl : 'https://amor1970s.com/products/' + (p.fullUrl || p.productId || '');
+    var nameCell = p.fullUrl 
+      ? '<a href="' + finalUrl + '" target="_blank" style="color:#a78bfa;text-decoration:underline;font-size:11px">' + (p.title || '').slice(0, 42) + '</a>' 
+      : '<span style="font-size:11px">' + (p.title || '').slice(0, 42) + '</span>';
+
+    return '<tr>'
+      + '<td><span style="color:#475569">' + (i + 1) + '</span></td>'
+      + '<td><span style="font-size:10px;color:#94a3b8">' + (p.productId || '–') + '</span></td>'
+      + '<td>' + nameCell + '</td>'
+      + '<td><span style="font-size:10px;color:#a78bfa">' + (p.type || '') + '</span></td>'
+      + '<td>' + mkts + '</td>'
+      + '<td class="num">' + cur(p.spend) + '</td>'
+      + '<td class="num" style="color:#475569">' + cur(p.revenue) + '</td>'
+      + '<td class="num" style="color:#4ade80">' + cur(p.true_revenue || 0) + '</td>'
+      + '<td class="num" style="' + roasStyle(trueRoas, be) + '">' + nf(trueRoas, 2) + 'x' + roasAnomaly + '</td>'
+      + '<td class="num">' + nf(p.purchases, 1) + '</td>'
+      + '</tr>';
+  }).join('') + '</tbody>';
+
+  document.getElementById('md-prod-tbl').innerHTML = '<table>' + headerHtml + bodyHtml + '</table>';
 }
 
 // ═══════════════════════════════════════
