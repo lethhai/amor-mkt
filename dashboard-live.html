@@ -2003,7 +2003,7 @@ function fcGetCrForDay(date, cr0, plan) {
   var start   = FC_START;        // 6/4
   var peak    = '2026-04-22';    // cut-off
   var end     = FC_END_ES;       // 3/5
-  var crPeak  = plan === 'A' ? cr0 * 1.8 : cr0 * 1.4;
+  var crPeak  = plan === 'A' ? cr0 * 2.0 : cr0 * 1.4;
 
   // Phase 1: từ start đến peak
   if (date <= peak) {
