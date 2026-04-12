@@ -429,16 +429,9 @@ thead th.sortable:hover{color:#a78bfa}
     </div>
     <div class="section">
       <div class="st">Top Products — Mother's Day</div>
-      <div class="filter-bar">
-        <input type="text" id="md-search" placeholder="🔍 Tìm tên sản phẩm..." oninput="renderMDTable()">
-        <button class="filter-btn active" data-mkt="all" onclick="setMDMktFilter(this,'all')">Tất cả</button>
-        <button class="filter-btn" data-mkt="ES" onclick="setMDMktFilter(this,'ES')">🇪🇸 ES</button>
-        <button class="filter-btn" data-mkt="IT" onclick="setMDMktFilter(this,'IT')">🇮🇹 IT</button>
-      </div>
       <div id="md-prod-tbl" class="twrap"></div>
     </div>
-    <div id="md-prod-tbl" class="twrap"></div>
-    </div> </div> <div class="tab-panel" id="tab-forecast">   
+  </div>
 <!-- Kết thúc — MD2026 -->
 
      
@@ -469,6 +462,15 @@ thead th.sortable:hover{color:#a78bfa}
         style="width:80px;background:#1a1d30;border:1px solid #2d3154;
           color:#e2e8f0;border-radius:6px;padding:3px 7px;font-size:11px"
         onchange="setFCAov(this.value)">
+    </div>
+
+    <div style="display:flex;gap:6px;align-items:center">
+      <span style="font-size:11px;color:#475569">CR Peak:</span>
+      <span id="fc-cr-display" style="font-size:11px;color:#60a5fa;font-weight:700">×2.0</span>
+      <input type="number" placeholder="Multiplier..." step="0.1" min="1.0" max="5.0"
+        style="width:80px;background:#1a1d30;border:1px solid #2d3154;
+          color:#e2e8f0;border-radius:6px;padding:3px 7px;font-size:11px"
+        onchange="setFCCrPeak(this.value)">
     </div>
 
     <div style="font-size:11px;color:#475569">
@@ -722,20 +724,7 @@ function renderOverview(d) {
     if (prevKey === 'spend')    prevVal = (pw.blended || {}).spend || 0;
     if (prevKey === 'revenue')  prevVal = (pw.shopifyOrderTotals || {}).totalRevenue || 0;
     if (prevKey === 'roas')     { var ps = (pw.blended||{}).spend||0; prevVal = ps>0?r2(((pw.shopifyOrderTotals||{}).totalRevenue||0)/ps):0; }
-    if (prevKey === 'profit') { 
-      var pr = pw.shopifyOrderTotals || {}; 
-      var pb = pw.blended || {}; 
-      var psp = pb.spend || 0; 
-      var prv = pr.totalRevenue || 0; 
-      
-      var pFF = prv * 0.29;
-      var pGW = prv * 0.07;
-      var pAPI = (pw.openAI || {}).totalSpend || 0;
-      var pTXG = (pw.byAccount && pw.byAccount['TXG 07']) ? (pw.byAccount['TXG 07'].spend || 0) : 0;
-      var pTax = pTXG * 0.12;
-      
-      prevVal = r2(prv - psp - pFF - pGW - pAPI - pTax); 
-    }  
+    if (prevKey === 'profit')   { var pr=pw.shopifyOrderTotals||{}; var pb=pw.blended||{}; var psp=pb.spend||0; var prv=pr.totalRevenue||0; prevVal=r2(prv-psp-prv*0.388); }
     if (prevKey === 'orders')   prevVal = (pw.shopifyOrderTotals || {}).orders || 0;
     if (!prevVal) return '';
     var delta = r2((curr - prevVal) / prevVal * 100);
@@ -952,6 +941,11 @@ function renderStore(d) {
     var stType = {};
     filteredKeys.forEach(function(k) { stType[k] = st[k]; });
 
+    // Filter top products
+    var typeFilteredProds = (d.shopifyTopProducts || []).filter(function(p) {
+      return ST_TYPES.indexOf(p.type) > -1;
+    });
+
     // Override totals theo type
     var typeRev   = filteredKeys.reduce(function(s,k){ return s+(st[k].revenue||0); }, 0);
     var typeUnits = filteredKeys.reduce(function(s,k){ return s+(st[k].unitsSold||0); }, 0);
@@ -966,42 +960,7 @@ function renderStore(d) {
       retentionRate: 0
     };
     st = stType;
-
-    // FIX MỚI: Cập nhật biến Market (sm) để Donut Chart nhảy theo đúng Type
-    var filteredSm = {};
-    Object.values(d.prodMap || {}).forEach(function(p) {
-      if (ST_TYPES.indexOf(p.type) > -1) {
-        var mShare = p.markets.length > 0 ? 1 / p.markets.length : 1;
-        var mkts = p.markets.length > 0 ? p.markets : ['Unknown'];
-        mkts.forEach(function(m) {
-          if (!filteredSm[m]) filteredSm[m] = { revenue: 0 };
-          filteredSm[m].revenue += (p.revenue || 0) * mShare;
-        });
-      }
-    });
-    sm = filteredSm;
-
-    // FIX MỚI: Cập nhật biến Daily (od) để Line Chart và Bar Chart nhảy theo đúng Type
-    var sdbt = d.shopifyDailyByType || {};
-    od = od.map(function(r) {
-      var dayData = sdbt[r.date] || {};
-      var fRev = 0, fUnits = 0, fOrd = 0;
-      ST_TYPES.forEach(function(t) {
-        if (dayData[t]) {
-          fRev   += dayData[t].revenue || 0;
-          fUnits += dayData[t].unitsSold || 0;
-          fOrd   += dayData[t].orderLines || 0; // Dùng số dòng đơn hàng làm proxy
-        }
-      });
-      return {
-        date: r.date,
-        totalRevenue: fRev,
-        orders: fOrd,
-        items: fUnits,
-        aov: fOrd > 0 ? r2(fRev / fOrd) : 0
-      };
-    });
-  }
+  }   
 
   // ── Market filter ──
   var mkt = ST_MARKET;
@@ -1151,25 +1110,18 @@ function renderStore(d) {
   // Items chính: lọc từ SHOPIFY_SALES_DAILY — items có revenue > $5
   // Dùng shopifyOrderDaily items field (đã có từ GAS)
   // Nếu có type filter → dùng shopifyDailyByType thay vì od.items
-  // Dữ liệu itemsData mới: Đếm từng Type, BỎ QUA Service và Addon (Giữ lại Accessories)
-  var sdbt = d.shopifyDailyByType || {};
-  var itemsData = od.map(function(r) {
-    var dayData = sdbt[r.date] || {};
-    var validItems = 0;
-    
-    Object.keys(dayData).forEach(function(type) {
-      var isService = isServiceType(type);
-      var isAddon   = type.toLowerCase().indexOf('addon') > -1; // Nhận diện chữ addon hoặc add-on
-      var inFilter  = ST_TYPES.length === 0 || ST_TYPES.indexOf(type) > -1;
-      
-      // Chỉ cộng dồn nếu nó KHÔNG phải Service, KHÔNG phải Addon, và thỏa mãn filter
-      if (!isService && !isAddon && inFilter) {
-        validItems += (dayData[type].unitsSold || 0);
-      }
+  var itemsData;
+  if (ST_TYPES.length > 0) {
+    var sdbt = d.shopifyDailyByType || {};
+    itemsData = od.map(function(r) {
+      var dayData = sdbt[r.date] || {};
+      return ST_TYPES.reduce(function(s, t) {
+        return s + ((dayData[t] || {}).unitsSold || 0);
+      }, 0);
     });
-    
-    return validItems;
-  });
+  } else {
+    itemsData = od.map(function(r) { return r.items || 0; });
+  }
 
   mkCh('ch-st-orders', {
     type: 'bar',
@@ -1579,9 +1531,8 @@ var worst = qualified.slice().sort(function(a,b) {
         + '/<span style="color:#4ade80">GG ' + cur(m.gg_spend || 0) + '</span></span>'
     ];
   });
-  // Lưu data types để sort
+  // Lưu data types để sort — FIX: không reset sort state khi re-render
   PI_TYPES_DATA = typeList.map(function(item) { return { key: item[0], m: item[1] }; });
-  PI_TYPES_SORT = { col: 2, dir: -1 }; // default sort by Spend desc
   renderPITypesTable();
 
   // ── Bubble chart ──
@@ -1807,15 +1758,33 @@ function sortPITypes(colIdx) {
   if (PI_TYPES_SORT.col === colIdx) PI_TYPES_SORT.dir *= -1;
   else { PI_TYPES_SORT.col = colIdx; PI_TYPES_SORT.dir = -1; }
   renderPITypesTable();
-}     
+}
+
+// FIX — 3 functions previously missing (tab Products broken)
+function filterProducts() { renderPITable(); }
+
+function setMktFilter(btn, mkt) {
+  PI_MKT_FILTER = mkt;
+  document.querySelectorAll('[data-mkt]').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  renderPITable();
+}
+
+function setRoasFilter(btn, val) {
+  if (PI_ROAS_FILTER === val) {
+    PI_ROAS_FILTER = null;
+    btn.classList.remove('active');
+  } else {
+    PI_ROAS_FILTER = val;
+    document.querySelectorAll('[data-roas]').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+  }
+  renderPITable();
+}
 
 // ═══════════════════════════════════════
 // TAB 5 — MOTHER'S DAY
 // ═══════════════════════════════════════
-var MD_PROD_DATA = [];
-var MD_MKT_FILTER = 'all';
-var MD_SORT = { col: 7, dir: -1 }; // Mặc định sort theo True Revenue
-     
 function renderMD(d) {
   if (!d) return;
   var b  = d.blended            || {};
@@ -1892,95 +1861,29 @@ function renderMD(d) {
     }
   });
 
-  // Lấy toàn bộ danh sách để có thể search/sort thay vì chỉ cắt 20 dòng
-  MD_PROD_DATA = d.topProducts || [];
-  renderMDTable(); // Gọi hàm vẽ bảng động
-} // <-- Kết thúc hàm renderMD ở đây
-
-// THÊM 3 HÀM MỚI NÀY ĐỂ XỬ LÝ FILTER & SORT CHO TAB MD
-function setMDMktFilter(btn, mkt) {
-  MD_MKT_FILTER = mkt;
-  document.querySelectorAll('#tab-mothers .filter-btn').forEach(function(b) {
-    b.classList.remove('active');
-  });
-  btn.classList.add('active');
-  renderMDTable();
-}
-
-function sortMDTable(colIdx) {
-  if (MD_SORT.col === colIdx) MD_SORT.dir *= -1;
-  else { MD_SORT.col = colIdx; MD_SORT.dir = -1; }
-  renderMDTable();
-}
-
-function renderMDTable() {
-  var search = (document.getElementById('md-search') || {}).value || '';
-  
-  // 1. Filter
-  var filtered = MD_PROD_DATA.filter(function(p) {
-    var matchSearch = !search || (p.title || '').toLowerCase().indexOf(search.toLowerCase()) > -1;
-    var matchMkt    = MD_MKT_FILTER === 'all' || (p.markets || []).indexOf(MD_MKT_FILTER) > -1;
-    return matchSearch && matchMkt;
-  });
-
-  // 2. Sort
-  var col = MD_SORT.col, dir = MD_SORT.dir;
-  var colKeys = ['idx', 'productId', 'title', 'type', 'markets', 'spend', 'revenue', 'true_revenue', 'true_roas', 'purchases'];
-  
-  filtered.sort(function(a, b) {
-    var av = a[colKeys[col]], bv = b[colKeys[col]];
-    if (col === 8) { // True ROAS custom sort (chia)
-       av = a.spend > 0 ? (a.true_revenue || 0)/a.spend : 0;
-       bv = b.spend > 0 ? (b.true_revenue || 0)/b.spend : 0;
-    }
-    if (typeof av === 'string') return dir * av.localeCompare(bv);
-    return dir * ((av || 0) - (bv || 0));
-  });
-
-  // 3. Header có nút Sort
-  var headers = ['#', 'ID', 'Product', 'Type', 'Market', 'Spend ($)', 'Ads Attr ($)', 'True Rev ($)', 'True ROAS', 'Purch'];
-  var sortableIdx = [5, 6, 7, 8, 9]; // Các cột số cho phép click để sort
-  
-  var headerHtml = '<thead><tr>' + headers.map(function(h, i) {
-    if (sortableIdx.indexOf(i) > -1) {
-      var ind = (MD_SORT.col === i) ? (MD_SORT.dir === 1 ? ' ▲' : ' ▼') : '';
-      return '<th class="sortable" onclick="sortMDTable(' + i + ')">' + h + '<span class="sort-indicator">' + ind + '</span></th>';
-    }
-    return '<th>' + h + '</th>';
-  }).join('') + '</tr></thead>';
-
-  // 4. Render Body
-  var bodyHtml = '<tbody>' + filtered.slice(0, 30).map(function(p, i) {
-    var be = p.beRoas || 1.63;
-    var mkts = (p.markets || []).map(function(m) {
+  var prods = (d.topProducts || []).slice(0, 20);
+  var pRows = prods.map(function(p, i) {
+    var be      = p.beRoas || 1.63;
+    var markets = (p.markets || []).map(function(m) {
       return '<span class="badge b-' + m.toLowerCase() + '">' + m + '</span>';
     }).join(' ') || '–';
-    
     var trueRoas = p.spend > 0 ? r2((p.true_revenue || 0) / p.spend) : 0;
-    var roasAnomaly = trueRoas > 10 && p.spend < 50 
-      ? '<span class="roas-anomaly" title="ROAS ảo do spend thấp">⚠️</span>' : '';
-
-    var finalUrl = (p.fullUrl && p.fullUrl.indexOf('http') === 0) 
-      ? p.fullUrl : 'https://amor1970s.com/products/' + (p.fullUrl || p.productId || '');
-    var nameCell = p.fullUrl 
-      ? '<a href="' + finalUrl + '" target="_blank" style="color:#a78bfa;text-decoration:underline;font-size:11px">' + (p.title || '').slice(0, 42) + '</a>' 
-      : '<span style="font-size:11px">' + (p.title || '').slice(0, 42) + '</span>';
-
-    return '<tr>'
-      + '<td><span style="color:#475569">' + (i + 1) + '</span></td>'
-      + '<td><span style="font-size:10px;color:#94a3b8">' + (p.productId || '–') + '</span></td>'
-      + '<td>' + nameCell + '</td>'
-      + '<td><span style="font-size:10px;color:#a78bfa">' + (p.type || '') + '</span></td>'
-      + '<td>' + mkts + '</td>'
-      + '<td class="num">' + cur(p.spend) + '</td>'
-      + '<td class="num" style="color:#475569">' + cur(p.revenue) + '</td>'
-      + '<td class="num" style="color:#4ade80">' + cur(p.true_revenue || 0) + '</td>'
-      + '<td class="num" style="' + roasStyle(trueRoas, be) + '">' + nf(trueRoas, 2) + 'x' + roasAnomaly + '</td>'
-      + '<td class="num">' + nf(p.purchases, 1) + '</td>'
-      + '</tr>';
-  }).join('') + '</tbody>';
-
-  document.getElementById('md-prod-tbl').innerHTML = '<table>' + headerHtml + bodyHtml + '</table>';
+    return [
+      '<span style="color:#475569">' + (i + 1) + '</span>',
+      '<span style="font-size:11px">' + (p.title || p.productId || '').slice(0, 45) + '</span>',
+      '<span style="font-size:10px;color:#a78bfa">' + (p.type || '') + '</span>',
+      markets,
+      '<span class="num">' + cur(p.spend)   + '</span>',
+      '<span class="num" style="color:#475569">' + cur(p.revenue) + '</span>',
+      '<span class="num" style="' + roasStyle(p.roas, be) + '">' + nf(p.roas, 2) + 'x</span>',
+      '<span class="num" style="color:#4ade80">' + cur(p.true_revenue || 0) + '</span>',
+      '<span class="num" style="' + roasStyle(trueRoas, be) + '">' + nf(trueRoas, 2) + 'x</span>',
+      '<span class="num">' + nf(p.purchases, 1) + '</span>'
+    ];
+  });
+  document.getElementById('md-prod-tbl').innerHTML = mkTable(
+    ['#', 'Product', 'Type', 'Market', 'Spend ($)', 'Revenue (Ads Attr.)', 'Ads ROAS', 'True Revenue ($)', 'True ROAS', 'Purchases'], pRows
+  );
 }
 
 // ═══════════════════════════════════════
@@ -2058,6 +1961,7 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
 
 var FC_PLAN         = 'A';
 var FC_AOV_OVERRIDE = null;
+var FC_CR_PEAK_MULT = 2.0; // FIX — Bội số CR đỉnh, điều chỉnh qua UI
 var FC_MANUAL       = {}; // { 'YYYY-MM-DD': { spend, orders } }
 
 var FC_START  = '2026-04-06';
@@ -2111,14 +2015,14 @@ function fcGetCpcForDay(date, cpcStart) {
 function fcGetCrYesterday(d) {
   var todayStr = today();
   var yest     = addDays(todayStr, -1);
-  var trend    = d.dailyTrend || [];
+  var trend    = d.dailyTrend || [];      // merged FB + GG
   var orders   = d.shopifyOrderDaily || [];
 
-  // Clicks hôm qua từ dailyTrend
-  var row  = trend.find(function(r) { return r.date === yest; }) || {};
-  var clk  = row.clicks || 0;
+  // Clicks = FB + GG (đã merge trong dailyTrend)
+  var row = trend.find(function(r) { return r.date === yest; }) || {};
+  var clk = row.clicks || 0;
 
-  // Orders hôm qua từ shopifyOrderDaily
+  // Orders = Shopify thực tế
   var oRow = orders.find(function(r) { return r.date === yest; }) || {};
   var ord  = oRow.orders || 0;
 
@@ -2130,7 +2034,7 @@ function fcGetCrForDay(date, cr0, plan) {
   var start   = FC_START;        // 6/4
   var peak    = '2026-04-22';    // cut-off
   var end     = FC_END_ES;       // 3/5
-  var crPeak  = plan === 'A' ? cr0 * 1.8 : cr0 * 1.4;
+  var crPeak  = plan === 'A' ? cr0 * FC_CR_PEAK_MULT : cr0 * (FC_CR_PEAK_MULT * 0.7); // FIX
 
   // Phase 1: từ start đến peak
   if (date <= peak) {
@@ -2211,9 +2115,14 @@ function fcBuildDays(d) {
     if (isPast) {
       // Data thực từ GAS — không cho edit
       spend   = spendMap[date]  || 0;
-      orders  = orderMap[date]  || 0;
-      revenue = revMap[date]    || r2(orders * aov);
+      var shopifyOrd = orderMap[date] || 0;
+      revenue = revMap[date]    || r2(shopifyOrd * aov);
       clicks  = clickMap[date]  || (cpcAvg > 0 ? r2(spend / cpcAvg) : 0);
+      // FIX — dùng paidRatio để loại bỏ organic khỏi CR
+      var adsRowDay = (d.dailyTrend || []).find(function(r) { return r.date === date; });
+      var adsRevVal = adsRowDay ? (adsRowDay.revenue || 0) : 0;
+      var paidRatio = revenue > 0 ? Math.min(1, adsRevVal / revenue) : 1;
+      orders  = r2(shopifyOrd * paidRatio);
       cr      = clicks > 0 ? r2(orders / clicks * 100) : 0;
       cpc     = clicks > 0 ? r2(spend / clicks) : 0;
 
@@ -2524,6 +2433,15 @@ function setFCPlan(plan) {
 function setFCAov(val) {
   var v = parseFloat(val);
   FC_AOV_OVERRIDE = (!isNaN(v) && v > 0) ? v : null;
+  renderForecast(DATA);
+}
+
+// FIX — CR Peak multiplier control
+function setFCCrPeak(val) {
+  var v = parseFloat(val);
+  FC_CR_PEAK_MULT = (!isNaN(v) && v >= 1) ? v : 2.0;
+  var el = document.getElementById('fc-cr-display');
+  if (el) el.textContent = '×' + FC_CR_PEAK_MULT;
   renderForecast(DATA);
 }
      
