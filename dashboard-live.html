@@ -1023,21 +1023,21 @@ function renderStore(d) {
     st = stFiltered;
   }
 
-  // FIX #7: Tính items đã loại trừ service types
-  var serviceUnits = 0, serviceRev = 0;
+  // Items Sold: nếu market filter active → dùng o.items (đã trừ service)
+  // Nếu không filter → tính displayUnits từ tổng store trừ service
+  var serviceUnits = 0;
   Object.keys(st).forEach(function(k) {
-    if (isServiceType(k)) {
-      serviceUnits += st[k].unitsSold || 0;
-      serviceRev   += st[k].revenue   || 0;
-    }
+    if (isServiceType(k)) serviceUnits += st[k].unitsSold || 0;
   });
-  var displayUnits = Math.max(0, (t.unitsSold || 0) - serviceUnits);
+  var displayUnits = mkt !== 'all'
+    ? (o.items || 0)  // đã trừ service trong market filter block
+    : Math.max(0, (t.unitsSold || 0) - serviceUnits);
 
   document.getElementById('st-kpis').innerHTML = [
     kpi('Total Revenue',    cur(o.totalRevenue || t.revenue || 0), 'Bao gồm ship · USD', 'green'),
     kpi('Shipping',         cur(o.shipping  || 0),                 'Tiền ship thu của khách', 'blue'),
     kpi('Orders',           nf(o.orders || 0),                     'Số đơn thực tế', 'blue'),
-    kpi('Items Sold',      nf(o.items || displayUnits),            'Excl. Shipping Protection'),
+    kpi('Items Sold',      nf(displayUnits),                        'Excl. Shipping Protection'),
     kpi('AOV',              cur(o.aov || 0),                       'Giá trị TB đơn', 'blue'),
     kpi('AOQ',              nf(o.aoq || 0, 1) + ' items',          'Số sản phẩm / đơn', 'blue'),
     kpi('Retention',        pct(o.retentionRate || 0),             'Tỷ lệ khách quay lại', (o.retentionRate > 15 ? 'green' : 'warn')),
@@ -1107,8 +1107,6 @@ function renderStore(d) {
   });
 
   // ── Orders chart: Orders + Items + AOV ──
-  // Khi type filter active → dùng shopifyDailyByType để lấy orderLines và unitsSold
-  // Khi không filter → dùng shopifyOrderDaily (od) bình thường
   var sdbt = d.shopifyDailyByType || {};
   var hasSdbt = Object.keys(sdbt).length > 0;
 
@@ -1128,11 +1126,14 @@ function renderStore(d) {
         return s + ((dayData[t] || {}).unitsSold || 0);
       }, 0);
     });
+  } else if (mkt !== 'all') {
+    // Market filter active (no type filter) → dùng od đã filter theo country
+    ordersData = od.map(function(r) { return r.orders || 0; });
+    itemsData  = od.map(function(r) { return r.items  || 0; });
   } else {
-    // Không filter hoặc chưa có shopifyDailyByType → dùng od gốc
+    // Không filter → tổng toàn store, dùng shopifyDailyByType để bỏ service
     ordersData = od.map(function(r) { return r.orders || 0; });
     itemsData  = od.map(function(r) {
-      // Tổng items từ tất cả type, bỏ service
       var dayData = sdbt[r.date] || {};
       if (Object.keys(dayData).length > 0) {
         return Object.keys(dayData).reduce(function(s, t) {
@@ -1172,12 +1173,13 @@ function renderStore(d) {
     }
   });
 
-// Top products table — FIX #7: lọc service & FIX Link Sản Phẩm
+// Top products table — filter service, type, và market
   var prods = (d.shopifyTopProducts || []).filter(function(p) {
-  if (isServiceType(p.type)) return false;
-  if (ST_TYPES.length > 0 && ST_TYPES.indexOf(p.type) === -1) return false;
-  return true;
-});
+    if (isServiceType(p.type)) return false;
+    if (ST_TYPES.length > 0 && ST_TYPES.indexOf(p.type) === -1) return false;
+    if (mkt !== 'all' && (p.markets || []).indexOf(mkt) === -1) return false;
+    return true;
+  });
   var rows  = prods.slice(0, 25).map(function(p, i) {
     var title    = (p.title || p.productId || '').slice(0, 45);
     
