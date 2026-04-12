@@ -1106,21 +1106,42 @@ function renderStore(d) {
     }
   });
 
-  // FIX #6: Orders chart → BAR (Orders), AOV → LINE
-  // Items chính: lọc từ SHOPIFY_SALES_DAILY — items có revenue > $5
-  // Dùng shopifyOrderDaily items field (đã có từ GAS)
-  // Nếu có type filter → dùng shopifyDailyByType thay vì od.items
-  var itemsData;
-  if (ST_TYPES.length > 0) {
-    var sdbt = d.shopifyDailyByType || {};
+  // ── Orders chart: Orders + Items + AOV ──
+  // Khi type filter active → dùng shopifyDailyByType để lấy orderLines và unitsSold
+  // Khi không filter → dùng shopifyOrderDaily (od) bình thường
+  var sdbt = d.shopifyDailyByType || {};
+  var hasSdbt = Object.keys(sdbt).length > 0;
+
+  var ordersData, itemsData;
+  if (ST_TYPES.length > 0 && hasSdbt) {
+    // Type filter active → tính từ shopifyDailyByType
+    ordersData = od.map(function(r) {
+      var dayData = sdbt[r.date] || {};
+      return ST_TYPES.reduce(function(s, t) {
+        return s + ((dayData[t] || {}).orderLines || 0);
+      }, 0);
+    });
     itemsData = od.map(function(r) {
       var dayData = sdbt[r.date] || {};
       return ST_TYPES.reduce(function(s, t) {
+        if (isServiceType(t)) return s;
         return s + ((dayData[t] || {}).unitsSold || 0);
       }, 0);
     });
   } else {
-    itemsData = od.map(function(r) { return r.items || 0; });
+    // Không filter hoặc chưa có shopifyDailyByType → dùng od gốc
+    ordersData = od.map(function(r) { return r.orders || 0; });
+    itemsData  = od.map(function(r) {
+      // Tổng items từ tất cả type, bỏ service
+      var dayData = sdbt[r.date] || {};
+      if (Object.keys(dayData).length > 0) {
+        return Object.keys(dayData).reduce(function(s, t) {
+          if (isServiceType(t)) return s;
+          return s + ((dayData[t] || {}).unitsSold || 0);
+        }, 0);
+      }
+      return r.items || 0;
+    });
   }
 
   mkCh('ch-st-orders', {
@@ -1129,7 +1150,7 @@ function renderStore(d) {
       labels: od.map(function(r) { return fd(r.date); }),
       datasets: [
         { type: 'bar', label: 'Orders',
-          data: od.map(function(r) { return r.orders; }),
+          data: ordersData,
           yAxisID: 'yO', backgroundColor: 'rgba(96,165,250,.55)', borderRadius: 3 },
         { type: 'bar', label: 'Items Sold',
           data: itemsData,
