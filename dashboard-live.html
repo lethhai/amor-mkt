@@ -482,7 +482,7 @@ thead th.sortable:hover{color:#a78bfa}
   <!-- KPIs -->
   <div id="fc-kpis" class="kpi-grid"></div>
 
-  <!-- Chart -->
+  <!-- Chart Revenue/Spend/Profit -->
   <div class="section">
     <div class="st">Revenue vs Spend vs Profit — 6/4 → 3/5</div>
     <div class="cbox">
@@ -492,6 +492,26 @@ thead th.sortable:hover{color:#a78bfa}
         <span style="color:#a78bfa">│ Hôm nay</span>
       </div>
       <div id="fc-chart-box" style="overflow-x:auto"></div>
+    </div>
+  </div>
+
+  <!-- Chart Orders / Items Sold Forecast -->
+  <div class="section">
+    <div class="st">
+      <span id="fc-orders-title">Orders Forecast — 6/4 → 3/5</span>
+    </div>
+    <div class="cbox">
+      <!-- Type pills -->
+      <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:11px;color:#475569;font-weight:600">Type:</span>
+        <div id="fc-type-pills" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      </div>
+      <div style="font-size:10px;color:#475569;margin-bottom:8px">
+        Màu đậm = Thực tế &nbsp;|&nbsp; Màu nhạt = Dự phóng &nbsp;|&nbsp;
+        <span style="color:#ef4444">│ Cut-off 22/4</span> &nbsp;|&nbsp;
+        <span style="color:#a78bfa">│ Hôm nay</span>
+      </div>
+      <div class="chart-container-lg"><canvas id="ch-fc-orders"></canvas></div>
     </div>
   </div>
 
@@ -1999,6 +2019,7 @@ var FC_PLAN         = 'A';
 var FC_AOV_OVERRIDE = null;
 var FC_CR_PEAK_MULT = 2.0; // FIX — Bội số CR đỉnh, điều chỉnh qua UI
 var FC_MANUAL       = {}; // { 'YYYY-MM-DD': { spend, orders } }
+var FC_TYPES        = []; // Product type filter cho Orders/Items chart
 
 var FC_START  = '2026-04-06';
 var FC_END_ES = '2026-05-03';
@@ -2430,6 +2451,7 @@ function renderForecast(d) {
   if (!d) return;
   var aov  = FC_AOV_OVERRIDE || fcGetAov(d);
   var days = fcBuildDays(d);
+  window._fcDays = days; // cache để setFCTypes dùng lại
 
   document.getElementById('fc-aov-display').textContent = cur(aov);
 
@@ -2456,6 +2478,175 @@ function renderForecast(d) {
 
   fcRenderChart(days);
   fcRenderTable(days);
+  fcRenderOrdersChart(days, d);
+}
+
+// ── Orders / Items Forecast Chart ────────────────
+function fcRenderOrdersChart(days, d) {
+  var todayStr = today();
+  var sdbt     = d.shopifyDailyByType || {};
+  var typeList  = Object.keys(d.shopifyByType || {})
+    .filter(function(k) { return k !== 'Unknown' && !isServiceType(k); })
+    .sort();
+
+  // Render type pills
+  var pillsEl = document.getElementById('fc-type-pills');
+  if (pillsEl) {
+    pillsEl.innerHTML =
+      '<button class="filter-btn ' + (FC_TYPES.length === 0 ? 'active' : '') + '" '
+      + 'onclick="setFCTypes(this,\'\')">Tất cả (Orders)</button>'
+      + typeList.map(function(tp) {
+          return '<button class="filter-btn ' + (FC_TYPES.indexOf(tp) > -1 ? 'active' : '') + '" '
+            + 'onclick="setFCTypes(this,\'' + tp + '\')">' + tp + '</button>';
+        }).join('');
+  }
+
+  // Update title
+  var titleEl = document.getElementById('fc-orders-title');
+  if (titleEl) {
+    titleEl.textContent = FC_TYPES.length > 0
+      ? 'Items Sold Forecast — ' + FC_TYPES.join(', ')
+      : 'Orders Forecast — 6/4 → 3/5';
+  }
+
+  var labels = days.map(function(d) { return fd(d.date); });
+
+  if (FC_TYPES.length === 0) {
+    // ── MODE: Orders per day ─────────────────────
+    var pastOrders   = days.map(function(d) { return d.isPast  ? (d.orders || 0) : null; });
+    var futureOrders = days.map(function(d) { return !d.isPast ? (d.orders || 0) : null; });
+
+    mkCh('ch-fc-orders', {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Orders (Thực tế)',
+            data: pastOrders,
+            backgroundColor: 'rgba(96,165,250,.85)', borderRadius: 3 },
+          { label: 'Orders (Dự phóng)',
+            data: futureOrders,
+            backgroundColor: 'rgba(96,165,250,.30)',
+            borderColor: 'rgba(96,165,250,.6)', borderWidth: 1, borderRadius: 3 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'top' },
+          annotation: {} },
+        scales: {
+          x: { grid: { display: false },
+            ticks: { maxTicksLimit: 14 } },
+          y: { grid: GRID, ticks: TICK_Y,
+            title: { display: true, text: 'Orders' } }
+        }
+      }
+    });
+
+  } else {
+    // ── MODE: Items Sold per type per day ─────────
+    // Tính avg items/order cho mỗi type từ last 7 days thực tế
+    var last7 = days.filter(function(d) { return d.isPast; }).slice(-7);
+    var avgItemsPerOrder = {};
+    FC_TYPES.forEach(function(tp) {
+      var totalUnits  = 0, totalOrders = 0;
+      last7.forEach(function(d) {
+        var dayData = sdbt[d.date] || {};
+        if (dayData[tp]) {
+          totalUnits  += dayData[tp].unitsSold  || 0;
+          totalOrders += dayData[tp].orderLines || 0;
+        }
+      });
+      avgItemsPerOrder[tp] = totalOrders > 0 ? totalUnits / totalOrders : 1;
+    });
+
+    // Colors cho từng type
+    var typeColorsSolid = [
+      'rgba(96,165,250,.85)','rgba(167,139,250,.85)','rgba(74,222,128,.85)',
+      'rgba(245,158,11,.85)','rgba(248,113,113,.85)','rgba(232,121,249,.85)',
+      'rgba(6,182,212,.85)','rgba(132,204,22,.85)','rgba(251,146,60,.85)','rgba(148,163,184,.85)'
+    ];
+    var typeColorsFaint = [
+      'rgba(96,165,250,.25)','rgba(167,139,250,.25)','rgba(74,222,128,.25)',
+      'rgba(245,158,11,.25)','rgba(248,113,113,.25)','rgba(232,121,249,.25)',
+      'rgba(6,182,212,.25)','rgba(132,204,22,.25)','rgba(251,146,60,.25)','rgba(148,163,184,.25)'
+    ];
+    var typeColorsBorder = [
+      'rgba(96,165,250,.6)','rgba(167,139,250,.6)','rgba(74,222,128,.6)',
+      'rgba(245,158,11,.6)','rgba(248,113,113,.6)','rgba(232,121,249,.6)',
+      'rgba(6,182,212,.6)','rgba(132,204,22,.6)','rgba(251,146,60,.6)','rgba(148,163,184,.6)'
+    ];
+
+    var datasets = [];
+    FC_TYPES.forEach(function(tp, ti) {
+      var colorSolid  = typeColorsSolid[ti  % typeColorsSolid.length];
+      var colorFaint  = typeColorsFaint[ti  % typeColorsFaint.length];
+      var colorBorder = typeColorsBorder[ti % typeColorsBorder.length];
+
+      // Past: actual unitsSold từ shopifyDailyByType
+      var pastItems = days.map(function(d) {
+        if (!d.isPast) return null;
+        var dayData = sdbt[d.date] || {};
+        return (dayData[tp] || {}).unitsSold || 0;
+      });
+
+      // Future: forecast orders × avgItemsPerOrder[type]
+      var ratio = avgItemsPerOrder[tp] || 1;
+      var futureItems = days.map(function(d) {
+        if (d.isPast) return null;
+        return r2((d.orders || 0) * ratio);
+      });
+
+      datasets.push({
+        label: tp + ' (Thực tế)',
+        data: pastItems,
+        backgroundColor: colorSolid,
+        borderRadius: 3, stack: 'past'
+      });
+      datasets.push({
+        label: tp + ' (Dự phóng)',
+        data: futureItems,
+        backgroundColor: colorFaint,
+        borderColor: colorBorder,
+        borderWidth: 1, borderRadius: 3, stack: 'future'
+      });
+    });
+
+    mkCh('ch-fc-orders', {
+      type: 'bar',
+      data: { labels: labels, datasets: datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'top' } },
+        scales: {
+          x: { stacked: false, grid: { display: false },
+            ticks: { maxTicksLimit: 14 } },
+          y: { grid: GRID, ticks: TICK_Y,
+            title: { display: true, text: 'Items Sold' } }
+        }
+      }
+    });
+  }
+}
+
+function setFCTypes(btn, type) {
+  if (type === '') {
+    FC_TYPES = [];
+    document.querySelectorAll('#fc-type-pills .filter-btn').forEach(function(b) {
+      b.classList.remove('active');
+    });
+    btn.classList.add('active');
+  } else {
+    var idx = FC_TYPES.indexOf(type);
+    if (idx > -1) FC_TYPES.splice(idx, 1);
+    else FC_TYPES.push(type);
+    var allBtn = document.querySelector('#fc-type-pills .filter-btn:first-child');
+    if (allBtn) allBtn.classList.toggle('active', FC_TYPES.length === 0);
+    btn.classList.toggle('active', FC_TYPES.indexOf(type) > -1);
+  }
+  if (DATA) fcRenderOrdersChart(window._fcDays || [], DATA);
 }
 
 // ── Controls ──────────────────────────────────────
