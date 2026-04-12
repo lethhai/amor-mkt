@@ -2556,37 +2556,51 @@ function fcRenderOrdersChart(days, d) {
 
   } else {
     // ── MODE: Items Sold TỔNG các type được chọn ─
-    // Tính avg items/order cho TẤT CẢ type được chọn (gộp) từ last 7 ngày thực tế
-    var last7 = days.filter(function(day) { return day.isPast; }).slice(-7);
-    var totalUnitsAll = 0, totalOrdersAll = 0;
-    last7.forEach(function(day) {
-      var dayData = sdbt[day.date] || {};
-      FC_TYPES.forEach(function(tp) {
-        if (dayData[tp]) {
-          totalUnitsAll  += dayData[tp].unitsSold  || 0;
-          totalOrdersAll += dayData[tp].orderLines || 0;
-        }
-      });
-    });
-    // avg items/order cho tất cả type được chọn
-    var avgRatio = totalOrdersAll > 0 ? totalUnitsAll / totalOrdersAll : 1;
+    // Logic: forecast_items = forecast_orders × avgItemsPerOrder × selectedTypePct
+    // Dùng shopifyByType (aggregated totals của range) thay vì daily data
+    var spByType = d.shopifyByType || {};
+    var spOrderTotals = d.shopifyOrderTotals || {};
 
-    // Past: actual tổng unitsSold của các type được chọn
+    // Tổng items toàn store (bỏ service)
+    var totalItemsStore = Object.keys(spByType).reduce(function(s, k) {
+      return isServiceType(k) ? s : s + (spByType[k].unitsSold || 0);
+    }, 0);
+
+    // Items của các type được chọn
+    var selectedItems = FC_TYPES.reduce(function(s, tp) {
+      return s + ((spByType[tp] || {}).unitsSold || 0);
+    }, 0);
+
+    // % items thuộc các type được chọn
+    var selectedPct = totalItemsStore > 0 ? selectedItems / totalItemsStore : 1;
+
+    // Avg items per order toàn store
+    var totalOrders = spOrderTotals.orders || 1;
+    var avgItemsPerOrder = totalItemsStore > 0 ? totalItemsStore / totalOrders : 1;
+
+    // Past: actual tổng unitsSold của các type được chọn từ shopifyDailyByType
     var pastItems = days.map(function(day) {
       if (!day.isPast) return null;
       var dayData = sdbt[day.date] || {};
-      return FC_TYPES.reduce(function(s, tp) {
+      var val = FC_TYPES.reduce(function(s, tp) {
         return s + ((dayData[tp] || {}).unitsSold || 0);
       }, 0);
+      // Nếu shopifyDailyByType không có data cho ngày này → dùng ratio
+      if (val === 0 && orderMapFc[day.date] > 0) {
+        val = Math.round(orderMapFc[day.date] * avgItemsPerOrder * selectedPct);
+      }
+      return val;
     });
 
-    // Future: forecast_orders × avg_ratio
+    // Future: forecast_orders × avgItemsPerOrder × selectedPct
     var futureItems = days.map(function(day) {
       if (day.isPast) return null;
-      return Math.round((day.orders || 0) * avgRatio);
+      return Math.round((day.orders || 0) * avgItemsPerOrder * selectedPct);
     });
 
     var typeLabel = FC_TYPES.length === 1 ? FC_TYPES[0] : FC_TYPES.length + ' types';
+    var subInfo = '(' + nf(selectedPct * 100, 1) + '% tổng items · '
+      + nf(avgItemsPerOrder, 2) + ' items/order)';
 
     mkCh('ch-fc-orders', {
       type: 'bar',
@@ -2596,7 +2610,7 @@ function fcRenderOrdersChart(days, d) {
           { label: typeLabel + ' — Items (Thực tế)',
             data: pastItems,
             backgroundColor: 'rgba(167,139,250,.85)', borderRadius: 3 },
-          { label: typeLabel + ' — Items (Dự phóng)',
+          { label: typeLabel + ' — Items (Dự phóng) ' + subInfo,
             data: futureItems,
             backgroundColor: 'rgba(167,139,250,.28)',
             borderColor: 'rgba(167,139,250,.55)', borderWidth: 1, borderRadius: 3 }
@@ -2610,14 +2624,15 @@ function fcRenderOrdersChart(days, d) {
           tooltip: {
             callbacks: {
               afterBody: function(items) {
-                // Hiện breakdown per type trong tooltip
                 if (FC_TYPES.length <= 1) return [];
-                var date = days[items[0].dataIndex];
-                if (!date || !date.isPast) return [];
-                var dayData = sdbt[date.date] || {};
-                return FC_TYPES.map(function(tp) {
-                  return '  ' + tp + ': ' + ((dayData[tp] || {}).unitsSold || 0);
+                var dayIdx = items[0].dataIndex;
+                if (!days[dayIdx] || !days[dayIdx].isPast) return [];
+                var dayData = sdbt[days[dayIdx].date] || {};
+                var lines = ['── Breakdown ──'];
+                FC_TYPES.forEach(function(tp) {
+                  lines.push('  ' + tp + ': ' + ((dayData[tp] || {}).unitsSold || 0));
                 });
+                return lines;
               }
             }
           }
