@@ -1816,16 +1816,29 @@ function renderMD(d) {
   var bc = d.blendedByCountry   || {};
   var sm = d.shopifyByMarket    || {};
 
-  var totalRevMD = o.totalRevenue || s.revenue || 0;
-  var trueROAS   = b.spend > 0 ? r2(totalRevMD / b.spend) : 0;
+  var totalRevMD   = o.totalRevenue || s.revenue || 0;
+  var trueROAS     = b.spend > 0 ? r2(totalRevMD / b.spend) : 0;
+  // Profit đầy đủ — giống Business Overview
+  var mdFulfill    = r2(totalRevMD * 0.29);
+  var mdGateway    = r2(totalRevMD * 0.07);
+  var mdApiCost    = r2((d.openAI || {}).totalSpend || 0);
+  var txg07Spend   = (d.byAccount && d.byAccount['TXG 07']) ? (d.byAccount['TXG 07'].spend || 0) : 0;
+  var mdTaxAds     = r2(txg07Spend * 0.12);
+  var mdProfit     = r2(totalRevMD - b.spend - mdFulfill - mdGateway - mdApiCost - mdTaxAds);
+  var mdProfitPct  = totalRevMD > 0 ? r2(mdProfit / totalRevMD * 100) : 0;
 
   document.getElementById('md-kpis').innerHTML = [
     kpi('Spend (từ 20/3)',    cur(b.spend),          'FB ' + cur(b.fb_spend || 0) + ' / GG ' + cur(b.gg_spend || 0)),
-    kpi('Revenue Attributed', cur(b.revenue),         'FB + GG platform'),
-    kpi('Blended ROAS',       nf(b.roas, 2) + 'x',   'Platform attributed', roasCls(b.roas, 1.65)),
-    kpi('Purchases',          nf(b.purchases, 1),    'CPA ' + cur(b.cpa)),
     kpi('Shopify Revenue ($)', cur(totalRevMD),       'Doanh thu thực tế · USD', 'green'),
     kpi('True ROAS',          nf(trueROAS, 2) + 'x', 'Shopify $ ÷ Paid Spend', roasCls(trueROAS, 1.65)),
+    kpi('Est. Profit',        cur(mdProfit),          'Rev − Ads − FF − GW − API − TaxAds · ' + nf(mdProfitPct, 1) + '% margin', mdProfit >= 0 ? 'green' : 'red'),
+    kpi('Fulfillment (29%)',  cur(mdFulfill),         'Rev × 29%', 'warn'),
+    kpi('Gateway (7%)',       cur(mdGateway),         'Rev × 7%', 'pink'),
+    kpi('OpenAI / API',       cur(mdApiCost),         nf((d.openAI || {}).totalItems || 0, 0) + ' items · ' + cur((d.openAI || {}).spentPerItem || 0) + '/item', 'pink'),
+    kpi('TaxAds TXG 07',      cur(mdTaxAds),          'TXG 07 Spend × 12%', 'pink'),
+    kpi('Revenue Attributed', cur(b.revenue),         'FB + GG platform attributed'),
+    kpi('Blended ROAS',       nf(b.roas, 2) + 'x',   'Platform attributed', roasCls(b.roas, 1.65)),
+    kpi('Purchases',          nf(b.purchases, 1),    'CPA ' + cur(b.cpa)),
   ].join('');
 
   var trend = d.dailyTrend || [];
