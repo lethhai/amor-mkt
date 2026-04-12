@@ -2509,12 +2509,24 @@ function fcRenderOrdersChart(days, d) {
       : 'Orders Forecast — 6/4 → 3/5';
   }
 
-  var labels = days.map(function(d) { return fd(d.date); });
+  // Raw Shopify orders map (để dùng số nguyên thực tế)
+  var orderMapFc = {};
+  (d.shopifyOrderDaily || []).forEach(function(r) {
+    orderMapFc[r.date] = r.orders || 0;
+  });
+
+  var labels = days.map(function(day) { return fd(day.date); });
 
   if (FC_TYPES.length === 0) {
     // ── MODE: Orders per day ─────────────────────
-    var pastOrders   = days.map(function(d) { return d.isPast  ? (d.orders || 0) : null; });
-    var futureOrders = days.map(function(d) { return !d.isPast ? (d.orders || 0) : null; });
+    // Past: dùng raw Shopify orders (số nguyên, không paidRatio)
+    // Future: dùng forecast orders (làm tròn)
+    var pastOrders   = days.map(function(day) {
+      return day.isPast ? (orderMapFc[day.date] || 0) : null;
+    });
+    var futureOrders = days.map(function(day) {
+      return !day.isPast ? Math.round(day.orders || 0) : null;
+    });
 
     mkCh('ch-fc-orders', {
       type: 'bar',
@@ -2526,104 +2538,93 @@ function fcRenderOrdersChart(days, d) {
             backgroundColor: 'rgba(96,165,250,.85)', borderRadius: 3 },
           { label: 'Orders (Dự phóng)',
             data: futureOrders,
-            backgroundColor: 'rgba(96,165,250,.30)',
-            borderColor: 'rgba(96,165,250,.6)', borderWidth: 1, borderRadius: 3 }
+            backgroundColor: 'rgba(96,165,250,.28)',
+            borderColor: 'rgba(96,165,250,.55)', borderWidth: 1, borderRadius: 3 }
         ]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
-        plugins: { legend: { position: 'top' },
-          annotation: {} },
+        plugins: { legend: { position: 'top' } },
         scales: {
-          x: { grid: { display: false },
-            ticks: { maxTicksLimit: 14 } },
-          y: { grid: GRID, ticks: TICK_Y,
+          x: { grid: { display: false }, ticks: { maxTicksLimit: 14 } },
+          y: { grid: GRID, ticks: { callback: function(v) { return Math.round(v); } },
             title: { display: true, text: 'Orders' } }
         }
       }
     });
 
   } else {
-    // ── MODE: Items Sold per type per day ─────────
-    // Tính avg items/order cho mỗi type từ last 7 days thực tế
-    var last7 = days.filter(function(d) { return d.isPast; }).slice(-7);
-    var avgItemsPerOrder = {};
-    FC_TYPES.forEach(function(tp) {
-      var totalUnits  = 0, totalOrders = 0;
-      last7.forEach(function(d) {
-        var dayData = sdbt[d.date] || {};
+    // ── MODE: Items Sold TỔNG các type được chọn ─
+    // Tính avg items/order cho TẤT CẢ type được chọn (gộp) từ last 7 ngày thực tế
+    var last7 = days.filter(function(day) { return day.isPast; }).slice(-7);
+    var totalUnitsAll = 0, totalOrdersAll = 0;
+    last7.forEach(function(day) {
+      var dayData = sdbt[day.date] || {};
+      FC_TYPES.forEach(function(tp) {
         if (dayData[tp]) {
-          totalUnits  += dayData[tp].unitsSold  || 0;
-          totalOrders += dayData[tp].orderLines || 0;
+          totalUnitsAll  += dayData[tp].unitsSold  || 0;
+          totalOrdersAll += dayData[tp].orderLines || 0;
         }
       });
-      avgItemsPerOrder[tp] = totalOrders > 0 ? totalUnits / totalOrders : 1;
+    });
+    // avg items/order cho tất cả type được chọn
+    var avgRatio = totalOrdersAll > 0 ? totalUnitsAll / totalOrdersAll : 1;
+
+    // Past: actual tổng unitsSold của các type được chọn
+    var pastItems = days.map(function(day) {
+      if (!day.isPast) return null;
+      var dayData = sdbt[day.date] || {};
+      return FC_TYPES.reduce(function(s, tp) {
+        return s + ((dayData[tp] || {}).unitsSold || 0);
+      }, 0);
     });
 
-    // Colors cho từng type
-    var typeColorsSolid = [
-      'rgba(96,165,250,.85)','rgba(167,139,250,.85)','rgba(74,222,128,.85)',
-      'rgba(245,158,11,.85)','rgba(248,113,113,.85)','rgba(232,121,249,.85)',
-      'rgba(6,182,212,.85)','rgba(132,204,22,.85)','rgba(251,146,60,.85)','rgba(148,163,184,.85)'
-    ];
-    var typeColorsFaint = [
-      'rgba(96,165,250,.25)','rgba(167,139,250,.25)','rgba(74,222,128,.25)',
-      'rgba(245,158,11,.25)','rgba(248,113,113,.25)','rgba(232,121,249,.25)',
-      'rgba(6,182,212,.25)','rgba(132,204,22,.25)','rgba(251,146,60,.25)','rgba(148,163,184,.25)'
-    ];
-    var typeColorsBorder = [
-      'rgba(96,165,250,.6)','rgba(167,139,250,.6)','rgba(74,222,128,.6)',
-      'rgba(245,158,11,.6)','rgba(248,113,113,.6)','rgba(232,121,249,.6)',
-      'rgba(6,182,212,.6)','rgba(132,204,22,.6)','rgba(251,146,60,.6)','rgba(148,163,184,.6)'
-    ];
-
-    var datasets = [];
-    FC_TYPES.forEach(function(tp, ti) {
-      var colorSolid  = typeColorsSolid[ti  % typeColorsSolid.length];
-      var colorFaint  = typeColorsFaint[ti  % typeColorsFaint.length];
-      var colorBorder = typeColorsBorder[ti % typeColorsBorder.length];
-
-      // Past: actual unitsSold từ shopifyDailyByType
-      var pastItems = days.map(function(d) {
-        if (!d.isPast) return null;
-        var dayData = sdbt[d.date] || {};
-        return (dayData[tp] || {}).unitsSold || 0;
-      });
-
-      // Future: forecast orders × avgItemsPerOrder[type]
-      var ratio = avgItemsPerOrder[tp] || 1;
-      var futureItems = days.map(function(d) {
-        if (d.isPast) return null;
-        return r2((d.orders || 0) * ratio);
-      });
-
-      datasets.push({
-        label: tp + ' (Thực tế)',
-        data: pastItems,
-        backgroundColor: colorSolid,
-        borderRadius: 3, stack: 'past'
-      });
-      datasets.push({
-        label: tp + ' (Dự phóng)',
-        data: futureItems,
-        backgroundColor: colorFaint,
-        borderColor: colorBorder,
-        borderWidth: 1, borderRadius: 3, stack: 'future'
-      });
+    // Future: forecast_orders × avg_ratio
+    var futureItems = days.map(function(day) {
+      if (day.isPast) return null;
+      return Math.round((day.orders || 0) * avgRatio);
     });
+
+    var typeLabel = FC_TYPES.length === 1 ? FC_TYPES[0] : FC_TYPES.length + ' types';
 
     mkCh('ch-fc-orders', {
       type: 'bar',
-      data: { labels: labels, datasets: datasets },
+      data: {
+        labels: labels,
+        datasets: [
+          { label: typeLabel + ' — Items (Thực tế)',
+            data: pastItems,
+            backgroundColor: 'rgba(167,139,250,.85)', borderRadius: 3 },
+          { label: typeLabel + ' — Items (Dự phóng)',
+            data: futureItems,
+            backgroundColor: 'rgba(167,139,250,.28)',
+            borderColor: 'rgba(167,139,250,.55)', borderWidth: 1, borderRadius: 3 }
+        ]
+      },
       options: {
         responsive: true, maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
-        plugins: { legend: { position: 'top' } },
+        plugins: {
+          legend: { position: 'top' },
+          tooltip: {
+            callbacks: {
+              afterBody: function(items) {
+                // Hiện breakdown per type trong tooltip
+                if (FC_TYPES.length <= 1) return [];
+                var date = days[items[0].dataIndex];
+                if (!date || !date.isPast) return [];
+                var dayData = sdbt[date.date] || {};
+                return FC_TYPES.map(function(tp) {
+                  return '  ' + tp + ': ' + ((dayData[tp] || {}).unitsSold || 0);
+                });
+              }
+            }
+          }
+        },
         scales: {
-          x: { stacked: false, grid: { display: false },
-            ticks: { maxTicksLimit: 14 } },
-          y: { grid: GRID, ticks: TICK_Y,
+          x: { grid: { display: false }, ticks: { maxTicksLimit: 14 } },
+          y: { grid: GRID, ticks: { callback: function(v) { return Math.round(v); } },
             title: { display: true, text: 'Items Sold' } }
         }
       }
