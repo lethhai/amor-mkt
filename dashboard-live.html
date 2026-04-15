@@ -2430,7 +2430,6 @@ function fcBuildDays(d) {
         scaleRule   = rule2.label + ' (Δ' + (delta2 >= 0 ? '+' : '') + nf(delta2, 1) + '%)';
       }
       spend   = manual.spend !== undefined ? manual.spend
-              : (isToday && (spendMap[date] || 0) > 0) ? spendMap[date]
               : r2((prevSpend || 0) * scaleFactor);
       cr      = r2(fcGetCrForDay(date, cr0, FC_PLAN) * 100);
       cpc     = fcGetCpcForDay(date, cpcAvg);
