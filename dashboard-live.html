@@ -471,13 +471,20 @@ thead th.sortable:hover{color:#a78bfa}
         onchange="setFCAov(this.value)">
     </div>
 
-    <div style="display:flex;gap:6px;align-items:center">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <span style="font-size:11px;color:#475569">CR Peak:</span>
-      <span id="fc-cr-display" style="font-size:11px;color:#60a5fa;font-weight:700">×2.0</span>
-      <input type="number" placeholder="Multiplier..." step="0.1" min="1.0" max="5.0"
-        style="width:80px;background:#1a1d30;border:1px solid #2d3154;
+      <span style="font-size:11px;color:#f87171">🇪🇸</span>
+      <span id="fc-cr-es-display" style="font-size:11px;color:#60a5fa;font-weight:700">×2.0</span>
+      <input type="number" placeholder="ES..." step="0.1" min="1.0" max="5.0"
+        style="width:65px;background:#1a1d30;border:1px solid #2d3154;
           color:#e2e8f0;border-radius:6px;padding:3px 7px;font-size:11px"
-        onchange="setFCCrPeak(this.value)">
+        onchange="setFCCrPeakES(this.value)">
+      <span style="font-size:11px;color:#4ade80">🇮🇹</span>
+      <span id="fc-cr-it-display" style="font-size:11px;color:#60a5fa;font-weight:700">×2.0</span>
+      <input type="number" placeholder="IT..." step="0.1" min="1.0" max="5.0"
+        style="width:65px;background:#1a1d30;border:1px solid #2d3154;
+          color:#e2e8f0;border-radius:6px;padding:3px 7px;font-size:11px"
+        onchange="setFCCrPeakIT(this.value)">
     </div>
 
     <div style="font-size:11px;color:#475569">
@@ -2024,10 +2031,13 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
 
 var FC_PLAN         = 'A';
 var FC_AOV_OVERRIDE = null;
-var FC_CR_PEAK_MULT = 2.0;
-var FC_MANUAL       = {};
+var FC_CR_PEAK_MULT = 2.0; // fallback chung
+var FC_CR_PEAK_ES   = 2.0; // cr0_ES × multiplier
+var FC_CR_PEAK_IT   = 2.0; // cr0_IT × multiplier
+var FC_MANUAL_ES    = {}; // manual override cho ES
+var FC_MANUAL_IT    = {}; // manual override cho IT
 var FC_TYPES        = [];
-var FC_MARKET       = 'all'; // 'all' | 'ES' | 'IT'
+var FC_MARKET       = 'all';
 
 // Config theo market
 var FC_MKT_CONFIG = {
@@ -2088,7 +2098,7 @@ function fcGetAov(d) {
 // ── Helpers CR/CPC ───────────────────────────────
 function fcGetCpcAvg(d) {
   var trend  = d.dailyTrend || [];
-  var last3  = trend.slice(-3);
+  var last3  = trend.slice(0, 3); // sort descending → index 0-2 = 3 ngày gần nhất
   var spend  = last3.reduce(function(s, r) { return s + (r.spend  || 0); }, 0);
   var clicks = last3.reduce(function(s, r) { return s + (r.clicks || 0); }, 0);
   return clicks > 0 ? r2(spend / clicks) : 0.40;
@@ -2097,7 +2107,7 @@ function fcGetCpcAvg(d) {
 // ── CPC tăng dần từ CPC_avg → $0.65 tại cut-off, giữ nguyên sau đó ──
 function fcGetCpcForDay(date, cpcStart) {
   var peak    = (FC_MKT_CONFIG[FC_MARKET] || FC_MKT_CONFIG['all']).cutoff;
-  var cpcPeak = 0.65;
+  var cpcPeak = 0.70;
   if (date >= peak) return cpcPeak;
   var totalDays = fcDaysBetween(FC_START, peak);
   var dayIdx    = fcDaysBetween(FC_START, date);
@@ -2108,7 +2118,7 @@ function fcGetCpcForDay(date, cpcStart) {
 // Market-explicit version dùng cho 'all' mode
 function _fcGetCpcForDayMkt(date, cpcStart, mkt) {
   var peak    = FC_MKT_CONFIG[mkt].cutoff;
-  var cpcPeak = 0.65;
+  var cpcPeak = 0.70;
   if (date >= peak) return cpcPeak;
   var totalDays = fcDaysBetween(FC_START, peak);
   var dayIdx    = fcDaysBetween(FC_START, date);
@@ -2117,11 +2127,13 @@ function _fcGetCpcForDayMkt(date, cpcStart, mkt) {
 }
 
 function _fcGetCrForDayMkt(date, cr0, plan, mkt) {
-  var mktCfg = FC_MKT_CONFIG[mkt];
-  var start  = FC_START;
-  var peak   = mktCfg.cutoff;
-  var end    = mktCfg.end;
-  var crPeak = plan === 'A' ? cr0 * FC_CR_PEAK_MULT : cr0 * (FC_CR_PEAK_MULT * 0.7);
+  var mktCfg   = FC_MKT_CONFIG[mkt];
+  var start    = FC_START;
+  var peak     = mktCfg.cutoff;
+  var end      = mktCfg.end;
+  // Dùng multiplier riêng per market
+  var mult     = mkt === 'IT' ? FC_CR_PEAK_IT : FC_CR_PEAK_ES;
+  var crPeak   = plan === 'A' ? cr0 * mult : cr0 * (mult * 0.7);
   if (date <= peak) {
     var totalDays = fcDaysBetween(start, peak);
     var dayIdx    = fcDaysBetween(start, date);
@@ -2243,10 +2255,17 @@ function _fcBuildForMarket(d, mkt) {
   // Spend ratio: IT = TXG 14 account, ES = tổng − TXG 14
   var totalSpend  = (d.blended            || {}).spend || 0;
   var totalRev    = (d.shopifyOrderTotals || {}).totalRevenue || 0;
-  var txg14Spend  = (d.byAccount && d.byAccount['TXG 14']) ? (d.byAccount['TXG 14'].spend || 0) : 0;
-  var mktSpendRatio = totalSpend > 0
-    ? (mkt === 'IT' ? txg14Spend / totalSpend : (totalSpend - txg14Spend) / totalSpend)
-    : (mkt === 'IT' ? 0.1 : 0.9);
+  // ES = Amor01 + TXG07 + Google Ads | IT = TXG14
+  var accts      = d.byAccount || {};
+  var txg14Spend = (accts['TXG 14'] || {}).spend || 0;
+  var amor01Spend= (accts['Amor 01'] || {}).spend || 0;
+  var txg07Spend = (accts['TXG 07']  || {}).spend || 0;
+  var ggSpend    = (d.blended || {}).gg_spend || 0;
+  var esSpend    = amor01Spend + txg07Spend + ggSpend;
+  var itSpend    = txg14Spend;
+  var esItTotal  = esSpend + itSpend || totalSpend || 1;
+  var mktSpendRatio = mkt === 'IT' ? itSpend / esItTotal : esSpend / esItTotal;
+  if (mktSpendRatio <= 0) mktSpendRatio = (mkt === 'IT') ? 0.1 : 0.9;
   // Rev ratio: vẫn dùng shopifyOrderByCountry (Shopify có data thực)
   var mktRevRatio = totalRev > 0 ? ((boc[mkt] || {}).totalRevenue || 0) / totalRev : (mkt === 'IT' ? 0.1 : 0.9);
 
@@ -2288,6 +2307,9 @@ function _fcBuildForMarket(d, mkt) {
     var isToday   = date === todayStr;
     var isFuture  = date > todayStr;
     var isHarvest = date >= harvestStart && date <= mktCfg.end;
+    // Manual override theo market
+    var manualMkt = (mkt === 'IT') ? FC_MANUAL_IT : FC_MANUAL_ES;
+    var manual    = manualMkt[date] || {};
     var spend, orders, revenue, clicks, cr, cpc, scaleRule, scaleFactor;
     if (isPast) {
       // True data từ Shopify — không tính toán, không paidRatio
@@ -2308,131 +2330,9 @@ function _fcBuildForMarket(d, mkt) {
         scaleFactor = rule2.factor;
         scaleRule   = rule2.label + ' (Δ' + (delta2 >= 0 ? '+' : '') + nf(delta2, 1) + '%)';
       }
-      spend   = r2((prevSpend || 0) * scaleFactor);
+      spend   = manual.spend  !== undefined ? manual.spend  : r2((prevSpend || 0) * scaleFactor);
       cr      = r2(_fcGetCrForDayMkt(date, cr0, FC_PLAN, mkt) * 100);
       cpc     = _fcGetCpcForDayMkt(date, cpcAvg, mkt);
-      clicks  = cpc > 0 ? r2(spend / cpc) : 0;
-      orders  = r2(clicks * (cr / 100));
-      revenue = r2(orders * aov);
-    }
-    var pctAds = revenue > 0 ? r2(spend / revenue * 100) : 0;
-    var roas   = spend   > 0 ? r2(revenue / spend)        : 0;
-    var profit = r2(revenue * FC_MARGIN - spend);
-    pctAdsHist[date] = pctAds;
-    prevSpend        = spend;
-    result.push({ date:date, isPast:isPast, isToday:isToday, isFuture:isFuture,
-      isHarvest:isHarvest, spend:spend, orders:orders, revenue:revenue,
-      clicks:clicks, cr:cr, cpc:cpc, aov:aov, pctAds:pctAds, roas:roas, profit:profit,
-      scaleRule:scaleRule||'–', isManual:false, isExp:isFuture });
-  });
-  return result;
-}
-
-// ── Build tất cả ngày — dispatch theo FC_MARKET ──────────────
-function fcBuildDays(d) {
-  if (FC_MARKET === 'all') {
-    // Option A: chạy ES + IT riêng → merge từng ngày
-    var esDays = _fcBuildForMarket(d, 'ES');
-    var itDays = _fcBuildForMarket(d, 'IT');
-    var esMap  = {};
-    esDays.forEach(function(day) { esMap[day.date] = day; });
-    return itDays.map(function(itDay) {
-      var esDay = esMap[itDay.date];
-      if (!esDay) return itDay; // sau 3/5: chỉ IT
-      var spend   = r2((esDay.spend   || 0) + (itDay.spend   || 0));
-      var orders  = r2((esDay.orders  || 0) + (itDay.orders  || 0));
-      var revenue = r2((esDay.revenue || 0) + (itDay.revenue || 0));
-      var profit  = r2((esDay.profit  || 0) + (itDay.profit  || 0));
-      var pctAds  = revenue > 0 ? r2(spend / revenue * 100) : 0;
-      var roas    = spend   > 0 ? r2(revenue / spend)        : 0;
-      return { date:itDay.date, isPast:itDay.isPast, isToday:itDay.isToday,
-        isFuture:itDay.isFuture, isHarvest:esDay.isHarvest||itDay.isHarvest,
-        spend:spend, orders:orders, revenue:revenue,
-        aov:orders>0?r2(revenue/orders):itDay.aov,
-        pctAds:pctAds, roas:roas, profit:profit,
-        cr:r2(((esDay.cr||0)+(itDay.cr||0))/2),
-        cpc:r2(((esDay.cpc||0)+(itDay.cpc||0))/2),
-        scaleRule:'ES: '+(esDay.scaleRule||'–')+' | IT: '+(itDay.scaleRule||'–'),
-        isManual:false, isExp:itDay.isFuture };
-    });
-  }
-
-  // Single market (ES hoặc IT) — với manual override support
-  var aov      = FC_AOV_OVERRIDE || fcGetAov(d);
-  var todayStr = today();
-  var cpcAvg   = fcGetCpcAvg(d);
-  var cr0      = fcGetCrYesterday(d);
-  var mktCfg   = FC_MKT_CONFIG[FC_MARKET];
-  var bc  = d.blendedByCountry      || {};
-  var boc = d.shopifyOrderByCountry  || {};
-  var totalSpend = (d.blended        || {}).spend || 0;
-  var totalRev   = (d.shopifyOrderTotals || {}).totalRevenue || 0;
-  // Spend ratio: IT = TXG 14 account, ES = tổng − TXG 14
-  var txg14Spend2 = (d.byAccount && d.byAccount['TXG 14']) ? (d.byAccount['TXG 14'].spend || 0) : 0;
-  var mktSpendRatio = totalSpend > 0
-    ? (FC_MARKET === 'IT' ? txg14Spend2 / totalSpend : (totalSpend - txg14Spend2) / totalSpend)
-    : 1;
-  var mktRevRatio = totalRev > 0 ? ((boc[FC_MARKET] || {}).totalRevenue || 0) / totalRev : 1;
-  var spendMap = {}, orderMap = {}, revMap = {}, clickMap = {};
-  (d.dailyTrend || []).forEach(function(r) {
-    spendMap[r.date] = (r.spend  || 0) * mktSpendRatio;
-    clickMap[r.date] = (r.clicks || 0) * mktSpendRatio;
-  });
-  var dailyByC = d.shopifyOrderDailyByCountry || {};
-  (d.shopifyOrderDaily || []).forEach(function(r) {
-    if (dailyByC[r.date] && dailyByC[r.date][FC_MARKET]) {
-      var md = dailyByC[r.date][FC_MARKET];
-      orderMap[r.date] = md.orders       || 0;
-      revMap[r.date]   = md.totalRevenue || 0;
-    } else {
-      orderMap[r.date] = (r.orders       || 0) * mktRevRatio;
-      revMap[r.date]   = (r.totalRevenue || 0) * mktRevRatio;
-    }
-  });
-  var harvestCfg   = FC_HARVEST_BY_MKT[FC_MARKET];
-  var harvestStart = harvestCfg.start;
-  var harvestDates = harvestCfg.dates;
-  var dates = [], cur2 = FC_START;
-  while (cur2 <= mktCfg.end) { dates.push(cur2); cur2 = addDays(cur2, 1); }
-  var result = [], pctAdsHist = {};
-  var prevSpend = (function() {
-    var ds = [], c3 = FC_START;
-    while (c3 < todayStr) { ds.push(c3); c3 = addDays(c3, 1); }
-    for (var i = ds.length - 1; i >= 0; i--) {
-      var s = spendMap[ds[i]]; if (s && s > 0) return s;
-    }
-    return 500 * mktSpendRatio;
-  })();
-  dates.forEach(function(date) {
-    var isPast    = date < todayStr;
-    var isToday   = date === todayStr;
-    var isFuture  = date > todayStr;
-    var isHarvest = date >= harvestStart && date <= mktCfg.end;
-    var manual    = FC_MANUAL[date] || {};
-    var spend, orders, revenue, clicks, cr, cpc, scaleRule, scaleFactor;
-    if (isPast) {
-      // True data từ Shopify — không tính toán, không paidRatio
-      spend   = spendMap[date] || 0;
-      orders  = orderMap[date] || 0;
-      revenue = revMap[date]   || r2(orders * aov);
-      clicks  = clickMap[date] || (cpcAvg > 0 ? r2(spend / cpcAvg) : 0);
-      cr      = clicks > 0 ? r2(orders / clicks * 100) : 0;
-      cpc     = clicks > 0 ? r2(spend  / clicks)       : 0;
-    } else {
-      if (isHarvest) {
-        scaleFactor = harvestDates[date] || FC_WIND_DOWN_FACTOR;
-        scaleRule   = harvestDates[date] ? '🌾 ×' + scaleFactor : '🌾 Wind-down ×' + FC_WIND_DOWN_FACTOR;
-      } else {
-        var delta2      = fcCalcDelta(date, pctAdsHist);
-        var prevPctAds2 = pctAdsHist[addDays(date, -1)] || 0;
-        var rule2       = fcGetRule(delta2, FC_PLAN, prevPctAds2);
-        scaleFactor = rule2.factor;
-        scaleRule   = rule2.label + ' (Δ' + (delta2 >= 0 ? '+' : '') + nf(delta2, 1) + '%)';
-      }
-      spend   = manual.spend !== undefined ? manual.spend
-              : r2((prevSpend || 0) * scaleFactor);
-      cr      = r2(fcGetCrForDay(date, cr0, FC_PLAN) * 100);
-      cpc     = fcGetCpcForDay(date, cpcAvg);
       clicks  = cpc > 0 ? r2(spend / cpc) : 0;
       orders  = manual.orders !== undefined ? manual.orders : r2(clicks * (cr / 100));
       revenue = r2(orders * aov);
@@ -2445,10 +2345,56 @@ function fcBuildDays(d) {
     result.push({ date:date, isPast:isPast, isToday:isToday, isFuture:isFuture,
       isHarvest:isHarvest, spend:spend, orders:orders, revenue:revenue,
       clicks:clicks, cr:cr, cpc:cpc, aov:aov, pctAds:pctAds, roas:roas, profit:profit,
-      scaleRule:scaleRule||'–', isManual:Object.keys(manual).length>0,
-      isExp:isFuture&&Object.keys(manual).length===0 });
+      scaleRule:scaleRule||'–', isManual:Object.keys(manual).length > 0, isExp:isFuture });
   });
   return result;
+}
+
+// ── Build tất cả ngày — luôn chạy ES + IT riêng, filter theo FC_MARKET ──
+function fcBuildDays(d) {
+  // Luôn build cả 2 market → đảm bảo ES + IT = Tất cả
+  var esDays = _fcBuildForMarket(d, 'ES');
+  var itDays = _fcBuildForMarket(d, 'IT');
+
+  // Build ES map để lookup nhanh
+  var esMap = {};
+  esDays.forEach(function(day) { esMap[day.date] = day; });
+
+  // Helper merge 1 ngày ES + IT
+  function mergeDay(itDay) {
+    var esDay = esMap[itDay.date];
+    if (!esDay) return itDay; // sau 3/5: chỉ IT
+    var spend   = r2((esDay.spend   || 0) + (itDay.spend   || 0));
+    var orders  = r2((esDay.orders  || 0) + (itDay.orders  || 0));
+    var revenue = r2((esDay.revenue || 0) + (itDay.revenue || 0));
+    var profit  = r2((esDay.profit  || 0) + (itDay.profit  || 0));
+    var pctAds  = revenue > 0 ? r2(spend / revenue * 100) : 0;
+    var roas    = spend   > 0 ? r2(revenue / spend)        : 0;
+    return {
+      date:      itDay.date,
+      isPast:    itDay.isPast,
+      isToday:   itDay.isToday,
+      isFuture:  itDay.isFuture,
+      isHarvest: esDay.isHarvest || itDay.isHarvest,
+      spend:     spend, orders:  orders, revenue: revenue,
+      aov:       orders > 0 ? r2(revenue / orders) : itDay.aov,
+      pctAds:    pctAds, roas: roas, profit: profit,
+      cr:        r2(((esDay.cr  || 0) + (itDay.cr  || 0)) / 2),
+      cpc:       r2(((esDay.cpc || 0) + (itDay.cpc || 0)) / 2),
+      scaleRule: 'ES: ' + (esDay.scaleRule || '–') + ' | IT: ' + (itDay.scaleRule || '–'),
+      isManual:  esDay.isManual || itDay.isManual,
+      isExp:     itDay.isFuture
+    };
+  }
+
+  if (FC_MARKET === 'all') {
+    return itDays.map(mergeDay);
+  }
+  if (FC_MARKET === 'ES') {
+    return esDays;
+  }
+  // FC_MARKET === 'IT'
+  return itDays;
 }
 // ── Delta: %Ads hôm qua vs AVG 3 ngày trước ──────
 function fcCalcDelta(date, hist) {
@@ -2618,8 +2564,9 @@ function fcRenderTable(days) {
       spendCell = '<span class="num">' + cur(d.spend) + '</span>';
     } else {
       spendCell = '<input class="fc-input" type="number" value="' + d.spend.toFixed(2) + '"'
-        + ' onchange="FC_MANUAL[\'' + d.date + '\']=FC_MANUAL[\'' + d.date + '\']||{};'
-        + 'FC_MANUAL[\'' + d.date + '\'].spend=parseFloat(this.value)||0;renderForecast(MD_DATA)">';
+        + ' onchange="var m=FC_MARKET===\'IT\'?FC_MANUAL_IT:FC_MANUAL_ES;'
+        + 'm[\'' + d.date + '\']=m[\'' + d.date + '\']||{};'
+        + 'm[\'' + d.date + '\'].spend=parseFloat(this.value)||0;renderForecast(MD_DATA)">';
     }
 
     // Orders cell
@@ -2631,8 +2578,9 @@ function fcRenderTable(days) {
         ? '<div style="font-size:9px;color:#334155">Exp:' + nf(d.orders, 0) + '</div>' : '';
       ordCell = '<input class="fc-input fc-input-ord" type="number" placeholder="'
         + nf(d.orders, 0) + '"'
-        + ' onchange="FC_MANUAL[\'' + d.date + '\']=FC_MANUAL[\'' + d.date + '\']||{};'
-        + 'FC_MANUAL[\'' + d.date + '\'].orders=parseFloat(this.value)||0;renderForecast(MD_DATA)">'
+        + ' onchange="var m=FC_MARKET===\'IT\'?FC_MANUAL_IT:FC_MANUAL_ES;'
+        + 'm[\'' + d.date + '\']=m[\'' + d.date + '\']||{};'
+        + 'm[\'' + d.date + '\'].orders=parseFloat(this.value)||0;renderForecast(MD_DATA)">'
         + expNote;
     }
 
@@ -2927,12 +2875,20 @@ function setFCAov(val) {
   renderForecast(MD_DATA);
 }
 
-// FIX — CR Peak multiplier control
-function setFCCrPeak(val) {
+// CR Peak per market
+function setFCCrPeakES(val) {
   var v = parseFloat(val);
-  FC_CR_PEAK_MULT = (!isNaN(v) && v >= 1) ? v : 2.0;
-  var el = document.getElementById('fc-cr-display');
-  if (el) el.textContent = '×' + FC_CR_PEAK_MULT;
+  FC_CR_PEAK_ES = (!isNaN(v) && v >= 1) ? v : 2.0;
+  var el = document.getElementById('fc-cr-es-display');
+  if (el) el.textContent = '×' + FC_CR_PEAK_ES;
+  renderForecast(MD_DATA);
+}
+
+function setFCCrPeakIT(val) {
+  var v = parseFloat(val);
+  FC_CR_PEAK_IT = (!isNaN(v) && v >= 1) ? v : 2.0;
+  var el = document.getElementById('fc-cr-it-display');
+  if (el) el.textContent = '×' + FC_CR_PEAK_IT;
   renderForecast(MD_DATA);
 }
      
