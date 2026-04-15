@@ -2540,7 +2540,7 @@ function fcRenderChart(days) {
 // ── Render Table ──────────────────────────────────
 function fcRenderTable(days) {
   var todayStr = today();
-  var heads = ['Ngày','Spend ($)','Orders','AOV','Revenue ($)',
+  var heads = ['Ngày','Spend ($)','Orders','Clicks','AOV','Revenue ($)',
     '%Ads','ROAS','Profit ($)','Plan','Scale Rule','CPC','CR%'];
 
   var hHtml = '<thead><tr>' + heads.map(function(h, i) {
@@ -2592,6 +2592,7 @@ function fcRenderTable(days) {
       + '<td style="white-space:nowrap;font-size:11px">' + dl + '</td>'
       + '<td>' + spendCell + '</td>'
       + '<td>' + ordCell + '</td>'
+      + '<td class="num" style="color:#94a3b8;font-size:11px">' + (d.clicks ? nf(Math.round(d.clicks)) : '–') + '</td>'
       + '<td class="num" style="color:#64748b;font-size:11px">' + cur(d.aov) + '</td>'
       + '<td class="num" style="color:#4ade80">' + cur(d.revenue) + '</td>'
       + '<td class="num">' + fcPctBadge(d.pctAds) + '</td>'
