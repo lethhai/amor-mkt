@@ -2154,37 +2154,41 @@ function _fcGetCrForDayMkt(date, cr0, plan, mkt) {
 }
      
 // ── CR baseline theo từng market ─────────────────
-// Dùng blended cr0 làm nền, điều chỉnh theo tỷ lệ order market
-// Lý do: clicks per market không reliable từ GAS (chỉ có blended clicks)
+// Dùng click ratio từ byAccount (chính xác) thay vì spend ratio
 function _fcGetCrYesterdayMkt(d, mkt) {
   var todayStr  = today();
   var yest      = addDays(todayStr, -1);
 
-  // Blended cr0 (đã tính chính xác)
-  var crBlended = fcGetCrYesterday(d);
+  // Click ratio từ byAccount thực tế
+  var accts2      = d.byAccount || {};
+  var ggClicks2   = (d.ggTotals || {}).clicks || 0;
+  var amor01Clk   = (accts2['Amor 01'] || {}).clicks || 0;
+  var txg07Clk    = (accts2['TXG 07']  || {}).clicks || 0;
+  var txg14Clk    = (accts2['TXG 14']  || {}).clicks || 0;
+  var esClicks2   = amor01Clk + txg07Clk + ggClicks2;
+  var itClicks2   = txg14Clk;
+  var totalClk2   = esClicks2 + itClicks2 || 1;
+  var clickRatio  = mkt === 'IT' ? itClicks2 / totalClk2 : esClicks2 / totalClk2;
 
-  // Tỷ lệ order của market so với tổng để điều chỉnh CR
+  // Clicks hôm qua theo market
+  var row = (d.dailyTrend || []).filter(function(r) { return r.date === yest; })[0] || {};
+  var clk = (row.clicks || 0) * clickRatio;
+
+  // Orders hôm qua theo market
   var dailyByC = d.shopifyOrderDailyByCountry || {};
+  var ord = 0;
   if (dailyByC[yest] && dailyByC[yest][mkt]) {
-    // Có data thực theo country → tính tỷ lệ order
-    var mktOrd   = dailyByC[yest][mkt].orders || 0;
+    ord = dailyByC[yest][mkt].orders || 0;
+  } else {
+    var boc      = d.shopifyOrderByCountry || {};
+    var totalRev = (d.shopifyOrderTotals   || {}).totalRevenue || 0;
+    var mktRev   = (boc[mkt] || {}).totalRevenue || 0;
+    var revRatio = totalRev > 0 ? mktRev / totalRev : 0.5;
     var oRow     = (d.shopifyOrderDaily || []).filter(function(r) { return r.date === yest; })[0] || {};
-    var totalOrd = oRow.orders || 0;
-    if (totalOrd > 0 && mktOrd > 0) {
-      // Scale cr0 theo tỷ lệ order: nếu market này có nhiều order hơn tỷ lệ spend → CR cao hơn
-      var boc      = d.shopifyOrderByCountry || {};
-      var totalRev = (d.shopifyOrderTotals   || {}).totalRevenue || 0;
-      var mktRev   = (boc[mkt] || {}).totalRevenue || 0;
-      var revRatio  = totalRev > 0 ? mktRev / totalRev : 0.5;
-      var ordRatio  = totalOrd > 0 ? mktOrd / totalOrd : 0.5;
-      // Nếu ordRatio > revRatio → market này convert tốt hơn → CR cao hơn blended
-      var crAdj = revRatio > 0 ? ordRatio / revRatio : 1;
-      return r2(crBlended * crAdj);
-    }
+    ord = (oRow.orders || 0) * revRatio;
   }
 
-  // Fallback: dùng blended cr0 trực tiếp
-  return crBlended;
+  return (clk > 0 && ord > 0) ? r2(ord / clk) : 0.015;
 }
 
 function fcGetCrYesterday(d) {
@@ -2269,11 +2273,23 @@ function _fcBuildForMarket(d, mkt) {
   // Rev ratio: vẫn dùng shopifyOrderByCountry (Shopify có data thực)
   var mktRevRatio = totalRev > 0 ? ((boc[mkt] || {}).totalRevenue || 0) / totalRev : (mkt === 'IT' ? 0.1 : 0.9);
 
-  // spendMap: scale từ dailyTrend blended × spend ratio (chưa có daily by country)
+  // Click ratio: dùng byAccount clicks thực tế (chính xác hơn spend ratio)
+  // ES = Amor01 + TXG07 + GG | IT = TXG14
+  var ggClicks    = (d.ggTotals || {}).clicks || 0;
+  var amor01Clicks= (accts['Amor 01'] || {}).clicks || 0;
+  var txg07Clicks = (accts['TXG 07']  || {}).clicks || 0;
+  var txg14Clicks = (accts['TXG 14']  || {}).clicks || 0;
+  var esClicks    = amor01Clicks + txg07Clicks + ggClicks;
+  var itClicks    = txg14Clicks;
+  var totalClicks = esClicks + itClicks || 1;
+  var mktClickRatio = mkt === 'IT' ? itClicks / totalClicks : esClicks / totalClicks;
+  if (mktClickRatio <= 0) mktClickRatio = mkt === 'IT' ? 0.1 : 0.9;
+
+  // spendMap: scale từ dailyTrend blended × spend ratio
   var spendMap = {}, orderMap = {}, revMap = {}, clickMap = {};
   (d.dailyTrend || []).forEach(function(r) {
     spendMap[r.date] = (r.spend  || 0) * mktSpendRatio;
-    clickMap[r.date] = (r.clicks || 0) * mktSpendRatio;
+    clickMap[r.date] = (r.clicks || 0) * mktClickRatio; // dùng click ratio thực tế
   });
 
   // orderMap/revMap: ưu tiên data thực theo country, fallback ratio
