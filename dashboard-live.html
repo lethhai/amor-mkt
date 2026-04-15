@@ -444,6 +444,13 @@ thead th.sortable:hover{color:#a78bfa}
       text-transform:uppercase;letter-spacing:.8px">🎯 MD Forecast Engine</div>
 
     <div style="display:flex;gap:6px;align-items:center">
+      <span style="font-size:11px;color:#475569">Market:</span>
+      <button class="fc-plan-btn active" id="fc-mkt-all" onclick="setFCMarket('all')">🌍 Tất cả</button>
+      <button class="fc-plan-btn" id="fc-mkt-es"  onclick="setFCMarket('ES')">🇪🇸 ES — cut-off 22/4</button>
+      <button class="fc-plan-btn" id="fc-mkt-it"  onclick="setFCMarket('IT')">🇮🇹 IT — cut-off 29/4</button>
+    </div>
+
+    <div style="display:flex;gap:6px;align-items:center">
       <span style="font-size:11px;color:#475569">Plan:</span>
       <button class="fc-plan-btn active" id="fc-plan-a" onclick="setFCPlan('A')">
         🎯 Plan A — Push Volume
@@ -484,11 +491,11 @@ thead th.sortable:hover{color:#a78bfa}
 
   <!-- Chart Revenue/Spend/Profit -->
   <div class="section">
-    <div class="st">Revenue vs Spend vs Profit — 6/4 → 3/5</div>
+    <div class="st" id="fc-rev-title">Revenue vs Spend vs Profit — 6/4 → 3/5</div>
     <div class="cbox">
       <div style="font-size:10px;color:#475569;margin-bottom:8px">
         Nét liền = Thực tế &nbsp;|&nbsp; Nét đứt = Dự phóng &nbsp;|&nbsp;
-        <span style="color:#ef4444">│ Cut-off 22/4</span> &nbsp;|&nbsp;
+        <span style="color:#ef4444">│ <span id="fc-cutoff-lbl-rev">Cut-off 22/4</span></span> &nbsp;|&nbsp;
         <span style="color:#a78bfa">│ Hôm nay</span>
       </div>
       <div id="fc-chart-box" style="overflow-x:auto"></div>
@@ -508,7 +515,7 @@ thead th.sortable:hover{color:#a78bfa}
       </div>
       <div style="font-size:10px;color:#475569;margin-bottom:8px">
         Màu đậm = Thực tế &nbsp;|&nbsp; Màu nhạt = Dự phóng &nbsp;|&nbsp;
-        <span style="color:#ef4444">│ Cut-off 22/4</span> &nbsp;|&nbsp;
+        <span style="color:#ef4444">│ <span id="fc-cutoff-lbl-ord">Cut-off 22/4</span></span> &nbsp;|&nbsp;
         <span style="color:#a78bfa">│ Hôm nay</span>
       </div>
       <div class="chart-container-lg"><canvas id="ch-fc-orders"></canvas></div>
@@ -2017,9 +2024,17 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
 
 var FC_PLAN         = 'A';
 var FC_AOV_OVERRIDE = null;
-var FC_CR_PEAK_MULT = 2.0; // FIX — Bội số CR đỉnh, điều chỉnh qua UI
-var FC_MANUAL       = {}; // { 'YYYY-MM-DD': { spend, orders } }
-var FC_TYPES        = []; // Product type filter cho Orders/Items chart
+var FC_CR_PEAK_MULT = 2.0;
+var FC_MANUAL       = {};
+var FC_TYPES        = [];
+var FC_MARKET       = 'all'; // 'all' | 'ES' | 'IT'
+
+// Config theo market
+var FC_MKT_CONFIG = {
+  'ES':  { cutoff: '2026-04-22', end: '2026-05-03', label: '🇪🇸 ES' },
+  'IT':  { cutoff: '2026-04-29', end: '2026-05-10', label: '🇮🇹 IT' },
+  'all': { cutoff: '2026-04-22', end: '2026-05-10', label: '🌍 Tất cả' }
+};
 
 var FC_START  = '2026-04-06';
 var FC_END_ES = '2026-05-03';
@@ -2055,9 +2070,9 @@ function fcGetCpcAvg(d) {
   return clicks > 0 ? r2(spend / clicks) : 0.40;
 }
 
-// ── CPC tăng dần từ CPC_avg → $0.65 tại 22/4, giữ nguyên sau đó ──
+// ── CPC tăng dần từ CPC_avg → $0.65 tại cut-off, giữ nguyên sau đó ──
 function fcGetCpcForDay(date, cpcStart) {
-  var peak    = '2026-04-22';
+  var peak    = (FC_MKT_CONFIG[FC_MARKET] || FC_MKT_CONFIG['all']).cutoff;
   var cpcPeak = 0.65;
 
   if (date >= peak) return cpcPeak;
@@ -2088,10 +2103,11 @@ function fcGetCrYesterday(d) {
 
 // ── CR theo ngày dựa trên plan ───────────────────
 function fcGetCrForDay(date, cr0, plan) {
-  var start   = FC_START;        // 6/4
-  var peak    = '2026-04-22';    // cut-off
-  var end     = FC_END_ES;       // 3/5
-  var crPeak  = plan === 'A' ? cr0 * FC_CR_PEAK_MULT : cr0 * (FC_CR_PEAK_MULT * 0.7); // FIX
+  var mktCfg  = FC_MKT_CONFIG[FC_MARKET] || FC_MKT_CONFIG['all'];
+  var start   = FC_START;
+  var peak    = mktCfg.cutoff; // dynamic theo market
+  var end     = mktCfg.end;   // dynamic theo market
+  var crPeak  = plan === 'A' ? cr0 * FC_CR_PEAK_MULT : cr0 * (FC_CR_PEAK_MULT * 0.7);
 
   // Phase 1: từ start đến peak
   if (date <= peak) {
@@ -2130,25 +2146,53 @@ function fcBuildDays(d) {
   var cpcAvg   = fcGetCpcAvg(d);
   var cr0      = fcGetCrYesterday(d);
 
-  // Maps từ GAS
-  var spendMap  = {}, orderMap = {}, revMap = {}, clickMap = {};
+  // Market config
+  var mktCfg  = FC_MKT_CONFIG[FC_MARKET] || FC_MKT_CONFIG['all'];
+  var cutoff  = mktCfg.cutoff;
+  var endDate = mktCfg.end;
+
+  // Tỷ lệ spend/revenue theo market từ GAS data
+  var bc  = d.blendedByCountry        || {};
+  var boc = d.shopifyOrderByCountry   || {};
+  var totalBlendedSpend = (d.blended  || {}).spend || 0;
+  var totalShopifyRev   = (d.shopifyOrderTotals || {}).totalRevenue || 0;
+
+  var mktSpendRatio = 1, mktRevRatio = 1;
+  if (FC_MARKET !== 'all' && totalBlendedSpend > 0) {
+    mktSpendRatio = ((bc[FC_MARKET] || {}).spend || 0) / totalBlendedSpend;
+  }
+  if (FC_MARKET !== 'all' && totalShopifyRev > 0) {
+    mktRevRatio = ((boc[FC_MARKET] || {}).totalRevenue || 0) / totalShopifyRev;
+  }
+
+  // Maps từ GAS — scale theo market ratio
+  var spendMap = {}, orderMap = {}, revMap = {}, clickMap = {};
   (d.dailyTrend || []).forEach(function(r) {
-    spendMap[r.date]  = r.spend   || 0;
-    clickMap[r.date]  = r.clicks  || 0;
+    spendMap[r.date] = (r.spend  || 0) * mktSpendRatio;
+    clickMap[r.date] = (r.clicks || 0) * mktSpendRatio; // clicks tỷ lệ theo spend
   });
+
+  // Revenue/orders: dùng data thực theo country nếu có, fallback ratio
+  var dailyByC = d.shopifyOrderDailyByCountry || {};
   (d.shopifyOrderDaily || []).forEach(function(r) {
-    orderMap[r.date] = r.orders       || 0;
-    revMap[r.date]   = r.totalRevenue || 0;
+    if (FC_MARKET !== 'all' && dailyByC[r.date] && dailyByC[r.date][FC_MARKET]) {
+      var mktDay   = dailyByC[r.date][FC_MARKET];
+      orderMap[r.date] = mktDay.orders       || 0;
+      revMap[r.date]   = mktDay.totalRevenue || 0;
+    } else {
+      orderMap[r.date] = (r.orders       || 0) * mktRevRatio;
+      revMap[r.date]   = (r.totalRevenue || 0) * mktRevRatio;
+    }
   });
 
-  // Danh sách ngày
+  // Danh sách ngày — theo market end date
   var dates = [], cur2 = FC_START;
-  while (cur2 <= FC_END_ES) { dates.push(cur2); cur2 = addDays(cur2, 1); }
+  while (cur2 <= endDate) { dates.push(cur2); cur2 = addDays(cur2, 1); }
 
-  var result      = [];
-  var pctAdsHist  = {};
+  var result     = [];
+  var pctAdsHist = {};
 
-  // Seed prevSpend từ ngày thực tế cuối cùng
+  // Seed prevSpend
   var prevSpend = (function() {
     var ds = [];
     var c3 = FC_START;
@@ -2157,14 +2201,17 @@ function fcBuildDays(d) {
       var s = spendMap[ds[i]];
       if (s && s > 0) return s;
     }
-    return 500;
+    return 500 * mktSpendRatio;
+
   })();
 
   dates.forEach(function(date) {
     var isPast    = date < todayStr;
     var isToday   = date === todayStr;
     var isFuture  = date > todayStr;
-    var isHarvest = date >= FC_HARVEST_START;
+    // Harvest = sau cut-off của market (ngày đỉnh điểm xong, bắt đầu wind-down)
+    var harvestStart = mktCfg.cutoff;
+    var isHarvest = date >= FC_HARVEST_START && date <= mktCfg.end;
     var manual    = FC_MANUAL[date] || {};
 
     var spend, orders, revenue, clicks, cr, cpc, scaleRule, scaleFactor;
@@ -2297,7 +2344,7 @@ function fcRenderChart(days) {
   var ti = days.findIndex(function(d){ return d.date === todayStr; });
   if (ti < 0) ti = days.findIndex(function(d){ return d.isFuture; }) - 1;
   if (ti < 0) ti = N - 1;
-  var cutIdx = days.findIndex(function(d){ return d.date === '2026-04-22'; });
+  var cutIdx = days.findIndex(function(d){ return d.date === (FC_MKT_CONFIG[FC_MARKET]||FC_MKT_CONFIG['all']).cutoff; });
 
   var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg"'
     + ' style="width:100%;min-width:700px;height:' + H + 'px">';
@@ -2326,7 +2373,7 @@ function fcRenderChart(days) {
     var cx2 = xp(cutIdx);
     svg += '<line x1="' + cx2 + '" y1="' + PT + '" x2="' + cx2 + '" y2="' + (H-PB)
       + '" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3"/>';
-    svg += '<text x="' + (cx2+3) + '" y="' + (PT+12) + '" font-size="10" fill="#f87171">Cut-off 22/4</text>';
+    svg += '<text x="' + (cx2+3) + '" y="' + (PT+12) + '" font-size="10" fill="#f87171">Cut-off ' + (FC_MKT_CONFIG[FC_MARKET]||FC_MKT_CONFIG['all']).cutoff.slice(8) + '/' + (FC_MKT_CONFIG[FC_MARKET]||FC_MKT_CONFIG['all']).cutoff.slice(5,7) + '</text>';
   }
 
   // Today line
@@ -2392,7 +2439,8 @@ function fcRenderTable(days) {
     var p  = d.date.split('-');
     var dl = p[2] + '/' + p[1];
     if (d.isToday)              dl += ' <span style="color:#a78bfa;font-size:9px">◀ hôm nay</span>';
-    if (d.date==='2026-04-22')  dl += ' <span style="color:#ef4444;font-size:9px">✂️</span>';
+    var mktCutoff = (FC_MKT_CONFIG[FC_MARKET] || FC_MKT_CONFIG['all']).cutoff;
+    if (d.date === mktCutoff) dl += ' <span style="color:#ef4444;font-size:9px">✂️</span>';
     if (d.isHarvest && !d.isToday && d.date !== '2026-04-21')
                                 dl += ' <span style="color:#f59e0b;font-size:9px">🌾</span>';
 
@@ -2449,9 +2497,20 @@ function fcRenderTable(days) {
 // ── Main render ───────────────────────────────────
 function renderForecast(d) {
   if (!d) return;
-  var aov  = FC_AOV_OVERRIDE || fcGetAov(d);
-  var days = fcBuildDays(d);
-  window._fcDays = days; // cache để setFCTypes dùng lại
+  var aov    = FC_AOV_OVERRIDE || fcGetAov(d);
+  var days   = fcBuildDays(d);
+  var mktCfg = FC_MKT_CONFIG[FC_MARKET] || FC_MKT_CONFIG['all'];
+  window._fcDays = days;
+
+  // Update titles & cutoff labels
+  var cutoffLabel = 'Cut-off ' + mktCfg.cutoff.slice(8) + '/' + mktCfg.cutoff.slice(5,7);
+  var endLabel    = mktCfg.end.slice(8) + '/' + mktCfg.end.slice(5,7);
+  var revTitle    = document.getElementById('fc-rev-title');
+  var lbl1        = document.getElementById('fc-cutoff-lbl-rev');
+  var lbl2        = document.getElementById('fc-cutoff-lbl-ord');
+  if (revTitle) revTitle.textContent = 'Revenue vs Spend vs Profit ' + mktCfg.label + ' — 6/4 → ' + endLabel;
+  if (lbl1)     lbl1.textContent = cutoffLabel;
+  if (lbl2)     lbl2.textContent = cutoffLabel;
 
   document.getElementById('fc-aov-display').textContent = cur(aov);
 
@@ -2466,9 +2525,9 @@ function renderForecast(d) {
   var realProfit= r2(pastOnly.reduce(function(s,x){ return s+x.profit; }, 0));
 
   document.getElementById('fc-kpis').innerHTML = [
-    kpi('Total Spend (Forecast)',  cur(tSpend),            '6/4 → 3/5 cả campaign'),
-    kpi('Total Revenue (Forecast)',cur(tRev),              'Orders × AOV', 'green'),
-    kpi('Est. Profit (Forecast)',  cur(tProfit),           'Rev × 61% − Spend', tProfit>=0?'green':'red'),
+    kpi('Total Spend (Forecast)',  cur(tSpend),   '6/4 → ' + endLabel + ' ' + mktCfg.label),
+    kpi('Total Revenue (Forecast)',cur(tRev),     'Orders × AOV', 'green'),
+    kpi('Est. Profit (Forecast)',  cur(tProfit),  'Rev × 61% − Spend', tProfit>=0?'green':'red'),
     kpi('Total Orders (Forecast)', nf(tOrders),            'Thực tế + Dự phóng', 'blue'),
     kpi('Avg %Ads',                fcPctBadge(avgPct),     'BE = 61%'),
     kpi('Spend đã tiêu',           cur(realSpend),         'Thực tế đến hôm nay', 'warn'),
@@ -2666,6 +2725,15 @@ function setFCTypes(btn, type) {
 }
 
 // ── Controls ──────────────────────────────────────
+function setFCMarket(mkt) {
+  FC_MARKET = mkt;
+  ['all','ES','IT'].forEach(function(m) {
+    var el = document.getElementById('fc-mkt-' + m.toLowerCase());
+    if (el) el.classList.toggle('active', m === mkt);
+  });
+  renderForecast(DATA);
+}
+
 function setFCPlan(plan) {
   FC_PLAN = plan;
   document.getElementById('fc-plan-a').classList.toggle('active', plan === 'A');
