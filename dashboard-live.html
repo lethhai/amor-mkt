@@ -2249,19 +2249,25 @@ function _fcBuildForMarket(d, mkt) {
   var aov      = FC_AOV_OVERRIDE || fcGetAov(d);
   var todayStr = today();
   var cpcAvg   = fcGetCpcAvg(d);
-  var cr0      = _fcGetCrYesterdayMkt(d, mkt); // CR baseline theo từng market
+  var cr0      = _fcGetCrYesterdayMkt(d, mkt);
   var mktCfg   = FC_MKT_CONFIG[mkt];
   var bc  = d.blendedByCountry      || {};
   var boc = d.shopifyOrderByCountry  || {};
-  var totalSpend = (d.blended        || {}).spend || 0;
+
+  // Ratio chỉ dùng làm fallback khi không có daily data theo country
+  var totalSpend = (d.blended            || {}).spend || 0;
   var totalRev   = (d.shopifyOrderTotals || {}).totalRevenue || 0;
   var mktSpendRatio = totalSpend > 0 ? ((bc[mkt]  || {}).spend        || 0) / totalSpend : 0.5;
   var mktRevRatio   = totalRev   > 0 ? ((boc[mkt] || {}).totalRevenue || 0) / totalRev   : 0.5;
+
+  // spendMap: scale từ dailyTrend blended × spend ratio (chưa có daily by country)
   var spendMap = {}, orderMap = {}, revMap = {}, clickMap = {};
   (d.dailyTrend || []).forEach(function(r) {
     spendMap[r.date] = (r.spend  || 0) * mktSpendRatio;
     clickMap[r.date] = (r.clicks || 0) * mktSpendRatio;
   });
+
+  // orderMap/revMap: ưu tiên data thực theo country, fallback ratio
   var dailyByC = d.shopifyOrderDailyByCountry || {};
   (d.shopifyOrderDaily || []).forEach(function(r) {
     if (dailyByC[r.date] && dailyByC[r.date][mkt]) {
@@ -2294,14 +2300,11 @@ function _fcBuildForMarket(d, mkt) {
     var isHarvest = date >= harvestStart && date <= mktCfg.end;
     var spend, orders, revenue, clicks, cr, cpc, scaleRule, scaleFactor;
     if (isPast) {
+      // True data từ Shopify — không tính toán, không paidRatio
       spend   = spendMap[date] || 0;
-      var shopifyOrd = orderMap[date] || 0;
-      revenue = revMap[date]   || r2(shopifyOrd * aov);
+      orders  = orderMap[date] || 0;
+      revenue = revMap[date]   || r2(orders * aov);
       clicks  = clickMap[date] || (cpcAvg > 0 ? r2(spend / cpcAvg) : 0);
-      var adsRow    = (d.dailyTrend || []).filter(function(r) { return r.date === date; })[0] || {};
-      var adsRevVal = (adsRow.revenue || 0) * mktSpendRatio;
-      var paidRatio = revenue > 0 ? Math.min(1, adsRevVal / revenue) : 1;
-      orders  = r2(shopifyOrd * paidRatio);
       cr      = clicks > 0 ? r2(orders / clicks * 100) : 0;
       cpc     = clicks > 0 ? r2(spend  / clicks)       : 0;
     } else {
@@ -2414,14 +2417,11 @@ function fcBuildDays(d) {
     var manual    = FC_MANUAL[date] || {};
     var spend, orders, revenue, clicks, cr, cpc, scaleRule, scaleFactor;
     if (isPast) {
+      // True data từ Shopify — không tính toán, không paidRatio
       spend   = spendMap[date] || 0;
-      var shopifyOrd = orderMap[date] || 0;
-      revenue = revMap[date]   || r2(shopifyOrd * aov);
+      orders  = orderMap[date] || 0;
+      revenue = revMap[date]   || r2(orders * aov);
       clicks  = clickMap[date] || (cpcAvg > 0 ? r2(spend / cpcAvg) : 0);
-      var adsRow    = (d.dailyTrend || []).filter(function(r) { return r.date === date; })[0] || {};
-      var adsRevVal = (adsRow.revenue || 0) * mktSpendRatio;
-      var paidRatio = revenue > 0 ? Math.min(1, adsRevVal / revenue) : 1;
-      orders  = r2(shopifyOrd * paidRatio);
       cr      = clicks > 0 ? r2(orders / clicks * 100) : 0;
       cpc     = clicks > 0 ? r2(spend  / clicks)       : 0;
     } else {
