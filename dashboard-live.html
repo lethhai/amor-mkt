@@ -2041,15 +2041,37 @@ var FC_END_ES = '2026-05-03';
 var FC_BE_PCT = 61;
 var FC_MARGIN = 0.61;
 
-// Harvesting hardcode
-var FC_HARVEST = {
-  '2026-04-21': 0.95,
-  '2026-04-22': 0.95,
-  '2026-04-23': 0.65,
-  '2026-04-24': 0.60
+// Harvesting theo market — bắt đầu từ cut-off
+var FC_HARVEST_BY_MKT = {
+  'ES': {
+    start: '2026-04-21',
+    dates: {
+      '2026-04-21': 0.95,
+      '2026-04-22': 0.95,
+      '2026-04-23': 0.65,
+      '2026-04-24': 0.60
+    }
+  },
+  'IT': {
+    start: '2026-04-29',
+    dates: {
+      '2026-04-29': 0.95,
+      '2026-04-30': 0.95,
+      '2026-05-01': 0.65,
+      '2026-05-02': 0.60
+    }
+  },
+  'all': {
+    start: '2026-04-21',
+    dates: {
+      '2026-04-21': 0.95,
+      '2026-04-22': 0.95,
+      '2026-04-23': 0.65,
+      '2026-04-24': 0.60
+    }
+  }
 };
-var FC_HARVEST_START    = '2026-04-21';
-var FC_WIND_DOWN_FACTOR = 0.7; // 25/4→3/5: -20%/ngày
+var FC_WIND_DOWN_FACTOR = 0.7; // Wind-down factor sau harvest dates
 
 // ── AOV từ last 7 days Shopify ──────────────────
 function fcGetAov(d) {
@@ -2209,10 +2231,12 @@ function fcBuildDays(d) {
     var isPast    = date < todayStr;
     var isToday   = date === todayStr;
     var isFuture  = date > todayStr;
-    // Harvest = sau cut-off của market (ngày đỉnh điểm xong, bắt đầu wind-down)
-    var harvestStart = mktCfg.cutoff;
-    var isHarvest = date >= FC_HARVEST_START && date <= mktCfg.end;
-    var manual    = FC_MANUAL[date] || {};
+    // Harvest theo market
+    var harvestCfg   = FC_HARVEST_BY_MKT[FC_MARKET] || FC_HARVEST_BY_MKT['all'];
+    var harvestStart = harvestCfg.start;
+    var harvestDates = harvestCfg.dates;
+    var isHarvest    = date >= harvestStart && date <= mktCfg.end;
+    var manual       = FC_MANUAL[date] || {};
 
     var spend, orders, revenue, clicks, cr, cpc, scaleRule, scaleFactor;
 
@@ -2235,8 +2259,8 @@ function fcBuildDays(d) {
       var baseSpend = prevSpend || 0;
 
       if (isHarvest) {
-        scaleFactor = FC_HARVEST[date] || FC_WIND_DOWN_FACTOR;
-        scaleRule   = FC_HARVEST[date]
+        scaleFactor = harvestDates[date] || FC_WIND_DOWN_FACTOR;
+        scaleRule   = harvestDates[date]
           ? '🌾 ×' + scaleFactor
           : '🌾 Wind-down ×' + FC_WIND_DOWN_FACTOR;
       } else {
@@ -2441,7 +2465,7 @@ function fcRenderTable(days) {
     if (d.isToday)              dl += ' <span style="color:#a78bfa;font-size:9px">◀ hôm nay</span>';
     var mktCutoff = (FC_MKT_CONFIG[FC_MARKET] || FC_MKT_CONFIG['all']).cutoff;
     if (d.date === mktCutoff) dl += ' <span style="color:#ef4444;font-size:9px">✂️</span>';
-    if (d.isHarvest && !d.isToday && d.date !== '2026-04-21')
+    if (d.isHarvest && !d.isToday && d.date !== (FC_HARVEST_BY_MKT[FC_MARKET]||FC_HARVEST_BY_MKT['all']).start)
                                 dl += ' <span style="color:#f59e0b;font-size:9px">🌾</span>';
 
     var rowCls = d.isToday ? 'fc-row-today' : d.isHarvest ? 'fc-row-harvest' : d.isPast ? 'fc-row-past' : '';
