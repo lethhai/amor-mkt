@@ -667,17 +667,18 @@ async function fetchGAS(from, to) {
 
 async function loadAll(from, to) {
   ov(true, 'Đang tải dữ liệu...');
+
+  var main, md, prev, prevFrom, prevTo;
   try {
     var mdFrom   = '2026-03-20';
     var mdTo     = today();
     var sameAsMd = (from === mdFrom && to === mdTo);
 
-    // Tính previous period cho WoW
-    var fromDate  = new Date(from + 'T12:00:00Z');
-    var toDate_   = new Date(to   + 'T12:00:00Z');
-    var diffDays  = Math.round((toDate_ - fromDate) / 86400000) + 1;
-    var prevTo    = addDays(from, -1);
-    var prevFrom  = addDays(prevTo, -(diffDays - 1));
+    var fromDate = new Date(from + 'T12:00:00Z');
+    var toDate_  = new Date(to   + 'T12:00:00Z');
+    var diffDays = Math.round((toDate_ - fromDate) / 86400000) + 1;
+    prevTo       = addDays(from, -1);
+    prevFrom     = addDays(prevTo, -(diffDays - 1));
 
     var fetches = [
       fetchGAS(from, to),
@@ -685,24 +686,36 @@ async function loadAll(from, to) {
       WOW_ON   ? fetchGAS(prevFrom, prevTo) : Promise.resolve(null)
     ];
     var results = await Promise.all(fetches);
-    var main = results[0];
-    var md   = results[1];
-    var prev = results[2];
-    if (!main.ok) throw new Error(main.error || 'GAS trả về lỗi');
+    main = results[0];
+    md   = results[1];
+    prev = results[2];
+
+    if (!main || !main.ok) throw new Error(
+      (main && main.error) ? main.error : 'GAS không trả về dữ liệu hợp lệ'
+    );
+
     DATA     = main;
-    MD_DATA  = md || main;
+    MD_DATA  = (md && md.ok) ? md : main;
     WOW_DATA = prev;
+
+  } catch(e) {
+    document.getElementById('ov-msg').textContent = '❌ Fetch lỗi: ' + e.message;
+    console.error('[loadAll] fetch error:', e);
+    return;
+  }
+
+  ov(false);
+
+  try {
     renderAll();
     document.getElementById('st-txt').textContent =
       fdFull(main.fromDate) + ' → ' + fdFull(main.toDate)
       + '  ·  ' + new Date(main.generatedAt).toLocaleTimeString('vi-VN')
       + '  (Spain time)'
       + (WOW_ON ? '  |  vs ' + fdFull(prevFrom) + '→' + fdFull(prevTo) : '');
-  } catch(e) {
-    document.getElementById('ov-msg').textContent = '❌ ' + e.message;
-    return;
+  } catch(renderErr) {
+    console.error('[renderAll] crash:', renderErr);
   }
-  ov(false);
 }
 
 function toggleWoW() {
