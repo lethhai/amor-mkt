@@ -680,15 +680,10 @@ async function loadAll(from, to) {
     prevTo       = addDays(from, -1);
     prevFrom     = addDays(prevTo, -(diffDays - 1));
 
-    var fetches = [
-      fetchGAS(from, to),
-      sameAsMd ? Promise.resolve(null) : fetchGAS(mdFrom, mdTo),
-      WOW_ON   ? fetchGAS(prevFrom, prevTo) : Promise.resolve(null)
-    ];
-    var results = await Promise.all(fetches);
-    main = results[0];
-    md   = results[1];
-    prev = results[2];
+    // Chạy tuần tự — tránh 429 concurrent limit của GAS
+    main = await fetchGAS(from, to);
+    md   = sameAsMd ? null : await fetchGAS(mdFrom, mdTo);
+    prev = WOW_ON   ? await fetchGAS(prevFrom, prevTo) : null;
 
     if (!main || !main.ok) throw new Error(
       (main && main.error) ? main.error : 'GAS không trả về dữ liệu hợp lệ'
