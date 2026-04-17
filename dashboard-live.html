@@ -2111,10 +2111,10 @@ function fcGetCpcAvg(d) {
   return clicks > 0 ? r2(spend / clicks) : 0.40;
 }
 
-// ── CPC tăng dần từ CPC_avg → $0.65 tại cut-off, giữ nguyên sau đó ──
+// ── CPC tăng dần từ CPC_avg → $0.95 tại cut-off, giữ nguyên sau đó ──
 function fcGetCpcForDay(date, cpcStart) {
   var peak    = (FC_MKT_CONFIG[FC_MARKET] || FC_MKT_CONFIG['all']).cutoff;
-  var cpcPeak = 0.70;
+  var cpcPeak = 0.95;
   if (date >= peak) return cpcPeak;
   var totalDays = fcDaysBetween(FC_START, peak);
   var dayIdx    = fcDaysBetween(FC_START, date);
@@ -2125,7 +2125,7 @@ function fcGetCpcForDay(date, cpcStart) {
 // Market-explicit version dùng cho 'all' mode
 function _fcGetCpcForDayMkt(date, cpcStart, mkt) {
   var peak    = FC_MKT_CONFIG[mkt].cutoff;
-  var cpcPeak = 0.70;
+  var cpcPeak = 0.95;
   if (date >= peak) return cpcPeak;
   var totalDays = fcDaysBetween(FC_START, peak);
   var dayIdx    = fcDaysBetween(FC_START, date);
