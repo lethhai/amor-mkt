@@ -1670,13 +1670,14 @@ function renderCampaignFromRows(d) {
     addMetric(byAccount[acct], r);
   });
 
+var trueTotals = {};
 trueRows.forEach(function(r) { addTrueMetric(trueTotals, r); });
 
-     var totalAds = d.blended || {};
-     var totalSpend = totalAds.spend || 0;
-     var trueRev = trueTotals.revenue || 0;
-     var trueRoas = totalSpend > 0 ? r2(trueRev / totalSpend) : 0;
-     var attrGap = r2((b.revenue || 0) - trueRev);
+var totalAds = d.blended || {};
+var totalSpend = totalAds.spend || 0;
+var trueRev = trueTotals.revenue || 0;
+var trueRoas = totalSpend > 0 ? r2(trueRev / totalSpend) : 0;
+var attrGap = r2((b.revenue || 0) - trueRev);
 
   document.getElementById('cp-kpis').innerHTML = [
     kpi('Blended Spend', cur(totalSpend), 'FB ' + cur(totalAds.fb_spend || 0) + ' · GG ' + cur(totalAds.gg_spend || 0)),
