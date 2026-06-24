@@ -289,6 +289,8 @@ thead th.sortable:hover{color:#a78bfa}
       <button class="filter-btn" onclick="setStoreMarket(this,'IT')">🇮🇹 IT</button>
     </div> 
     <div class="filter-bar" style="margin-bottom:12px" id="st-type-pills"></div>   
+    <div class="filter-bar" style="margin-bottom:12px" id="st-occasion-pills"></div>
+    <div class="filter-bar" style="margin-bottom:12px" id="st-interest-pills"></div>
     <div class="disclaimer">
       <div class="di">🛒</div>
       <p><strong>Dữ liệu thuần Shopify — Cấp độ Order &amp; Sản phẩm · Currency: USD ($)</strong>
@@ -332,6 +334,10 @@ thead th.sortable:hover{color:#a78bfa}
       Attr Revenue ở tab này = platform-attributed (FB pixel + GG conversion). Attr ROAS có thể bị double-count. Dùng True Revenue / True ROAS để đối chiếu hiệu quả thật.</p>
     </div>
     <div id="cp-kpis" class="kpi-grid"></div>
+    <div class="filter-bar" style="margin-bottom:12px" id="cp-market-pills"></div>
+    <div class="filter-bar" style="margin-bottom:12px" id="cp-type-filter-pills"></div>
+    <div class="filter-bar" style="margin-bottom:12px" id="cp-occasion-pills"></div>
+    <div class="filter-bar" style="margin-bottom:12px" id="cp-interest-pills"></div>
     <div class="g3">
       <div>
         <div class="st">Spend by Market</div>
@@ -395,13 +401,14 @@ thead th.sortable:hover{color:#a78bfa}
       <div class="st">Top 30 Products — Chi tiết</div>
       <div class="filter-bar">
         <input type="text" id="pi-search" placeholder="🔍 Tìm tên sản phẩm..." oninput="filterProducts()">
-        <button class="filter-btn active" data-mkt="all" onclick="setMktFilter(this,'all')">Tất cả</button>
-        <button class="filter-btn" data-mkt="ES" onclick="setMktFilter(this,'ES')">ES</button>
-        <button class="filter-btn" data-mkt="IT" onclick="setMktFilter(this,'IT')">IT</button>
+        <span id="pi-market-pills"></span>
         <button class="filter-btn" data-roas="below" onclick="setRoasFilter(this,'below')">⚠️ Dưới BE</button>
         <button class="filter-btn" data-roas="above" onclick="setRoasFilter(this,'above')">✅ Trên BE</button>
         <span style="font-size:11px;color:#475569;margin-left:4px" id="pi-count"></span>
       </div>
+      <div class="filter-bar" style="margin-bottom:12px" id="pi-type-pills"></div>
+      <div class="filter-bar" style="margin-bottom:12px" id="pi-occasion-pills"></div>
+      <div class="filter-bar" style="margin-bottom:12px" id="pi-interest-pills"></div>
       <div id="pi-top-tbl" class="twrap"></div>
     </div>
   </div>
@@ -611,7 +618,7 @@ function isServiceType(t) {
 // ═══════════════════════════════════════
 // CONFIG & STATE
 // ═══════════════════════════════════════
-var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxJTq8h_WEWyEB7QBpYBK66AWMOqK9ptHIG-Fc6gsgNOoXe0ssI31EFg8Dd_8racbXR/exec';
+var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyXNPAUAH-1D01TiGMTYNI9D8IV5iw65pfxOrFMsvp_xh_Ldrzi32-YjJ9Gb6dqogPa/exec';
 function getGasUrl() { return localStorage.getItem('gas_url') || DEFAULT_GAS_URL; }
 
 Chart.defaults.color       = '#64748b';
@@ -973,6 +980,14 @@ function renderStore(d) {
 
   var pillsEl = document.getElementById('st-type-pills');
   if (pillsEl) pillsEl.innerHTML = pillsHtml;
+  var fo = d.filterOptions || {};
+  renderFilterPills('st-occasion-pills', 'Occasion', fo.occasions || [], ST_OCCASIONS, 'setStoreOccasion');
+  renderFilterPills('st-interest-pills', 'Interest', fo.interests || [], ST_INTERESTS, 'setStoreInterest');
+
+  if ((d.shopifyRows || []).length && (ST_TYPES.length || ST_OCCASIONS.length || ST_INTERESTS.length)) {
+    renderStoreFromRows(d);
+    return;
+  }
 
   // ── Apply type filter ──
   if (ST_TYPES.length > 0) {
@@ -1288,6 +1303,117 @@ function renderStore(d) {
     '<table>' + headerHtml + bodyHtml + '</table>';
 }
 
+function renderStoreFromRows(d) {
+  var rows = (d.shopifyRows || []).filter(function(r) {
+    return rowMatchesFilters(r, {
+      market: ST_MARKET,
+      types: ST_TYPES,
+      occasions: ST_OCCASIONS,
+      interests: ST_INTERESTS
+    });
+  });
+
+  var totals = { revenue: 0, unitsSold: 0, orderLines: 0 };
+  var daily = {}, byMarket = {}, byType = {}, byProd = {};
+  rows.forEach(function(r) {
+    totals.revenue += r.revenue || 0;
+    totals.unitsSold += r.unitsSold || 0;
+    totals.orderLines += r.orderLines || 0;
+    if (!daily[r.date]) daily[r.date] = { date: r.date, totalRevenue: 0, items: 0, orders: 0, aov: 0 };
+    daily[r.date].totalRevenue += r.revenue || 0;
+    daily[r.date].items += r.unitsSold || 0;
+    daily[r.date].orders += r.orderLines || 0;
+
+    (r.markets || ['Unknown']).forEach(function(m) {
+      if (!byMarket[m]) byMarket[m] = { revenue: 0, unitsSold: 0, orderLines: 0 };
+      byMarket[m].revenue += (r.revenue || 0) / (r.markets || ['Unknown']).length;
+      byMarket[m].unitsSold += (r.unitsSold || 0) / (r.markets || ['Unknown']).length;
+      byMarket[m].orderLines += (r.orderLines || 0) / (r.markets || ['Unknown']).length;
+    });
+
+    var type = r.type || 'Unknown';
+    if (!byType[type]) byType[type] = { revenue: 0, unitsSold: 0, orderLines: 0 };
+    byType[type].revenue += r.revenue || 0;
+    byType[type].unitsSold += r.unitsSold || 0;
+    byType[type].orderLines += r.orderLines || 0;
+
+    var key = r.productId || r.title;
+    if (key) {
+      if (!byProd[key]) byProd[key] = Object.assign({}, r, { revenue: 0, unitsSold: 0, orderLines: 0 });
+      byProd[key].revenue += r.revenue || 0;
+      byProd[key].unitsSold += r.unitsSold || 0;
+      byProd[key].orderLines += r.orderLines || 0;
+    }
+  });
+
+  var dailyList = Object.keys(daily).sort().map(function(dt) {
+    var x = daily[dt];
+    x.totalRevenue = r2(x.totalRevenue);
+    x.aov = x.orders > 0 ? r2(x.totalRevenue / x.orders) : 0;
+    return x;
+  });
+  var aov = totals.orderLines > 0 ? r2(totals.revenue / totals.orderLines) : 0;
+  var aoq = totals.orderLines > 0 ? r2(totals.unitsSold / totals.orderLines) : 0;
+
+  document.getElementById('st-kpis').innerHTML = [
+    kpi('True Revenue', cur(totals.revenue), 'Filtered Shopify rows', 'green'),
+    kpi('Shipping', cur(0), 'Không phân bổ trong product filter', 'blue'),
+    kpi('True Orders', nf(totals.orderLines), 'Order lines theo filter', 'blue'),
+    kpi('True Items Sold', nf(totals.unitsSold), 'Filtered items'),
+    kpi('AOV', cur(aov), 'True Rev / Order Lines', 'blue'),
+    kpi('AOQ', nf(aoq, 1) + ' items', 'Items / Order Lines', 'blue')
+  ].join('');
+
+  mkCh('ch-st-daily', {
+    type: 'line',
+    data: { labels: dailyList.map(function(r) { return fd(r.date); }),
+      datasets: [{ label: 'True Revenue ($)', data: dailyList.map(function(r) { return r.totalRevenue || 0; }),
+        borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.08)', fill: true, pointRadius: 2, tension: .3 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { y: { grid: GRID, ticks: TICK_Y }, x: { grid: { display: false } } } }
+  });
+
+  var mktKeys = Object.keys(byMarket).filter(function(k) { return k !== 'Unknown'; });
+  mkCh('ch-st-market', {
+    type: 'doughnut',
+    data: { labels: mktKeys, datasets: [{ data: mktKeys.map(function(k) { return byMarket[k].revenue || 0; }),
+      backgroundColor: ['#f87171', '#4ade80', '#60a5fa'], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+  });
+
+  var typeKeys = Object.keys(byType).filter(function(k) { return k !== 'Unknown' && !isServiceType(k); })
+    .sort(function(a, b) { return (byType[b].revenue || 0) - (byType[a].revenue || 0); });
+  mkCh('ch-st-type', {
+    type: 'bar',
+    data: { labels: typeKeys, datasets: [
+      { type: 'bar', label: 'True Items Sold', data: typeKeys.map(function(k) { return byType[k].unitsSold || 0; }), xAxisID: 'xI', backgroundColor: 'rgba(167,139,250,.6)', borderRadius: 3 },
+      { type: 'line', label: 'True Revenue ($)', data: typeKeys.map(function(k) { return byType[k].revenue || 0; }), xAxisID: 'xR', borderColor: '#22c55e', pointRadius: 3, tension: .3 }
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { position: 'top' } },
+      scales: { xI: { position: 'bottom', grid: { display: false } }, xR: { position: 'top', grid: GRID, ticks: TICK_Y }, y: { grid: { display: false } } } }
+  });
+
+  mkCh('ch-st-orders', {
+    type: 'bar',
+    data: { labels: dailyList.map(function(r) { return fd(r.date); }), datasets: [
+      { type: 'bar', label: 'True Orders', data: dailyList.map(function(r) { return r.orders || 0; }), yAxisID: 'yO', backgroundColor: 'rgba(96,165,250,.55)', borderRadius: 3 },
+      { type: 'bar', label: 'True Items Sold', data: dailyList.map(function(r) { return r.items || 0; }), yAxisID: 'yO', backgroundColor: 'rgba(167,139,250,.45)', borderRadius: 3 },
+      { type: 'line', label: 'AOV ($)', data: dailyList.map(function(r) { return r.aov || 0; }), yAxisID: 'yA', borderColor: '#f59e0b', pointRadius: 2, tension: .3 }
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } },
+      scales: { yO: { position: 'left', grid: GRID }, yA: { position: 'right', grid: { display: false }, ticks: TICK_Y } } }
+  });
+
+  var prods = Object.values(byProd).sort(function(a, b) { return b.revenue - a.revenue; });
+  var bodyHtml = '<tbody>' + prods.slice(0, 25).map(function(p, i) {
+    var title = (p.title || p.productId || '').slice(0, 45);
+    var markets = (p.markets || []).map(function(m) { return '<span class="badge b-' + m.toLowerCase() + '">' + m + '</span>'; }).join(' ');
+    return '<tr><td>' + (i + 1) + '</td><td>' + title + '</td><td>' + (p.type || '') + '</td><td>' + markets + '</td><td class="num">' + cur(p.revenue) + '</td><td class="num">' + nf(p.orderLines) + '</td></tr>';
+  }).join('') + '</tbody>';
+  document.getElementById('st-products').innerHTML =
+    '<table><thead><tr><th>#</th><th>Product</th><th>Type</th><th>Market</th><th>True Revenue ($)</th><th>Order Lines</th></tr></thead>' + bodyHtml + '</table>';
+}
+
 function sortStProd(colIdx) {
   if (!window._stProdSort) window._stProdSort = { col: 4, dir: -1 };
   if (window._stProdSort.col === colIdx) window._stProdSort.dir *= -1;
@@ -1302,6 +1428,17 @@ function sortStProd(colIdx) {
 // FIX #10: showTypeDetail dùng dailyByType thực
 // ═══════════════════════════════════════
 function renderCampaign(d) {
+  var fo = d.filterOptions || {};
+  renderFilterPills('cp-market-pills', 'Market', fo.markets || [], CP_MARKETS, 'setCampaignMarket');
+  renderFilterPills('cp-type-filter-pills', 'Type', fo.types || [], CP_TYPES, 'setCampaignTypeFilter');
+  renderFilterPills('cp-occasion-pills', 'Occasion', fo.occasions || [], CP_OCCASIONS, 'setCampaignOccasion');
+  renderFilterPills('cp-interest-pills', 'Interest', fo.interests || [], CP_INTERESTS, 'setCampaignInterest');
+
+  if ((d.adsRows || []).length && (CP_MARKETS.length || CP_TYPES.length || CP_OCCASIONS.length || CP_INTERESTS.length)) {
+    renderCampaignFromRows(d);
+    return;
+  }
+
   var b  = d.blended  || {};
   var fb = d.fbTotals || {};
   var gg = d.ggTotals || {};
@@ -1482,6 +1619,180 @@ function renderCampaign(d) {
   );
 }
 
+function renderCampaignFromRows(d) {
+  var rows = (d.adsRows || []).filter(function(r) {
+    return rowMatchesFilters(r, {
+      markets: CP_MARKETS,
+      types: CP_TYPES,
+      occasions: CP_OCCASIONS,
+      interests: CP_INTERESTS
+    });
+  });
+  var trueRows = (d.shopifyRows || []).filter(function(r) {
+    return rowMatchesFilters(r, {
+      markets: CP_MARKETS,
+      types: CP_TYPES,
+      occasions: CP_OCCASIONS,
+      interests: CP_INTERESTS
+    });
+  });
+
+  var b = {}, fb = {}, gg = {}, byCountry = {}, byType = {}, byAccount = {}, daily = {};
+  rows.forEach(function(r) {
+    addMetric(b, r);
+    if (r.source === 'FB') addMetric(fb, r);
+    if (r.source === 'GG') addMetric(gg, r);
+
+    var dateKey = r.date || '';
+    if (!daily[dateKey]) daily[dateKey] = { date: dateKey, fb_spend: 0, fb_revenue: 0, gg_spend: 0, gg_revenue: 0 };
+    if (r.source === 'FB') {
+      daily[dateKey].fb_spend   = r2(daily[dateKey].fb_spend + (r.spend || 0));
+      daily[dateKey].fb_revenue = r2(daily[dateKey].fb_revenue + (r.revenue || 0));
+    }
+    if (r.source === 'GG') {
+      daily[dateKey].gg_spend   = r2(daily[dateKey].gg_spend + (r.spend || 0));
+      daily[dateKey].gg_revenue = r2(daily[dateKey].gg_revenue + (r.revenue || 0));
+    }
+
+    (r.markets || ['Unknown']).forEach(function(m) {
+      if (!byCountry[m]) byCountry[m] = {};
+      addMetric(byCountry[m], r);
+    });
+
+    var type = r.type || 'Unknown';
+    if (!byType[type]) byType[type] = { beRoas: r.beRoas || 1.63, fb_spend: 0, gg_spend: 0 };
+    addMetric(byType[type], r);
+    if (r.source === 'FB') byType[type].fb_spend = r2((byType[type].fb_spend || 0) + (r.spend || 0));
+    if (r.source === 'GG') byType[type].gg_spend = r2((byType[type].gg_spend || 0) + (r.spend || 0));
+
+    var acct = r.account || r.source || 'Unknown';
+    if (!byAccount[acct]) byAccount[acct] = {};
+    addMetric(byAccount[acct], r);
+  });
+
+  var trueTotals = {};
+  trueRows.forEach(function(r) { addTrueMetric(trueTotals, r); });
+  var trueRev = trueTotals.revenue || 0;
+  var trueRoas = b.spend > 0 ? r2(trueRev / b.spend) : 0;
+  var attrGap = r2((b.revenue || 0) - trueRev);
+
+  document.getElementById('cp-kpis').innerHTML = [
+    kpi('Blended Spend',    cur(b.spend || 0),    'FB ' + cur(fb.spend || 0) + ' · GG ' + cur(gg.spend || 0)),
+    kpi('Attr Revenue',     cur(b.revenue || 0),  'FB ' + cur(fb.revenue || 0) + ' · GG ' + cur(gg.revenue || 0)),
+    kpi('Attr ROAS',        nf(b.roas || 0, 2) + 'x', 'Platform-attributed', roasCls(b.roas || 0, 1.65)),
+    kpi('Attr CPA',         cur(b.cpa || 0),      nf(b.purchases || 0, 1) + ' attr purchases'),
+    kpi('True Revenue',     cur(trueRev),         'Shopify revenue theo filter', 'green'),
+    kpi('True ROAS',        nf(trueRoas, 2) + 'x', 'True Revenue / Spend', roasCls(trueRoas, 1.65)),
+    kpi('Attr Gap',         (attrGap >= 0 ? '+' : '') + cur(attrGap), 'Attr Revenue - True Revenue', attrGap <= 0 ? 'green' : 'warn'),
+    kpi('FB Impressions',   nf(fb.impressions || 0), 'CTR/filter'),
+    kpi('FB Clicks',        nf(fb.clicks || 0),   ''),
+    kpi('Add-to-Cart (FB)', nf(b.atc || 0),       ''),
+    kpi('GG Attr Purchases', nf(gg.purchases || 0, 1), 'Modeled attribution', 'blue')
+  ].join('');
+
+  var bcKeys = Object.keys(byCountry).filter(function(k) { return k.toLowerCase() !== 'unknown'; });
+  mkCh('ch-cp-mkt-donut', {
+    type: 'doughnut',
+    data: { labels: bcKeys,
+      datasets: [{ data: bcKeys.map(function(k) { return byCountry[k].spend || 0; }),
+        backgroundColor: ['#f87171', '#4ade80', '#60a5fa'], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right' },
+        tooltip: { callbacks: { label: function(ctx) { return ' ' + cur(ctx.raw) + ' spend'; } } } } }
+  });
+
+  var trend = Object.keys(daily).sort().map(function(k) { return daily[k]; });
+  mkCh('ch-cp-fb-daily', {
+    type: 'bar',
+    data: { labels: trend.map(function(r) { return fd(r.date); }),
+      datasets: [
+        { type: 'bar', label: 'FB Attr ROAS', data: trend.map(function(r) { return r.fb_spend > 0 ? r2(r.fb_revenue / r.fb_spend) : 0; }), yAxisID: 'yR', backgroundColor: 'rgba(167,139,250,.55)', borderRadius: 2 },
+        { type: 'line', label: 'FB Spend ($)', data: trend.map(function(r) { return r.fb_spend || 0; }), yAxisID: 'yS', borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,.08)', fill: true, pointRadius: 2, tension: .3 }
+      ] },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top' } },
+      scales: { yR: { position: 'right', grid: GRID, min: 0, title: { display: true, text: 'Attr ROAS' } }, yS: { position: 'left', grid: GRID, ticks: TICK_Y, title: { display: true, text: 'Spend ($)' } } } }
+  });
+  mkCh('ch-cp-gg-daily', {
+    type: 'bar',
+    data: { labels: trend.map(function(r) { return fd(r.date); }),
+      datasets: [
+        { type: 'bar', label: 'GG Attr ROAS', data: trend.map(function(r) { return r.gg_spend > 0 ? r2(r.gg_revenue / r.gg_spend) : 0; }), yAxisID: 'yR', backgroundColor: 'rgba(34,197,94,.5)', borderRadius: 2 },
+        { type: 'line', label: 'GG Spend ($)', data: trend.map(function(r) { return r.gg_spend || 0; }), yAxisID: 'yS', borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.08)', fill: true, pointRadius: 2, tension: .3 }
+      ] },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top' } },
+      scales: { yR: { position: 'right', grid: GRID, min: 0, title: { display: true, text: 'Attr ROAS' } }, yS: { position: 'left', grid: GRID, ticks: TICK_Y, title: { display: true, text: 'Spend ($)' } } } }
+  });
+
+  var typeList = Object.entries(byType).sort(function(a, b) { return b[1].spend - a[1].spend; });
+  var pillsEl = document.getElementById('cp-type-pills');
+  if (pillsEl) {
+    pillsEl.innerHTML = typeList.map(function(item) {
+      return '<button class="type-pill" data-type="' + item[0] + '">' + item[0] + '</button>';
+    }).join('');
+    pillsEl.querySelectorAll('.type-pill').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        pillsEl.querySelectorAll('.type-pill').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.toggle('active');
+        var active = pillsEl.querySelector('.type-pill.active');
+        if (active) showTypeDetailFiltered(active.dataset.type, rows);
+        else document.getElementById('cp-type-chart-box').style.display = 'none';
+      });
+    });
+  }
+
+  var typeRows = typeList.map(function(item) {
+    var type = item[0], m = item[1], be = m.beRoas || 1.63;
+    return [
+      '<strong>' + type + '</strong><span class="be">BE ' + nf(be, 2) + 'x</span>',
+      '<span class="num">' + cur(m.spend) + '</span>',
+      '<span class="num">' + cur(m.revenue) + '</span>',
+      '<span class="num" style="' + roasStyle(m.roas, be) + '">' + nf(m.roas, 2) + 'x</span>',
+      '<span class="num">' + cur(m.cpa) + '</span>',
+      '<span class="num">' + nf(m.purchases, 1) + '</span>',
+      '<span style="font-size:10px"><span style="color:#60a5fa">FB ' + cur(m.fb_spend || 0) + '</span> / <span style="color:#4ade80">GG ' + cur(m.gg_spend || 0) + '</span></span>'
+    ];
+  });
+  document.getElementById('cp-types-tbl').innerHTML = mkTable(['Product Type', 'Spend', 'Attr Revenue', 'Attr ROAS', 'Attr CPA', 'Attr Purchases', 'FB / GG'], typeRows);
+
+  var acctRows = Object.entries(byAccount).sort(function(a, b) { return b[1].spend - a[1].spend; }).map(function(item) {
+    var name = item[0], m = item[1];
+    return ['<strong>' + name + '</strong>', '<span class="num">' + cur(m.spend) + '</span>', '<span class="num">' + cur(m.revenue) + '</span>', '<span class="num" style="' + roasStyle(m.roas, 1.65) + '">' + nf(m.roas, 2) + 'x</span>', '<span class="num">' + cur(m.cpa) + '</span>', '<span class="num">' + nf(m.purchases, 1) + '</span>'];
+  });
+  document.getElementById('cp-accounts-tbl').innerHTML = mkTable(['Account', 'Spend', 'Attr Revenue', 'Attr ROAS', 'Attr CPA', 'Attr Purchases'], acctRows);
+
+  var totalMktSpend = bcKeys.reduce(function(s, k) { return s + (byCountry[k].spend || 0); }, 0);
+  var cpMktRows = bcKeys.sort(function(a, b) { return (byCountry[b].spend || 0) - (byCountry[a].spend || 0); }).map(function(k) {
+    var m = byCountry[k], spendPct = totalMktSpend > 0 ? r2(m.spend / totalMktSpend * 100) : 0;
+    return ['<span class="badge b-' + k.toLowerCase() + '">' + k + '</span>', '<span class="num">' + cur(m.spend) + '</span>', '<span class="num" style="color:#94a3b8;font-size:11px">' + pct(spendPct) + '</span>', '<span class="num">' + cur(m.revenue) + '</span>', '<span class="num" style="' + roasStyle(m.roas, 1.65) + '">' + nf(m.roas, 2) + 'x</span>', '<span class="num">' + nf(m.purchases, 1) + '</span>'];
+  });
+  document.getElementById('cp-mkt-tbl').innerHTML = mkTable(['Market', 'Spend', '% Spend', 'Attr Revenue', 'Attr ROAS', 'Attr Purchases'], cpMktRows);
+  document.getElementById('cp-crea-tbl').innerHTML = mkTable(['Note', 'Filtered Rows'], [['Creative URL detail', rows.length + ' ads rows matched filter']]);
+}
+
+function showTypeDetailFiltered(type, rows) {
+  var box = document.getElementById('cp-type-chart-box');
+  var title = document.getElementById('cp-type-chart-title');
+  title.textContent = type + ' — Spend ($) & Attr ROAS Daily';
+  box.style.display = 'block';
+  var daily = {};
+  (rows || []).filter(function(r) { return (r.type || 'Unknown') === type; }).forEach(function(r) {
+    var k = r.date || '';
+    if (!daily[k]) daily[k] = { date: k, spend: 0, revenue: 0 };
+    daily[k].spend = r2(daily[k].spend + (r.spend || 0));
+    daily[k].revenue = r2(daily[k].revenue + (r.revenue || 0));
+  });
+  var dates = Object.keys(daily).sort();
+  mkCh('ch-cp-type-trend', {
+    type: 'bar',
+    data: { labels: dates.map(fd), datasets: [
+      { type: 'bar', label: 'Attr ROAS', data: dates.map(function(k) { return daily[k].spend > 0 ? r2(daily[k].revenue / daily[k].spend) : 0; }), yAxisID: 'yR', backgroundColor: 'rgba(167,139,250,.55)', borderRadius: 2 },
+      { type: 'line', label: 'Spend ($)', data: dates.map(function(k) { return daily[k].spend || 0; }), yAxisID: 'yS', borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,.08)', fill: true, pointRadius: 2, tension: .3 }
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top' } },
+      scales: { yR: { position: 'right', grid: GRID, min: 0, title: { display: true, text: 'Attr ROAS' } }, yS: { position: 'left', grid: GRID, ticks: TICK_Y, title: { display: true, text: 'Spend ($)' } } } }
+  });
+}
+
 // FIX #10: showTypeDetail — dùng dailyByType từ WebApp v4.3
 function showTypeDetail(type, d) {
   var box   = document.getElementById('cp-type-chart-box');
@@ -1553,10 +1864,85 @@ var PI_MKT_FILTER = 'all';
 var PI_ROAS_FILTER= null;
 var PI_SORT       = { col: 6, dir: -1 }; // default: sort by Spend desc
 
+var ST_OCCASIONS = [];
+var ST_INTERESTS = [];
+var CP_MARKETS = [];
+var CP_TYPES = [];
+var CP_OCCASIONS = [];
+var CP_INTERESTS = [];
+var PI_TYPES_FILTER = [];
+var PI_OCCASIONS_FILTER = [];
+var PI_INTERESTS_FILTER = [];
+
+function arrHasAny(arr, selected) {
+  if (!selected || selected.length === 0) return true;
+  arr = arr || [];
+  for (var i = 0; i < selected.length; i++) {
+    if (arr.indexOf(selected[i]) > -1) return true;
+  }
+  return false;
+}
+
+function rowMatchesFilters(row, opts) {
+  opts = opts || {};
+  if (opts.market && opts.market !== 'all' && (row.markets || []).indexOf(opts.market) === -1) return false;
+  if (opts.markets && opts.markets.length && !arrHasAny(row.markets, opts.markets)) return false;
+  if (opts.types && opts.types.length && opts.types.indexOf(row.type) === -1) return false;
+  if (opts.occasions && opts.occasions.length && !arrHasAny(row.occasions, opts.occasions)) return false;
+  if (opts.interests && opts.interests.length && !arrHasAny(row.interests, opts.interests)) return false;
+  return true;
+}
+
+function renderFilterPills(containerId, label, options, selected, handlerName, allLabel) {
+  var el = document.getElementById(containerId);
+  if (!el) return;
+  options = (options || []).filter(Boolean);
+  var html = '<span style="font-size:11px;color:#475569;font-weight:600;margin-right:4px">' + label + ':</span>';
+  html += '<button class="filter-btn ' + (!selected || selected.length === 0 ? 'active' : '') + '" onclick="' + handlerName + '(this,\'\')">' + (allLabel || 'Tất cả') + '</button>';
+  html += options.map(function(v) {
+    var safe = String(v).replace(/'/g, "\\'");
+    var active = selected && selected.indexOf(v) > -1;
+    return '<button class="filter-btn ' + (active ? 'active' : '') + '" onclick="' + handlerName + '(this,\'' + safe + '\')">' + v + '</button>';
+  }).join('');
+  el.innerHTML = html;
+}
+
+
+function toggleFilterValue(selected, value) {
+  if (!value) return [];
+  var out = (selected || []).slice();
+  var idx = out.indexOf(value);
+  if (idx > -1) out.splice(idx, 1);
+  else out.push(value);
+  return out;
+}
+
+function addMetric(target, src) {
+  target.spend       = r2((target.spend       || 0) + (src.spend       || 0));
+  target.revenue     = r2((target.revenue     || 0) + (src.revenue     || 0));
+  target.purchases   = r2((target.purchases   || 0) + (src.purchases   || 0));
+  target.clicks      = r2((target.clicks      || 0) + (src.clicks      || 0));
+  target.impressions = r2((target.impressions || 0) + (src.impressions || 0));
+  target.atc         = r2((target.atc         || 0) + (src.atc         || 0));
+  target.roas        = target.spend > 0 ? r2(target.revenue / target.spend) : 0;
+  target.cpa         = target.purchases > 0 ? r2(target.spend / target.purchases) : 0;
+}
+
+function addTrueMetric(target, src) {
+  target.revenue    = r2((target.revenue    || 0) + (src.revenue    || 0));
+  target.unitsSold  = r2((target.unitsSold  || 0) + (src.unitsSold  || 0));
+  target.orderLines = r2((target.orderLines || 0) + (src.orderLines || 0));
+}
+
 function renderProducts(d) {
   var types    = d.byProductType || {};
   var top      = d.topProducts   || [];
   var typeList = Object.entries(types).sort(function(a, b) { return b[1].spend - a[1].spend; });
+  var fo = d.filterOptions || {};
+  renderFilterPills('pi-market-pills', 'Market', fo.markets || [], PI_MKT_FILTER === 'all' ? [] : [PI_MKT_FILTER], 'setProductMarket');
+  renderFilterPills('pi-type-pills', 'Type', fo.types || [], PI_TYPES_FILTER, 'setProductType');
+  renderFilterPills('pi-occasion-pills', 'Occasion', fo.occasions || [], PI_OCCASIONS_FILTER, 'setProductOccasion');
+  renderFilterPills('pi-interest-pills', 'Interest', fo.interests || [], PI_INTERESTS_FILTER, 'setProductInterest');
 
      var qualified = typeList.filter(function(x) {
   return x[0] !== 'Unknown' && x[1].spend > 50;
@@ -1646,6 +2032,8 @@ var worst = qualified.slice().sort(function(a,b) {
       fullUrl:   p.fullUrl || '',   
       type:      p.type || '',
       markets:   p.markets || [],
+      occasions: p.occasions || [],
+      interests: p.interests || [],
       spend:     p.spend || 0,
       trueRev:   p.true_revenue || 0,
       trueRoas:  p.true_roas || 0,
@@ -1667,10 +2055,13 @@ function renderPITable() {
   var filtered = PI_DATA.filter(function(p) {
     var matchSearch = !search || p.title.toLowerCase().indexOf(search.toLowerCase()) > -1;
     var matchMkt    = PI_MKT_FILTER === 'all' || p.markets.indexOf(PI_MKT_FILTER) > -1;
+    var matchType   = PI_TYPES_FILTER.length === 0 || PI_TYPES_FILTER.indexOf(p.type) > -1;
+    var matchOcc    = arrHasAny(p.occasions, PI_OCCASIONS_FILTER);
+    var matchInt    = arrHasAny(p.interests, PI_INTERESTS_FILTER);
     var matchRoas   = !PI_ROAS_FILTER
       || (PI_ROAS_FILTER === 'below' && p.trueRoas < p.beRoas)
       || (PI_ROAS_FILTER === 'above' && p.trueRoas >= p.beRoas);
-    return matchSearch && matchMkt && matchRoas;
+    return matchSearch && matchMkt && matchType && matchOcc && matchInt && matchRoas;
   });
 
   // Sort
@@ -1773,6 +2164,36 @@ function setStoreTypes(btn, type) {
   renderStore(DATA);
 }
 
+function setStoreOccasion(btn, value) {
+  ST_OCCASIONS = toggleFilterValue(ST_OCCASIONS, value);
+  renderStore(DATA);
+}
+
+function setStoreInterest(btn, value) {
+  ST_INTERESTS = toggleFilterValue(ST_INTERESTS, value);
+  renderStore(DATA);
+}
+
+function setCampaignMarket(btn, value) {
+  CP_MARKETS = toggleFilterValue(CP_MARKETS, value);
+  renderCampaign(DATA);
+}
+
+function setCampaignTypeFilter(btn, value) {
+  CP_TYPES = toggleFilterValue(CP_TYPES, value);
+  renderCampaign(DATA);
+}
+
+function setCampaignOccasion(btn, value) {
+  CP_OCCASIONS = toggleFilterValue(CP_OCCASIONS, value);
+  renderCampaign(DATA);
+}
+
+function setCampaignInterest(btn, value) {
+  CP_INTERESTS = toggleFilterValue(CP_INTERESTS, value);
+  renderCampaign(DATA);
+}
+
 function renderPITypesTable() {
   var colKeys = ['key','be','spend','trueRev','trueRoas','attrRev','attrRoas','gap','truePurch','trueCpa'];
   var sorted  = PI_TYPES_DATA.slice().sort(function(a, b) {
@@ -1846,6 +2267,30 @@ function setMktFilter(btn, mkt) {
   document.querySelectorAll('[data-mkt]').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
   renderPITable();
+}
+
+function setProductMarket(btn, mkt) {
+  PI_MKT_FILTER = mkt || 'all';
+  renderPITable();
+  renderProducts(DATA);
+}
+
+function setProductType(btn, value) {
+  PI_TYPES_FILTER = toggleFilterValue(PI_TYPES_FILTER, value);
+  renderPITable();
+  renderProducts(DATA);
+}
+
+function setProductOccasion(btn, value) {
+  PI_OCCASIONS_FILTER = toggleFilterValue(PI_OCCASIONS_FILTER, value);
+  renderPITable();
+  renderProducts(DATA);
+}
+
+function setProductInterest(btn, value) {
+  PI_INTERESTS_FILTER = toggleFilterValue(PI_INTERESTS_FILTER, value);
+  renderPITable();
+  renderProducts(DATA);
 }
 
 function setRoasFilter(btn, val) {
@@ -2355,7 +2800,7 @@ function _fcBuildForMarket(d, mkt) {
         var prevPctAds2 = pctAdsHist[addDays(date, -1)] || 0;
         var rule2       = fcGetRule(delta2, FC_PLAN, prevPctAds2);
         scaleFactor = rule2.factor;
-        scaleRule   = rule2.label + ' (Δ' + (delta2 >= 0 ? '+' : '') + nf(delta2, 1) + '%)';
+        scaleRule   = rule2.label + ' (Î”' + (delta2 >= 0 ? '+' : '') + nf(delta2, 1) + '%)';
       }
       spend   = manual.spend  !== undefined ? manual.spend  : r2((prevSpend || 0) * scaleFactor);
       cr      = r2(_fcGetCrForDayMkt(date, cr0, FC_PLAN, mkt) * 100);
