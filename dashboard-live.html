@@ -1670,14 +1670,16 @@ function renderCampaignFromRows(d) {
     addMetric(byAccount[acct], r);
   });
 
-  var trueTotals = {};
-  trueRows.forEach(function(r) { addTrueMetric(trueTotals, r); });
-  var trueRev = trueTotals.revenue || 0;
-  var trueRoas = b.spend > 0 ? r2(trueRev / b.spend) : 0;
-  var attrGap = r2((b.revenue || 0) - trueRev);
+trueRows.forEach(function(r) { addTrueMetric(trueTotals, r); });
+
+     var totalAds = d.blended || {};
+     var totalSpend = totalAds.spend || 0;
+     var trueRev = trueTotals.revenue || 0;
+     var trueRoas = totalSpend > 0 ? r2(trueRev / totalSpend) : 0;
+     var attrGap = r2((b.revenue || 0) - trueRev);
 
   document.getElementById('cp-kpis').innerHTML = [
-    kpi('Blended Spend',    cur(b.spend || 0),    'FB ' + cur(fb.spend || 0) + ' · GG ' + cur(gg.spend || 0)),
+    kpi('Blended Spend', cur(totalSpend), 'FB ' + cur(totalAds.fb_spend || 0) + ' · GG ' + cur(totalAds.gg_spend || 0)),
     kpi('Attr Revenue',     cur(b.revenue || 0),  'FB ' + cur(fb.revenue || 0) + ' · GG ' + cur(gg.revenue || 0)),
     kpi('Attr ROAS',        nf(b.roas || 0, 2) + 'x', 'Platform-attributed', roasCls(b.roas || 0, 1.65)),
     kpi('Attr CPA',         cur(b.cpa || 0),      nf(b.purchases || 0, 1) + ' attr purchases'),
