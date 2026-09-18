@@ -1270,43 +1270,20 @@ function renderStore(d) {
     if (mkt !== 'all' && (p.markets || []).indexOf(mkt) === -1) return false;
     return true;
   });
-  var rows  = prods.slice(0, 25).map(function(p, i) {
-    var title    = (p.title || p.productId || '').slice(0, 45);
-    
-    // Nối đúng domain Amor1970s
-    var finalUrl = (p.fullUrl && p.fullUrl.indexOf('http') === 0) 
-                    ? p.fullUrl 
-                    : 'https://amor1970s.com/products/' + (p.fullUrl || p.productId || '');
-                    
-    var nameCell = p.fullUrl
-      ? '<a href="' + finalUrl + '" target="_blank" style="color:#a78bfa;text-decoration:underline;font-size:11px">' + title + '</a>'
-      : '<span style="font-size:11px">' + title + '</span>';
-      
-    var markets  = (p.markets || []).map(function(m) {
-      return '<span class="badge b-' + m.toLowerCase() + '">' + m + '</span>';
-    }).join(' ') || '–';
-    
-    return [
-      '<span style="color:#475569">' + (i + 1) + '</span>',
-      nameCell,
-      '<span style="font-size:10px;color:#a78bfa">' + (p.type || '–') + '</span>',
-      markets,
-      '<span class="num">' + cur(p.revenue)   + '</span>',
-      '<span class="num">' + nf(p.orderLines) + '</span>'
-    ];
-  });
+
   // Sort top products
-  var ST_PROD_SORT = window._stProdSort || { col: 4, dir: -1 };
+  var ST_PROD_SORT = window._stProdSort || { col: 7, dir: -1 };
   var sortedProds = prods.slice().sort(function(a, b) {
-    var keys = ['', '', '', '', 'revenue', 'orderLines'];
+    var keys = ['', 'productId', 'imageUrl', 'title', 'type', 'markets', 'orderLines', 'revenue'];
     var av = a[keys[ST_PROD_SORT.col]] || 0;
     var bv = b[keys[ST_PROD_SORT.col]] || 0;
-    return ST_PROD_SORT.dir * (bv - av);
+    if (typeof av === 'string') return ST_PROD_SORT.dir * av.localeCompare(bv);
+    return ST_PROD_SORT.dir * ((av || 0) - (bv || 0));
   });
 
-  var stHeads = ['#', 'Product', 'Type', 'Market', 'True Revenue ($)', 'Order Lines'];
+  var stHeads = ['#', 'ID', 'Preview', 'Product', 'Type', 'Market', 'True Orders', 'True Revenue ($)'];
   var headerHtml = '<thead><tr>' + stHeads.map(function(h, i) {
-    if (i < 4) return '<th>' + h + '</th>';
+    if (i < 6) return '<th>' + h + '</th>';
     var ind = (ST_PROD_SORT.col === i) ? (ST_PROD_SORT.dir === 1 ? ' ▲' : ' ▼') : '';
     return '<th class="sortable" onclick="sortStProd(' + i + ')">'
       + h + '<span class="sort-indicator">' + ind + '</span></th>';
@@ -1314,22 +1291,32 @@ function renderStore(d) {
 
   var bodyHtml = '<tbody>' + sortedProds.slice(0, 25).map(function(p, i) {
     var title   = (p.title || p.productId || '').slice(0, 45);
-    var finalUrl= (p.fullUrl && p.fullUrl.indexOf('http') === 0)
-                  ? p.fullUrl
-                  : 'https://amor1970s.com/products/' + (p.fullUrl || p.productId || '');
-    var nameCell= p.fullUrl
-      ? '<a href="' + finalUrl + '" target="_blank" style="color:#a78bfa;text-decoration:underline;font-size:11px">' + title + '</a>'
-      : '<span style="font-size:11px">' + title + '</span>';
+    var finalUrl = productUrlFromFullUrl(p.fullUrl, p.productId);
+    var idCell = finalUrl
+      ? '<a class="product-id-link" href="' + escHtml(finalUrl) + '" target="_blank" rel="noopener" title="Mở sản phẩm">'
+          + escHtml(p.productId || '–') + '</a>'
+      : '<span style="font-size:10px;color:#94a3b8">' + escHtml(p.productId || '–') + '</span>';
+    var previewCell = p.imageUrl
+      ? '<button class="product-thumb-btn" onclick="openProductPreviewFromEl(this)" '
+          + 'data-img="' + escHtml(p.imageUrl) + '" '
+          + 'data-title="' + escHtml(p.title || p.productId || '') + '" '
+          + 'data-url="' + escHtml(finalUrl) + '" '
+          + 'title="Click để xem ảnh lớn">'
+          + '<img class="product-thumb" src="' + escHtml(p.imageUrl) + '" alt="' + escHtml(p.title || 'Product preview') + '" loading="lazy">'
+        + '</button>'
+      : '<span class="product-thumb-empty">No img</span>';
     var markets = (p.markets || []).map(function(m) {
-      return '<span class="badge b-' + m.toLowerCase() + '">' + m + '</span>';
+      return '<span class="badge b-' + escHtml(m).toLowerCase() + '">' + escHtml(m) + '</span>';
     }).join(' ') || '–';
     return '<tr>'
       + '<td><span style="color:#475569">' + (i+1) + '</span></td>'
-      + '<td>' + nameCell + '</td>'
-      + '<td><span style="font-size:10px;color:#a78bfa">' + (p.type||'–') + '</span></td>'
+      + '<td>' + idCell + '</td>'
+      + '<td>' + previewCell + '</td>'
+      + '<td><span style="font-size:11px" title="' + escHtml(p.title || '') + '">' + escHtml(title) + '</span></td>'
+      + '<td><span style="font-size:10px;color:#a78bfa">' + escHtml(p.type||'–') + '</span></td>'
       + '<td>' + markets + '</td>'
-      + '<td class="num">' + cur(p.revenue) + '</td>'
       + '<td class="num">' + nf(p.orderLines) + '</td>'
+      + '<td class="num">' + cur(p.revenue) + '</td>'
       + '</tr>';
   }).join('') + '</tbody>';
 
@@ -1441,15 +1428,40 @@ function renderStoreFromRows(d) {
   var prods = Object.values(byProd).sort(function(a, b) { return b.revenue - a.revenue; });
   var bodyHtml = '<tbody>' + prods.slice(0, 25).map(function(p, i) {
     var title = (p.title || p.productId || '').slice(0, 45);
-    var markets = (p.markets || []).map(function(m) { return '<span class="badge b-' + m.toLowerCase() + '">' + m + '</span>'; }).join(' ');
-    return '<tr><td>' + (i + 1) + '</td><td>' + title + '</td><td>' + (p.type || '') + '</td><td>' + markets + '</td><td class="num">' + cur(p.revenue) + '</td><td class="num">' + nf(p.orderLines) + '</td></tr>';
+    var finalUrl = productUrlFromFullUrl(p.fullUrl, p.productId);
+    var idCell = finalUrl
+      ? '<a class="product-id-link" href="' + escHtml(finalUrl) + '" target="_blank" rel="noopener" title="Mở sản phẩm">'
+          + escHtml(p.productId || '–') + '</a>'
+      : '<span style="font-size:10px;color:#94a3b8">' + escHtml(p.productId || '–') + '</span>';
+    var previewCell = p.imageUrl
+      ? '<button class="product-thumb-btn" onclick="openProductPreviewFromEl(this)" '
+          + 'data-img="' + escHtml(p.imageUrl) + '" '
+          + 'data-title="' + escHtml(p.title || p.productId || '') + '" '
+          + 'data-url="' + escHtml(finalUrl) + '" '
+          + 'title="Click để xem ảnh lớn">'
+          + '<img class="product-thumb" src="' + escHtml(p.imageUrl) + '" alt="' + escHtml(p.title || 'Product preview') + '" loading="lazy">'
+        + '</button>'
+      : '<span class="product-thumb-empty">No img</span>';
+    var markets = (p.markets || []).map(function(m) {
+      return '<span class="badge b-' + escHtml(m).toLowerCase() + '">' + escHtml(m) + '</span>';
+    }).join(' ') || '–';
+    return '<tr>'
+      + '<td><span style="color:#475569">' + (i + 1) + '</span></td>'
+      + '<td>' + idCell + '</td>'
+      + '<td>' + previewCell + '</td>'
+      + '<td><span style="font-size:11px" title="' + escHtml(p.title || '') + '">' + escHtml(title) + '</span></td>'
+      + '<td><span style="font-size:10px;color:#a78bfa">' + escHtml(p.type || '–') + '</span></td>'
+      + '<td>' + markets + '</td>'
+      + '<td class="num">' + nf(p.orderLines) + '</td>'
+      + '<td class="num">' + cur(p.revenue) + '</td>'
+      + '</tr>';
   }).join('') + '</tbody>';
   document.getElementById('st-products').innerHTML =
-    '<table><thead><tr><th>#</th><th>Product</th><th>Type</th><th>Market</th><th>True Revenue ($)</th><th>Order Lines</th></tr></thead>' + bodyHtml + '</table>';
+    '<table><thead><tr><th>#</th><th>ID</th><th>Preview</th><th>Product</th><th>Type</th><th>Market</th><th>True Orders</th><th>True Revenue ($)</th></tr></thead>' + bodyHtml + '</table>';
 }
 
 function sortStProd(colIdx) {
-  if (!window._stProdSort) window._stProdSort = { col: 4, dir: -1 };
+  if (!window._stProdSort) window._stProdSort = { col: 7, dir: -1 };
   if (window._stProdSort.col === colIdx) window._stProdSort.dir *= -1;
   else { window._stProdSort.col = colIdx; window._stProdSort.dir = -1; }
   renderStore(DATA);
