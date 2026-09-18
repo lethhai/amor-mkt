@@ -184,7 +184,9 @@ tbody tr:hover{background:#181b2e}
 .filter-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
 .filter-bar input[type=text]{background:#1a1d30;border:1px solid #2d3154;color:#e2e8f0;
   border-radius:6px;padding:5px 10px;font-size:11px;outline:none;width:220px}
-.filter-bar input[type=text]:focus{border-color:#6366f1}
+.filter-bar input[type=date]{background:#1a1d30;border:1px solid #2d3154;color:#e2e8f0;
+  border-radius:6px;padding:5px 10px;font-size:11px;outline:none}
+.filter-bar input[type=text]:focus,.filter-bar input[type=date]:focus{border-color:#6366f1}
 .filter-bar input[type=text]::placeholder{color:#475569}
 .filter-btn{padding:4px 10px;border-radius:20px;border:1px solid #2d3154;
   background:transparent;color:#94a3b8;font-size:11px;font-weight:600;
@@ -435,6 +437,11 @@ thead th.sortable:hover{color:#a78bfa}
       <div class="st">Top 30 Products — Chi tiết</div>
       <div class="filter-bar">
         <input type="text" id="pi-search" placeholder="🔍 Tìm tên sản phẩm..." oninput="filterProducts()">
+        <span style="font-size:11px;color:#475569;font-weight:600">Created:</span>
+        <input type="date" id="pi-created-from" onchange="setProductCreatedFilter()">
+        <span style="color:#475569">→</span>
+        <input type="date" id="pi-created-to" onchange="setProductCreatedFilter()">
+        <button class="filter-btn" onclick="clearProductCreatedFilter()">Tất cả ngày tạo</button>
         <span id="pi-market-pills"></span>
         <button class="filter-btn" data-roas="below" onclick="setRoasFilter(this,'below')">⚠️ Dưới BE</button>
         <button class="filter-btn" data-roas="above" onclick="setRoasFilter(this,'above')">✅ Trên BE</button>
@@ -444,6 +451,7 @@ thead th.sortable:hover{color:#a78bfa}
       <div class="filter-bar" style="margin-bottom:12px" id="pi-occasion-pills"></div>
       <div class="filter-bar" style="margin-bottom:12px" id="pi-interest-pills"></div>
       <div id="pi-top-tbl" class="twrap"></div>
+      <div id="pi-pager" class="filter-bar" style="justify-content:flex-end;margin-top:-6px"></div>
     </div>
   </div>
 
@@ -652,7 +660,7 @@ function isServiceType(t) {
 // ═══════════════════════════════════════
 // CONFIG & STATE
 // ═══════════════════════════════════════
-var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzLrVtk55W812h_qK-uWvEO9mUguF6G22hrO6i04ERL2XeVDZHKPGhEY2r0_q6DfI2Y/exec';
+var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyYxK1qf90CMEtEAS9os0si4m7EWCjnw3S-wmzAwKKjvhi3XNAGuXu0qQh4drT-LDdE/exec';
 function getGasUrl() { return localStorage.getItem('gas_url') || DEFAULT_GAS_URL; }
 
 Chart.defaults.color       = '#64748b';
@@ -1272,18 +1280,18 @@ function renderStore(d) {
   });
 
   // Sort top products
-  var ST_PROD_SORT = window._stProdSort || { col: 7, dir: -1 };
+  var ST_PROD_SORT = window._stProdSort || { col: 8, dir: -1 };
   var sortedProds = prods.slice().sort(function(a, b) {
-    var keys = ['', 'productId', 'imageUrl', 'title', 'type', 'markets', 'orderLines', 'revenue'];
+    var keys = ['', 'productId', 'imageUrl', 'productCreatedAt', 'title', 'type', 'markets', 'orderLines', 'revenue'];
     var av = a[keys[ST_PROD_SORT.col]] || 0;
     var bv = b[keys[ST_PROD_SORT.col]] || 0;
     if (typeof av === 'string') return ST_PROD_SORT.dir * av.localeCompare(bv);
     return ST_PROD_SORT.dir * ((av || 0) - (bv || 0));
   });
 
-  var stHeads = ['#', 'ID', 'Preview', 'Product', 'Type', 'Market', 'True Orders', 'True Revenue ($)'];
+  var stHeads = ['#', 'ID', 'Preview', 'Product Created At', 'Product', 'Type', 'Market', 'True Orders', 'True Revenue ($)'];
   var headerHtml = '<thead><tr>' + stHeads.map(function(h, i) {
-    if (i < 6) return '<th>' + h + '</th>';
+    if (i < 7) return '<th>' + h + '</th>';
     var ind = (ST_PROD_SORT.col === i) ? (ST_PROD_SORT.dir === 1 ? ' ▲' : ' ▼') : '';
     return '<th class="sortable" onclick="sortStProd(' + i + ')">'
       + h + '<span class="sort-indicator">' + ind + '</span></th>';
@@ -1312,6 +1320,7 @@ function renderStore(d) {
       + '<td><span style="color:#475569">' + (i+1) + '</span></td>'
       + '<td>' + idCell + '</td>'
       + '<td>' + previewCell + '</td>'
+      + '<td><span style="font-size:10px;color:#94a3b8">' + escHtml(isoDateOnly(p.productCreatedAt) || '–') + '</span></td>'
       + '<td><span style="font-size:11px" title="' + escHtml(p.title || '') + '">' + escHtml(title) + '</span></td>'
       + '<td><span style="font-size:10px;color:#a78bfa">' + escHtml(p.type||'–') + '</span></td>'
       + '<td>' + markets + '</td>'
@@ -1449,6 +1458,7 @@ function renderStoreFromRows(d) {
       + '<td><span style="color:#475569">' + (i + 1) + '</span></td>'
       + '<td>' + idCell + '</td>'
       + '<td>' + previewCell + '</td>'
+      + '<td><span style="font-size:10px;color:#94a3b8">' + escHtml(isoDateOnly(p.productCreatedAt) || '–') + '</span></td>'
       + '<td><span style="font-size:11px" title="' + escHtml(p.title || '') + '">' + escHtml(title) + '</span></td>'
       + '<td><span style="font-size:10px;color:#a78bfa">' + escHtml(p.type || '–') + '</span></td>'
       + '<td>' + markets + '</td>'
@@ -1457,11 +1467,11 @@ function renderStoreFromRows(d) {
       + '</tr>';
   }).join('') + '</tbody>';
   document.getElementById('st-products').innerHTML =
-    '<table><thead><tr><th>#</th><th>ID</th><th>Preview</th><th>Product</th><th>Type</th><th>Market</th><th>True Orders</th><th>True Revenue ($)</th></tr></thead>' + bodyHtml + '</table>';
+    '<table><thead><tr><th>#</th><th>ID</th><th>Preview</th><th>Product Created At</th><th>Product</th><th>Type</th><th>Market</th><th>True Orders</th><th>True Revenue ($)</th></tr></thead>' + bodyHtml + '</table>';
 }
 
 function sortStProd(colIdx) {
-  if (!window._stProdSort) window._stProdSort = { col: 7, dir: -1 };
+  if (!window._stProdSort) window._stProdSort = { col: 8, dir: -1 };
   if (window._stProdSort.col === colIdx) window._stProdSort.dir *= -1;
   else { window._stProdSort.col = colIdx; window._stProdSort.dir = -1; }
   renderStore(DATA);
@@ -1908,7 +1918,11 @@ var PI_TYPES_DATA  = [];   // raw type rows for sort
 var PI_TYPES_SORT  = { col: 2, dir: -1 };
 var PI_MKT_FILTER = 'all';
 var PI_ROAS_FILTER= null;
-var PI_SORT       = { col: 7, dir: -1 }; // default: sort by True Revenue desc
+var PI_SORT       = { col: 8, dir: -1 }; // default: sort by True Revenue desc
+var PI_PAGE       = 1;
+var PI_PAGE_SIZE  = 25;
+var PI_CREATED_FROM = '';
+var PI_CREATED_TO   = '';
 
 var ST_OCCASIONS = [];
 var ST_INTERESTS = [];
@@ -1941,6 +1955,20 @@ function productUrlFromFullUrl(fullUrl, productId) {
   if (fullUrl.indexOf('/products/') === 0) return 'https://amor1970s.com' + fullUrl;
   if (fullUrl.indexOf('products/') === 0) return 'https://amor1970s.com/' + fullUrl;
   return 'https://amor1970s.com/products/' + fullUrl;
+}
+
+function isoDateOnly(v) {
+  v = String(v || '').trim();
+  if (!v) return '';
+  return v.substring(0, 10);
+}
+
+function dateInRange(v, from, to) {
+  v = isoDateOnly(v);
+  if (!v && (from || to)) return false;
+  if (from && v < from) return false;
+  if (to && v > to) return false;
+  return true;
 }
 
 function openProductPreviewFromEl(el) {
@@ -2027,6 +2055,9 @@ function addTrueMetric(target, src) {
 function renderProducts(d) {
   var types    = d.byProductType || {};
   var top      = d.topProducts   || [];
+  var orderedProducts = (d.shopifyTopProducts || []).filter(function(p) {
+    return !isServiceType(p.type) && (p.orderLines || 0) >= 1;
+  });
   var typeList = Object.entries(types).sort(function(a, b) { return b[1].spend - a[1].spend; });
   var fo = d.filterOptions || {};
   renderFilterPills('pi-market-pills', 'Market', fo.markets || [], PI_MKT_FILTER === 'all' ? [] : [PI_MKT_FILTER], 'setProductMarket');
@@ -2046,7 +2077,7 @@ var worst = qualified.slice().sort(function(a,b) {
 
   document.getElementById('pi-kpis').innerHTML = [
     kpi('Product Types',     typeList.length, 'Từ SHOPIFY_PRODUCT metafield (cột M)'),
-    kpi('Products w/ Spend', top.length,      'Có FB hoặc GG spend'),
+    kpi('Products w/ Orders', orderedProducts.length, 'Có từ 1 order trong date range'),
     best  ? kpi('Best: '  + best[0],  nf(best[1].true_roas,  2) + 'x', cur(best[1].spend),  'green') : '',
     worst ? kpi('Worst: ' + worst[0], nf(worst[1].true_roas, 2) + 'x', cur(worst[1].spend), 'red')   : '',
   ].join('');
@@ -2113,27 +2144,38 @@ var worst = qualified.slice().sort(function(a,b) {
     }
   });
 
-  // ── Lưu data gốc để sort/filter ──
-  PI_DATA = top.slice(0, 30).map(function(p, i) {
+  // ── Lưu data gốc để sort/filter/page
+  // Bảng Product lấy theo Shopify true orders, sau đó merge thêm ads metrics nếu có.
+  var adByProduct = {};
+  (top || []).forEach(function(p) {
+    var key = p.productId || p.title;
+    if (key) adByProduct[key] = p;
+  });
+
+  PI_DATA = orderedProducts.map(function(p, i) {
+    var ad = adByProduct[p.productId] || adByProduct[p.title] || {};
+    var spend = ad.spend || 0;
+    var trueRev = p.revenue || 0;
     return {
       idx:       i + 1,
       productId: p.productId || '',
       title:     p.title || p.productId || '',
       fullUrl:   p.fullUrl || '',   
       imageUrl:  p.imageUrl || '',
+      productCreatedAt: isoDateOnly(p.productCreatedAt || ''),
       type:      p.type || '',
       markets:   p.markets || [],
       occasions: p.occasions || [],
       interests: p.interests || [],
-      spend:     p.spend || 0,
-      trueRev:   p.true_revenue || 0,
-      trueRoas:  p.true_roas || 0,
-      attrRev:   p.revenue || 0,
-      attrRoas:  p.roas || 0,
-      truePurch: p.true_purchases || 0,
-      fbSpend:   p.fb_spend || 0,
-      ggSpend:   p.gg_spend || 0,
-      beRoas:    p.beRoas || 1.63
+      spend:     spend,
+      trueRev:   trueRev,
+      trueRoas:  spend > 0 ? r2(trueRev / spend) : 0,
+      attrRev:   ad.revenue || 0,
+      attrRoas:  ad.roas || 0,
+      truePurch: p.orderLines || 0,
+      fbSpend:   ad.fb_spend || 0,
+      ggSpend:   ad.gg_spend || 0,
+      beRoas:    ad.beRoas || 1.63
     };
   });
 
@@ -2149,15 +2191,16 @@ function renderPITable() {
     var matchType   = PI_TYPES_FILTER.length === 0 || PI_TYPES_FILTER.indexOf(p.type) > -1;
     var matchOcc    = arrHasAny(p.occasions, PI_OCCASIONS_FILTER);
     var matchInt    = arrHasAny(p.interests, PI_INTERESTS_FILTER);
+    var matchCreated= dateInRange(p.productCreatedAt, PI_CREATED_FROM, PI_CREATED_TO);
     var matchRoas   = !PI_ROAS_FILTER
       || (PI_ROAS_FILTER === 'below' && p.trueRoas < p.beRoas)
       || (PI_ROAS_FILTER === 'above' && p.trueRoas >= p.beRoas);
-    return matchSearch && matchMkt && matchType && matchOcc && matchInt && matchRoas;
+    return matchSearch && matchMkt && matchType && matchOcc && matchInt && matchCreated && matchRoas;
   });
 
   // Sort
   var col = PI_SORT.col, dir = PI_SORT.dir;
-  var colKeys = ['idx','productId','imageUrl','title','type','markets','spend','trueRev','trueRoas','attrRev','attrRoas','truePurch','fbSpend'];
+  var colKeys = ['idx','productId','imageUrl','productCreatedAt','title','type','markets','spend','trueRev','trueRoas','attrRev','attrRoas','truePurch','fbSpend'];
   filtered.sort(function(a, b) {
     var av = a[colKeys[col]], bv = b[colKeys[col]];
     if (typeof av === 'string') return dir * av.localeCompare(bv);
@@ -2165,10 +2208,15 @@ function renderPITable() {
   });
 
   var countEl = document.getElementById('pi-count');
-  if (countEl) countEl.textContent = filtered.length + ' sản phẩm';
+  var totalPages = Math.max(1, Math.ceil(filtered.length / PI_PAGE_SIZE));
+  if (PI_PAGE > totalPages) PI_PAGE = totalPages;
+  if (PI_PAGE < 1) PI_PAGE = 1;
+  var startIdx = (PI_PAGE - 1) * PI_PAGE_SIZE;
+  var pageRows = filtered.slice(startIdx, startIdx + PI_PAGE_SIZE);
+  if (countEl) countEl.textContent = filtered.length + ' sản phẩm · Trang ' + PI_PAGE + '/' + totalPages;
 
-  var headers = ['#','ID','Preview','Product','Type','Market','Spend','True Revenue ($)','True ROAS','Attr Revenue ($)','Attr ROAS','True Purch','FB/GG'];
-  var sortableIdx = [6,7,8,9,10,11]; // Spend, True Rev, True ROAS, Attr Rev, Attr ROAS, True Purch
+  var headers = ['#','ID','Preview','Product Created At','Product','Type','Market','Spend','True Revenue ($)','True ROAS','Attr Revenue ($)','Attr ROAS','True Purch','FB/GG'];
+  var sortableIdx = [3,7,8,9,10,11,12]; // Created, Spend, True Rev, True ROAS, Attr Rev, Attr ROAS, True Purch
 
   var headerHtml = '<thead><tr>' + headers.map(function(h, i) {
     var isSortable = sortableIdx.indexOf(i) > -1;
@@ -2180,7 +2228,7 @@ function renderPITable() {
     return '<th>' + h + '</th>';
   }).join('') + '</tr></thead>';
 
-  var bodyHtml = '<tbody>' + filtered.map(function(p, i) {
+  var bodyHtml = '<tbody>' + pageRows.map(function(p, i) {
     var be       = p.beRoas;
     var mkts     = p.markets.map(function(m) {
       return '<span class="badge b-' + escHtml(m).toLowerCase() + '">' + escHtml(m) + '</span>';
@@ -2203,9 +2251,10 @@ function renderPITable() {
         + '</button>'
       : '<span class="product-thumb-empty">No img</span>';
     return '<tr>'
-      + '<td><span style="color:#475569">' + (i + 1) + '</span></td>'
+      + '<td><span style="color:#475569">' + (startIdx + i + 1) + '</span></td>'
       + '<td>' + idCell + '</td>'
       + '<td>' + previewCell + '</td>'
+      + '<td><span style="font-size:10px;color:#94a3b8">' + escHtml(p.productCreatedAt || '–') + '</span></td>'
       + '<td><span style="font-size:11px" title="' + escHtml(p.title || '') + '">' + escHtml((p.title || p.productId || '').slice(0, 42)) + '</span></td>'
          
       + '<td><span style="font-size:10px;color:#a78bfa">' + escHtml(p.type) + '</span></td>'
@@ -2224,11 +2273,53 @@ function renderPITable() {
 
   document.getElementById('pi-top-tbl').innerHTML =
     '<table>' + headerHtml + bodyHtml + '</table>';
+
+  var pager = document.getElementById('pi-pager');
+  if (pager) {
+    var pageBtns = [];
+    for (var pg = 1; pg <= totalPages; pg++) {
+      if (totalPages > 7 && pg !== 1 && pg !== totalPages && Math.abs(pg - PI_PAGE) > 1) {
+        if (pageBtns[pageBtns.length - 1] !== '<span style="color:#475569;font-size:11px">...</span>') {
+          pageBtns.push('<span style="color:#475569;font-size:11px">...</span>');
+        }
+        continue;
+      }
+      pageBtns.push('<button class="filter-btn ' + (pg === PI_PAGE ? 'active' : '') + '" onclick="setPIPage(' + pg + ')">' + pg + '</button>');
+    }
+    pager.innerHTML =
+      '<button class="filter-btn" onclick="setPIPage(' + (PI_PAGE - 1) + ')" ' + (PI_PAGE <= 1 ? 'disabled style="opacity:.45;cursor:not-allowed"' : '') + '>Trước</button>'
+      + pageBtns.join('')
+      + '<button class="filter-btn" onclick="setPIPage(' + (PI_PAGE + 1) + ')" ' + (PI_PAGE >= totalPages ? 'disabled style="opacity:.45;cursor:not-allowed"' : '') + '>Sau</button>';
+  }
 }
 
 function sortPI(colIdx) {
   if (PI_SORT.col === colIdx) PI_SORT.dir *= -1;
   else { PI_SORT.col = colIdx; PI_SORT.dir = -1; }
+  PI_PAGE = 1;
+  renderPITable();
+}
+
+function setPIPage(page) {
+  PI_PAGE = page;
+  renderPITable();
+}
+
+function setProductCreatedFilter() {
+  PI_CREATED_FROM = (document.getElementById('pi-created-from') || {}).value || '';
+  PI_CREATED_TO   = (document.getElementById('pi-created-to') || {}).value || '';
+  PI_PAGE = 1;
+  renderPITable();
+}
+
+function clearProductCreatedFilter() {
+  PI_CREATED_FROM = '';
+  PI_CREATED_TO = '';
+  var fromEl = document.getElementById('pi-created-from');
+  var toEl   = document.getElementById('pi-created-to');
+  if (fromEl) fromEl.value = '';
+  if (toEl)   toEl.value = '';
+  PI_PAGE = 1;
   renderPITable();
 }
 
@@ -2355,10 +2446,14 @@ function sortPITypes(colIdx) {
 }
 
 // FIX — 3 functions previously missing (tab Products broken)
-function filterProducts() { renderPITable(); }
+function filterProducts() {
+  PI_PAGE = 1;
+  renderPITable();
+}
 
 function setMktFilter(btn, mkt) {
   PI_MKT_FILTER = mkt;
+  PI_PAGE = 1;
   document.querySelectorAll('[data-mkt]').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
   renderPITable();
@@ -2366,25 +2461,25 @@ function setMktFilter(btn, mkt) {
 
 function setProductMarket(btn, mkt) {
   PI_MKT_FILTER = mkt || 'all';
-  renderPITable();
+  PI_PAGE = 1;
   renderProducts(DATA);
 }
 
 function setProductType(btn, value) {
   PI_TYPES_FILTER = toggleFilterValue(PI_TYPES_FILTER, value);
-  renderPITable();
+  PI_PAGE = 1;
   renderProducts(DATA);
 }
 
 function setProductOccasion(btn, value) {
   PI_OCCASIONS_FILTER = toggleFilterValue(PI_OCCASIONS_FILTER, value);
-  renderPITable();
+  PI_PAGE = 1;
   renderProducts(DATA);
 }
 
 function setProductInterest(btn, value) {
   PI_INTERESTS_FILTER = toggleFilterValue(PI_INTERESTS_FILTER, value);
-  renderPITable();
+  PI_PAGE = 1;
   renderProducts(DATA);
 }
 
@@ -2397,6 +2492,7 @@ function setRoasFilter(btn, val) {
     document.querySelectorAll('[data-roas]').forEach(function(b) { b.classList.remove('active'); });
     btn.classList.add('active');
   }
+  PI_PAGE = 1;
   renderPITable();
 }
 
