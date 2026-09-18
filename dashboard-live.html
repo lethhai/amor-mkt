@@ -89,6 +89,29 @@ tbody tr:last-child{border-bottom:none}
 tbody td{padding:7px 11px;color:#cbd5e1;vertical-align:middle}
 tbody tr:hover{background:#181b2e}
 .num{text-align:right;font-variant-numeric:tabular-nums}
+.product-id-link{font-size:10px;color:#93c5fd;text-decoration:underline;text-underline-offset:2px}
+.product-id-link:hover{color:#bfdbfe}
+.product-thumb-btn{width:42px;height:42px;border:1px solid #2d3154;border-radius:6px;
+                   background:#0d0f1a;padding:0;overflow:hidden;cursor:pointer;display:inline-flex;
+                   align-items:center;justify-content:center;vertical-align:middle}
+.product-thumb-btn:hover{border-color:#a78bfa}
+.product-thumb{width:100%;height:100%;object-fit:cover;display:block}
+.product-thumb-empty{width:42px;height:42px;border:1px dashed #334155;border-radius:6px;
+                     color:#475569;display:inline-flex;align-items:center;justify-content:center;
+                     font-size:10px;background:#0d0f1a}
+#product-image-modal{display:none;position:fixed;inset:0;background:rgba(13,15,26,.86);
+                     z-index:700;align-items:center;justify-content:center;padding:24px}
+#product-image-modal.open{display:flex}
+.image-modal-box{background:#131626;border:1px solid #252840;border-radius:12px;
+                 width:min(760px,94vw);max-height:92vh;padding:16px;box-shadow:0 20px 80px rgba(0,0,0,.45)}
+.image-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.image-modal-title{font-size:13px;font-weight:700;color:#e2e8f0;line-height:1.35}
+.image-modal-close{background:#1a1d30;border:1px solid #2d3154;color:#94a3b8;border-radius:6px;
+                   width:30px;height:30px;cursor:pointer;font-size:18px;line-height:1}
+.image-modal-close:hover{border-color:#a78bfa;color:#c4b5fd}
+.image-modal-img{width:100%;max-height:68vh;object-fit:contain;background:#0d0f1a;border-radius:8px;
+                 border:1px solid #252840}
+.image-modal-link{display:inline-block;margin-top:12px;color:#93c5fd;font-size:12px;text-decoration:underline}
 /* ── DISCLAIMER ── */
 .disclaimer{background:#1a1500;border:1.5px solid #b45309;border-radius:10px;
             padding:12px 15px;margin-bottom:18px;display:flex;gap:10px;align-items:flex-start}
@@ -207,6 +230,17 @@ thead th.sortable:hover{color:#a78bfa}
       <button class="btn-cancel" onclick="closeSettings()">Hủy</button>
       <button class="btn-save" onclick="saveSettings()">Lưu &amp; Tải lại</button>
     </div>
+  </div>
+</div>
+
+<div id="product-image-modal" onclick="if(event.target===this) closeProductPreview()">
+  <div class="image-modal-box">
+    <div class="image-modal-head">
+      <div class="image-modal-title" id="product-image-title">Product preview</div>
+      <button class="image-modal-close" onclick="closeProductPreview()" title="Đóng">×</button>
+    </div>
+    <img class="image-modal-img" id="product-image-large" src="" alt="Product preview">
+    <a class="image-modal-link" id="product-image-link" href="#" target="_blank" rel="noopener">Mở sản phẩm</a>
   </div>
 </div>
 
@@ -618,7 +652,7 @@ function isServiceType(t) {
 // ═══════════════════════════════════════
 // CONFIG & STATE
 // ═══════════════════════════════════════
-var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyXNPAUAH-1D01TiGMTYNI9D8IV5iw65pfxOrFMsvp_xh_Ldrzi32-YjJ9Gb6dqogPa/exec';
+var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzLrVtk55W812h_qK-uWvEO9mUguF6G22hrO6i04ERL2XeVDZHKPGhEY2r0_q6DfI2Y/exec';
 function getGasUrl() { return localStorage.getItem('gas_url') || DEFAULT_GAS_URL; }
 
 Chart.defaults.color       = '#64748b';
@@ -1670,17 +1704,14 @@ function renderCampaignFromRows(d) {
     addMetric(byAccount[acct], r);
   });
 
-var trueTotals = {};
-trueRows.forEach(function(r) { addTrueMetric(trueTotals, r); });
-
-var totalAds = d.blended || {};
-var totalSpend = totalAds.spend || 0;
-var trueRev = trueTotals.revenue || 0;
-var trueRoas = totalSpend > 0 ? r2(trueRev / totalSpend) : 0;
-var attrGap = r2((b.revenue || 0) - trueRev);
+  var trueTotals = {};
+  trueRows.forEach(function(r) { addTrueMetric(trueTotals, r); });
+  var trueRev = trueTotals.revenue || 0;
+  var trueRoas = b.spend > 0 ? r2(trueRev / b.spend) : 0;
+  var attrGap = r2((b.revenue || 0) - trueRev);
 
   document.getElementById('cp-kpis').innerHTML = [
-    kpi('Blended Spend', cur(totalSpend), 'FB ' + cur(totalAds.fb_spend || 0) + ' · GG ' + cur(totalAds.gg_spend || 0)),
+    kpi('Blended Spend',    cur(b.spend || 0),    'FB ' + cur(fb.spend || 0) + ' · GG ' + cur(gg.spend || 0)),
     kpi('Attr Revenue',     cur(b.revenue || 0),  'FB ' + cur(fb.revenue || 0) + ' · GG ' + cur(gg.revenue || 0)),
     kpi('Attr ROAS',        nf(b.roas || 0, 2) + 'x', 'Platform-attributed', roasCls(b.roas || 0, 1.65)),
     kpi('Attr CPA',         cur(b.cpa || 0),      nf(b.purchases || 0, 1) + ' attr purchases'),
@@ -1865,7 +1896,7 @@ var PI_TYPES_DATA  = [];   // raw type rows for sort
 var PI_TYPES_SORT  = { col: 2, dir: -1 };
 var PI_MKT_FILTER = 'all';
 var PI_ROAS_FILTER= null;
-var PI_SORT       = { col: 6, dir: -1 }; // default: sort by Spend desc
+var PI_SORT       = { col: 7, dir: -1 }; // default: sort by True Revenue desc
 
 var ST_OCCASIONS = [];
 var ST_INTERESTS = [];
@@ -1884,6 +1915,50 @@ function arrHasAny(arr, selected) {
     if (arr.indexOf(selected[i]) > -1) return true;
   }
   return false;
+}
+
+function escHtml(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, function(c) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+  });
+}
+
+function productUrlFromFullUrl(fullUrl, productId) {
+  if (!fullUrl) return '';
+  if (fullUrl.indexOf('http') === 0) return fullUrl;
+  if (fullUrl.indexOf('/products/') === 0) return 'https://amor1970s.com' + fullUrl;
+  if (fullUrl.indexOf('products/') === 0) return 'https://amor1970s.com/' + fullUrl;
+  return 'https://amor1970s.com/products/' + fullUrl;
+}
+
+function openProductPreviewFromEl(el) {
+  openProductPreview(
+    el.getAttribute('data-img') || '',
+    el.getAttribute('data-title') || '',
+    el.getAttribute('data-url') || ''
+  );
+}
+
+function openProductPreview(imageUrl, title, productUrl) {
+  if (!imageUrl) return;
+  document.getElementById('product-image-title').textContent = title || 'Product preview';
+  document.getElementById('product-image-large').src = imageUrl;
+  var link = document.getElementById('product-image-link');
+  if (productUrl) {
+    link.href = productUrl;
+    link.style.display = 'inline-block';
+  } else {
+    link.removeAttribute('href');
+    link.style.display = 'none';
+  }
+  document.getElementById('product-image-modal').classList.add('open');
+}
+
+function closeProductPreview() {
+  var modal = document.getElementById('product-image-modal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  document.getElementById('product-image-large').src = '';
 }
 
 function rowMatchesFilters(row, opts) {
@@ -2033,6 +2108,7 @@ var worst = qualified.slice().sort(function(a,b) {
       productId: p.productId || '',
       title:     p.title || p.productId || '',
       fullUrl:   p.fullUrl || '',   
+      imageUrl:  p.imageUrl || '',
       type:      p.type || '',
       markets:   p.markets || [],
       occasions: p.occasions || [],
@@ -2069,7 +2145,7 @@ function renderPITable() {
 
   // Sort
   var col = PI_SORT.col, dir = PI_SORT.dir;
-  var colKeys = ['idx','productId','title','type','markets','spend','trueRev','trueRoas','attrRev','attrRoas','truePurch','fbSpend'];
+  var colKeys = ['idx','productId','imageUrl','title','type','markets','spend','trueRev','trueRoas','attrRev','attrRoas','truePurch','fbSpend'];
   filtered.sort(function(a, b) {
     var av = a[colKeys[col]], bv = b[colKeys[col]];
     if (typeof av === 'string') return dir * av.localeCompare(bv);
@@ -2079,8 +2155,8 @@ function renderPITable() {
   var countEl = document.getElementById('pi-count');
   if (countEl) countEl.textContent = filtered.length + ' sản phẩm';
 
-  var headers = ['#','ID','Product','Type','Market','Spend','True Revenue ($)','True ROAS','Attr Revenue ($)','Attr ROAS','True Purch','FB/GG'];
-  var sortableIdx = [5,6,7,8,9,10]; // Spend, True Rev, True ROAS, Attr Rev, Attr ROAS, True Purch
+  var headers = ['#','ID','Preview','Product','Type','Market','Spend','True Revenue ($)','True ROAS','Attr Revenue ($)','Attr ROAS','True Purch','FB/GG'];
+  var sortableIdx = [6,7,8,9,10,11]; // Spend, True Rev, True ROAS, Attr Rev, Attr ROAS, True Purch
 
   var headerHtml = '<thead><tr>' + headers.map(function(h, i) {
     var isSortable = sortableIdx.indexOf(i) > -1;
@@ -2095,28 +2171,32 @@ function renderPITable() {
   var bodyHtml = '<tbody>' + filtered.map(function(p, i) {
     var be       = p.beRoas;
     var mkts     = p.markets.map(function(m) {
-      return '<span class="badge b-' + m.toLowerCase() + '">' + m + '</span>';
+      return '<span class="badge b-' + escHtml(m).toLowerCase() + '">' + escHtml(m) + '</span>';
     }).join(' ') || '–';
     var roasAnomaly = p.trueRoas > 10 && p.spend < 50
       ? '<span class="roas-anomaly" title="ROAS cao bất thường — spend thấp, cần verify">⚠️</span>'
       : '';
+    var productUrl = productUrlFromFullUrl(p.fullUrl, p.productId);
+    var idCell = productUrl
+      ? '<a class="product-id-link" href="' + escHtml(productUrl) + '" target="_blank" rel="noopener" title="Mở sản phẩm">'
+          + escHtml(p.productId || '–') + '</a>'
+      : '<span style="font-size:10px;color:#94a3b8">' + escHtml(p.productId || '–') + '</span>';
+    var previewCell = p.imageUrl
+      ? '<button class="product-thumb-btn" onclick="openProductPreviewFromEl(this)" '
+          + 'data-img="' + escHtml(p.imageUrl) + '" '
+          + 'data-title="' + escHtml(p.title || p.productId || '') + '" '
+          + 'data-url="' + escHtml(productUrl) + '" '
+          + 'title="Click để xem ảnh lớn">'
+          + '<img class="product-thumb" src="' + escHtml(p.imageUrl) + '" alt="' + escHtml(p.title || 'Product preview') + '" loading="lazy">'
+        + '</button>'
+      : '<span class="product-thumb-empty">No img</span>';
     return '<tr>'
       + '<td><span style="color:#475569">' + (i + 1) + '</span></td>'
-      + '<td><span style="font-size:10px;color:#94a3b8">' + (p.productId || '–') + '</span></td>'
+      + '<td>' + idCell + '</td>'
+      + '<td>' + previewCell + '</td>'
+      + '<td><span style="font-size:11px" title="' + escHtml(p.title || '') + '">' + escHtml((p.title || p.productId || '').slice(0, 42)) + '</span></td>'
          
- // Nối đúng domain Amor1970s
-      + '<td>' + (function() {
-          var t = p.title.slice(0, 42);
-          if (!p.fullUrl) return '<span style="font-size:11px">' + t + '</span>';
-          var url = p.fullUrl.indexOf('http') === 0
-            ? p.fullUrl
-            : 'https://amor1970s.com/products/' + p.fullUrl;
-          return '<a href="' + url + '" target="_blank" '
-            + 'style="color:#a78bfa;text-decoration:underline;font-size:11px">' + t + '</a>';
-        })()
-      + '</td>'
-         
-      + '<td><span style="font-size:10px;color:#a78bfa">' + p.type + '</span></td>'
+      + '<td><span style="font-size:10px;color:#a78bfa">' + escHtml(p.type) + '</span></td>'
       + '<td>' + mkts + '</td>'
       + '<td class="num">' + cur(p.spend) + '</td>'
       + '<td class="num" style="color:#4ade80">' + cur(p.trueRev) + '</td>'
