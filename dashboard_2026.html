@@ -1285,6 +1285,10 @@ function renderStore(d) {
     var keys = ['', 'productId', 'imageUrl', 'productCreatedAt', 'title', 'type', 'markets', 'orderLines', 'revenue'];
     var av = a[keys[ST_PROD_SORT.col]] || 0;
     var bv = b[keys[ST_PROD_SORT.col]] || 0;
+    if (keys[ST_PROD_SORT.col] === 'productCreatedAt') {
+      av = isoDateOnly(av);
+      bv = isoDateOnly(bv);
+    }
     if (typeof av === 'string') return ST_PROD_SORT.dir * av.localeCompare(bv);
     return ST_PROD_SORT.dir * ((av || 0) - (bv || 0));
   });
@@ -1958,9 +1962,32 @@ function productUrlFromFullUrl(fullUrl, productId) {
 }
 
 function isoDateOnly(v) {
-  v = String(v || '').trim();
-  if (!v) return '';
-  return v.substring(0, 10);
+  if (v == null || v === '') return '';
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    if (isNaN(v.getTime())) return '';
+    return v.getFullYear() + '-' + String(v.getMonth() + 1).padStart(2, '0') + '-' + String(v.getDate()).padStart(2, '0');
+  }
+
+  var s = String(v || '').trim();
+  if (!s) return '';
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+
+  var eu = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (eu) return eu[3] + '-' + eu[2].padStart(2, '0') + '-' + eu[1].padStart(2, '0');
+
+  var MONTHS = { Jan:'01', Feb:'02', Mar:'03', Apr:'04', May:'05', Jun:'06',
+                 Jul:'07', Aug:'08', Sep:'09', Oct:'10', Nov:'11', Dec:'12' };
+  var g = s.match(/\b([A-Z][a-z]{2})\s+(\d{1,2})(?:\s+(\d{4}))?\b/);
+  if (g && MONTHS[g[1]]) {
+    var year = g[3] || String(new Date().getFullYear());
+    return year + '-' + MONTHS[g[1]] + '-' + g[2].padStart(2, '0');
+  }
+
+  var d = new Date(s.replace(/\s*\([^)]+\)\s*$/, ''));
+  if (!isNaN(d.getTime())) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  return '';
 }
 
 function dateInRange(v, from, to) {
