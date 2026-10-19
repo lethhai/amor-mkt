@@ -276,12 +276,11 @@ thead th.sortable:hover{color:#a78bfa}
 </div>
 
 <div id="tab-bar">
-  <button class="tab-btn active" data-tab="overview">🏦 Business Overview</button>
+  <button class="tab-btn active" data-tab="overview">📈 Marketing Overview</button>
   <button class="tab-btn" data-tab="store">🛒 Store</button>
-  <button class="tab-btn" data-tab="campaign">📊 Campaign</button>
-  <button class="tab-btn" data-tab="products">🔬 Products</button>
-  <button class="tab-btn" data-tab="mothers">🌸 Mother's Day</button>
-  <button class="tab-btn" data-tab="forecast">🎯 MD Forecast</button>   
+  <button class="tab-btn" data-tab="facebook">📘 Facebook Ads</button>
+  <button class="tab-btn" data-tab="google">🔎 Google Ads</button>
+  <button class="tab-btn" data-tab="products">🔬 Product ROAS</button>
 </div>
 
 <div id="main">
@@ -291,27 +290,32 @@ thead th.sortable:hover{color:#a78bfa}
     <div id="ov-kpis" class="kpi-grid"></div>
     <div class="section">
       <div class="st">Hiệu quả theo Market — ES vs IT</div>
-      <div class="infobox">💱 <strong>Currency:</strong> Toàn bộ hiển thị <strong>USD ($)</strong>. Shopify = True Revenue / True Orders. Facebook &amp; Google = Attr Revenue / Attr ROAS theo attribution của platform.</div>
+      <div class="infobox">💱 <strong>Shopify Order Revenue</strong> là tổng cấp store có shipping. <strong>Attr.*</strong> là số platform tự ghi nhận, có thể trùng attribution giữa Facebook và Google. Product ROAS dùng doanh thu dòng sản phẩm Shopify và không cộng shipping.</div>
       <div id="ov-market-tbl" class="twrap"></div>
+    </div>
+    <div class="section">
+      <div class="st">Đóng góp theo kênh quảng cáo</div>
+      <div class="infobox">Attr.Revenue và Attr.Order dùng attribution của từng nền tảng; có thể trùng đơn, nên không cộng hai kênh để thay cho Shopify Order Revenue.</div>
+      <div id="ov-channel-tbl" class="twrap"></div>
     </div>
     <div class="g2">
       <div>
-        <div class="st">Spend / Revenue / Profit theo ngày</div>
+        <div class="st">Marketing performance theo ngày</div>
         <div class="cbox">
-          <div class="ctitle">Daily Trend — True Revenue ($) vs Spend ($)</div>
+          <div class="ctitle">Shopify Order Revenue (incl. shipping) vs Paid Spend ($)</div>
           <div class="chart-container"><canvas id="ch-ov-daily"></canvas></div>
         </div>
       </div>
       <div>
-        <div class="st">Phân bổ chi phí (Revenue Allocation)</div>
+        <div class="st">Paid spend theo kênh</div>
         <div class="cbox">
-          <div class="ctitle">Cost &amp; Profit Breakdown</div>
+          <div class="ctitle">Facebook vs Google Spend</div>
           <div class="chart-container"><canvas id="ch-ov-donut"></canvas></div>
         </div>
       </div>
     </div>
     <div class="section">
-      <div class="st">Gap Analysis — True Revenue vs Attr Revenue</div>
+      <div class="st">Shopify Order Revenue vs combined platform attribution</div>
       <div id="ov-gap" class="cbox"></div>
     </div>
   </div>
@@ -330,7 +334,7 @@ thead th.sortable:hover{color:#a78bfa}
     <div class="disclaimer">
       <div class="di">🛒</div>
       <p><strong>Dữ liệu thuần Shopify — Cấp độ Order &amp; Sản phẩm · Currency: USD ($)</strong>
-      True Revenue lấy từ Shopify và đã convert EUR × 1.15 → USD. True Items Sold đã loại trừ sản phẩm dịch vụ (Shipping Protection). AOV và Retention tính trên số đơn hàng thực.</p>
+      Shopify Order Revenue là tổng cấp đơn hàng (có shipping và discount theo số liệu Shopify). Doanh thu theo sản phẩm ở tab Product ROAS chỉ cộng giá trị dòng sản phẩm, không phân bổ shipping. Items Sold đã loại trừ sản phẩm dịch vụ; AOV và Retention tính theo đơn Shopify.</p>
     </div>
     <div id="st-kpis" class="kpi-grid"></div>
     <div class="g2">
@@ -362,79 +366,41 @@ thead th.sortable:hover{color:#a78bfa}
     </div>
   </div>
 
-  <!-- TAB 3 — CAMPAIGN PERFORMANCE -->
-  <div class="tab-panel" id="tab-campaign">
-    <div class="disclaimer">
-      <div class="di">⚠️</div>
-      <p><strong>Nguồn dữ liệu: FB Ads API + Google Ads API — Chưa đối chiếu với Shopify</strong>
-      Attr Revenue ở tab này = platform-attributed (FB pixel + GG conversion). Attr ROAS có thể bị double-count. Dùng True Revenue / True ROAS để đối chiếu hiệu quả thật.</p>
-    </div>
-    <div id="cp-kpis" class="kpi-grid"></div>
-    <div class="filter-bar" style="margin-bottom:12px" id="cp-market-pills"></div>
-    <div class="filter-bar" style="margin-bottom:12px" id="cp-type-filter-pills"></div>
-    <div class="filter-bar" style="margin-bottom:12px" id="cp-occasion-pills"></div>
-    <div class="filter-bar" style="margin-bottom:12px" id="cp-interest-pills"></div>
-    <div class="g3">
-      <div>
-        <div class="st">Spend by Market</div>
-        <div class="cbox">
-          <div class="ctitle">Blended Spend — ES vs IT</div>
-          <div class="chart-container-sm"><canvas id="ch-cp-mkt-donut"></canvas></div>
-        </div>
-      </div>
-      <div>
-        <div class="st">FB Ads — ROAS (Bar) &amp; Spend (Line)</div>
-        <div class="cbox">
-          <div class="ctitle">Facebook Only</div>
-          <div class="chart-container-sm"><canvas id="ch-cp-fb-daily"></canvas></div>
-        </div>
-      </div>
-      <div>
-        <div class="st">Google Ads — ROAS (Bar) &amp; Spend (Line)</div>
-        <div class="cbox">
-          <div class="ctitle">Google Ads Only</div>
-          <div class="chart-container-sm"><canvas id="ch-cp-gg-daily"></canvas></div>
-        </div>
-      </div>
-    </div>
-    <div class="section">
-      <div class="st">Phân tích theo Product Type — Click để lọc</div>
-      <div class="type-pills" id="cp-type-pills"></div>
-      <div id="cp-type-chart-box" class="cbox" style="display:none">
-        <div class="ctitle" id="cp-type-chart-title"></div>
-        <div class="chart-container-sm"><canvas id="ch-cp-type-trend"></canvas></div>
-      </div>
-      <div id="cp-types-tbl" class="twrap"></div>
-    </div>
+  <!-- TAB 3 — FACEBOOK ADS -->
+  <div class="tab-panel" id="tab-facebook">
+    <div class="disclaimer"><div class="di">ⓘ</div><p><strong>Facebook Ads · Meta-attributed results</strong> “Attr.*” là số Facebook ghi nhận, không phải doanh thu Shopify. Hierarchy hiển thị campaign → ad set → ad cùng spend trong khoảng ngày đã chọn. Creative được tổng hợp theo Creative ID; với flexible ads, hiệu quả ở cấp ad/creative, còn từng asset chỉ là danh mục preview.</p></div>
+    <div id="fb-kpis" class="kpi-grid"></div>
     <div class="g2">
-      <div>
-        <div class="st">Theo Account</div>
-        <div id="cp-accounts-tbl" class="twrap"></div>
-      </div>
-      <div>
-        <div class="st">Theo Market (Blended)</div>
-        <div id="cp-mkt-tbl" class="twrap"></div>
-      </div>
+      <div><div class="st">Attr.Revenue và Spend theo ngày</div><div class="cbox"><div class="chart-container"><canvas id="ch-fb-daily"></canvas></div></div></div>
+      <div><div class="st">Phân bổ spend theo market</div><div class="cbox"><div class="chart-container-sm"><canvas id="ch-fb-market"></canvas></div></div></div>
     </div>
-    <div class="section">
-      <div class="st">Top Creatives (FB)</div>
-      <div id="cp-crea-tbl" class="twrap"></div>
-    </div>
+    <div class="section"><div class="st">Facebook Campaign → Ad Set → Ad</div><div id="cp-fb-hierarchy" class="twrap"></div></div>
+    <div class="section"><div class="st">Creative hiệu quả theo Creative ID</div><div id="cp-crea-tbl" class="twrap"></div></div>
+  </div>
+
+  <!-- TAB 4 — GOOGLE ADS -->
+  <div class="tab-panel" id="tab-google">
+    <div class="disclaimer"><div class="di">ⓘ</div><p><strong>Google Ads · Conversion attribution</strong> “Attr.*” là conversions và conversion value Google ghi nhận. Product True ROAS so sánh doanh thu dòng sản phẩm Shopify với spend đã map; đây là góc nhìn theo sản phẩm, không phải attribution của Google.</p></div>
+    <div id="gg-kpis" class="kpi-grid"></div>
+    <div class="section"><div class="st">Google Ads theo ngày</div><div class="cbox"><div class="chart-container"><canvas id="ch-gg-daily"></canvas></div></div></div>
+    <div class="section"><div class="st">Hiệu quả theo Campaign</div><div id="gg-campaigns-tbl" class="twrap"></div></div>
+    <div class="section"><div class="st">Shopping / PMax theo sản phẩm</div><div class="filter-bar"><input id="gg-product-search" type="text" placeholder="🔍 Tìm sản phẩm hoặc SKU..." oninput="renderGoogleProductTable()"><span id="gg-product-count" style="font-size:11px;color:#94a3b8"></span></div><div id="gg-products-tbl" class="twrap"></div></div>
   </div>
 
   <!-- TAB 4 — PRODUCT INTELLIGENCE -->
   <div class="tab-panel" id="tab-products">
     <div id="pi-kpis" class="kpi-grid"></div>
     <div class="section">
-      <div class="st">Product Types — ROAS vs BE ROAS</div>
+      <div class="st">Product Types — Product True ROAS vs BE ROAS (provisional)</div>
+      <div class="infobox">Product True ROAS = Shopify product revenue ÷ mapped FB/Google spend. Revenue theo sản phẩm không gồm shipping. BE ROAS hiện là ngưỡng tạm thời; cấu hình <code>BE_ROAS_CONFIG</code> đang chờ cập nhật, nên chưa dùng để kết luận đạt/chưa đạt.</div>
       <div id="pi-types-tbl" class="twrap"></div>
     </div>
     <div class="section">
-      <div class="st">Top Products — Spend vs True ROAS (Bubble size = True Revenue)</div>
+      <div class="st">Top Products — Spend vs Product True ROAS (bubble size = Shopify Product Revenue)</div>
       <div class="cbox"><div class="chart-container-lg"><canvas id="ch-pi-bubble"></canvas></div></div>
     </div>
     <div class="section">
-      <div class="st">Top 30 Products — Chi tiết</div>
+      <div class="st">Products — Shopify sales matched to ad spend</div>
       <div class="filter-bar">
         <input type="text" id="pi-search" placeholder="🔍 Tìm tên sản phẩm..." oninput="filterProducts()">
         <span style="font-size:11px;color:#475569;font-weight:600">Created:</span>
@@ -443,8 +409,8 @@ thead th.sortable:hover{color:#a78bfa}
         <input type="date" id="pi-created-to" onchange="setProductCreatedFilter()">
         <button class="filter-btn" onclick="clearProductCreatedFilter()">Tất cả ngày tạo</button>
         <span id="pi-market-pills"></span>
-        <button class="filter-btn" data-roas="below" onclick="setRoasFilter(this,'below')">⚠️ Dưới BE</button>
-        <button class="filter-btn" data-roas="above" onclick="setRoasFilter(this,'above')">✅ Trên BE</button>
+        <button class="filter-btn" data-roas="below" onclick="setRoasFilter(this,'below')">⚠️ Dưới BE tạm</button>
+        <button class="filter-btn" data-roas="above" onclick="setRoasFilter(this,'above')">✅ Trên BE tạm</button>
         <span style="font-size:11px;color:#475569;margin-left:4px" id="pi-count"></span>
       </div>
       <div class="filter-bar" style="margin-bottom:12px" id="pi-type-pills"></div>
@@ -660,7 +626,7 @@ function isServiceType(t) {
 // ═══════════════════════════════════════
 // CONFIG & STATE
 // ═══════════════════════════════════════
-var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwrJjwhf0C0XI3_TyPtArqlMVV5MSoqRtxq1Hzrt2yRhOUDrqhypgszmes16wSIC-fi/exec';
+var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxGW1u73H_1seWovFyY7BBR6tM9fiqP5Usfl_ztCMSk58mUeKUNhn4n1CGuKQj303E/exec';
 function getGasUrl() { return localStorage.getItem('gas_url') || DEFAULT_GAS_URL; }
 
 Chart.defaults.color       = '#64748b';
@@ -669,6 +635,7 @@ Chart.defaults.font.size   = 11;
 
 var DATA    = null;
 var MD_DATA = null;
+var GG_PRODUCT_ROWS = [];
 var CH      = {};
 var WOW_ON  = false;   // Week-over-Week toggle state
 var WOW_DATA= null;    // previous period data
@@ -717,21 +684,16 @@ async function fetchGAS(from, to) {
 async function loadAll(from, to) {
   ov(true, 'Đang tải dữ liệu...');
 
-  var main, md, prev, prevFrom, prevTo;
+  var main, prev, prevFrom, prevTo;
   try {
-    var mdFrom   = '2026-03-20';
-    var mdTo     = today();
-    var sameAsMd = (from === mdFrom && to === mdTo);
-
     var fromDate = new Date(from + 'T12:00:00Z');
     var toDate_  = new Date(to   + 'T12:00:00Z');
     var diffDays = Math.round((toDate_ - fromDate) / 86400000) + 1;
     prevTo       = addDays(from, -1);
     prevFrom     = addDays(prevTo, -(diffDays - 1));
 
-    // Chạy tuần tự — tránh 429 concurrent limit của GAS
+    // Chỉ gọi một payload chính và tùy chọn một kỳ so sánh; tránh fetch thừa.
     main = await fetchGAS(from, to);
-    md   = sameAsMd ? null : await fetchGAS(mdFrom, mdTo);
     prev = WOW_ON   ? await fetchGAS(prevFrom, prevTo) : null;
 
     if (!main || !main.ok) throw new Error(
@@ -739,7 +701,7 @@ async function loadAll(from, to) {
     );
 
     DATA     = main;
-    MD_DATA  = (md && md.ok) ? md : main;
+    MD_DATA  = main;
     WOW_DATA = prev;
 
   } catch(e) {
@@ -774,38 +736,25 @@ function toggleWoW() {
 function renderAll() {
   renderOverview(DATA);
   renderStore(DATA);
-  renderCampaign(DATA);
+  renderFacebookAds(DATA);
+  renderGoogleAds(DATA);
   renderProducts(DATA);
-  renderMD(MD_DATA);
-  renderForecast(MD_DATA); // dùng MD_DATA (20/3→hôm nay) để có đủ data từ 6/4
 }
 
 // ═══════════════════════════════════════
-// TAB 1 — BUSINESS OVERVIEW
-// FIX #5: Profit = Rev - Ads - FF(29%) - Gateway(7%) - AppAPI(2.8%) - TaxAds(TXG07×12%)
-// FIX #4: Donut chart hiển thị % từng khoản
+// TAB 1 — MARKETING OVERVIEW
+// Shopify order revenue, spend, platform attribution, and channel contribution
 // ═══════════════════════════════════════
 function renderOverview(d) {
   var b  = d.blended            || {};
-  var s  = d.shopifyTotals      || {};
   var o  = d.shopifyOrderTotals || {};
   var bc = d.blendedByCountry   || {};
   var sm = d.shopifyOrderByCountry || {};
 
   var totalSpend  = b.spend    || 0;
-  var productRev  = s.revenue  || 0;
-  var totalRevInp = o.totalRevenue || productRev || 0;
-
-  var fulfillment  = r2(totalRevInp * 0.29);
-  var gatewayFee   = r2(totalRevInp * 0.07);
-  var appApiCost   = r2((DATA.openAI || {}).totalSpend || 0);  // Thực tế từ sheet API
-  var txg07Spend   = (d.byAccount && d.byAccount['TXG 07']) ? (d.byAccount['TXG 07'].spend || 0) : 0;
-  var taxAds       = r2(txg07Spend * 0.12);
-  var totalCost    = totalSpend + fulfillment + gatewayFee + appApiCost + taxAds;
-  var profit       = r2(totalRevInp - totalCost);
+  var totalRevInp = o.totalRevenue || 0;
   var trueROAS     = totalSpend > 0 ? r2(totalRevInp / totalSpend) : 0;
   var gap          = r2(totalRevInp - (b.revenue || 0));
-  var txg07Ratio   = totalSpend > 0 ? txg07Spend / totalSpend : 0;
 
   // WoW delta helper
   function wowDelta(curr, prevKey) {
@@ -815,7 +764,6 @@ function renderOverview(d) {
     if (prevKey === 'spend')    prevVal = (pw.blended || {}).spend || 0;
     if (prevKey === 'revenue')  prevVal = (pw.shopifyOrderTotals || {}).totalRevenue || 0;
     if (prevKey === 'roas')     { var ps = (pw.blended||{}).spend||0; prevVal = ps>0?r2(((pw.shopifyOrderTotals||{}).totalRevenue||0)/ps):0; }
-    if (prevKey === 'profit')   { var pr=pw.shopifyOrderTotals||{}; var pb=pw.blended||{}; var psp=pb.spend||0; var prv=pr.totalRevenue||0; prevVal=r2(prv-psp-prv*0.388); }
     if (prevKey === 'orders')   prevVal = (pw.shopifyOrderTotals || {}).orders || 0;
     if (!prevVal) return '';
     var delta = r2((curr - prevVal) / prevVal * 100);
@@ -833,19 +781,14 @@ function renderOverview(d) {
   }
 
   document.getElementById('ov-kpis').innerHTML = noDataBanner + [
-    kpi('Total Ads Spend',     cur(totalSpend) + wowDelta(totalSpend,'spend'),   'FB ' + cur(b.fb_spend || 0) + ' + GG ' + cur(b.gg_spend || 0)),
-    kpi('True Revenue ($)',    cur(totalRevInp) + wowDelta(totalRevInp,'revenue'),'Shopify revenue · USD', 'green'),
-    kpi('True ROAS',           nf(trueROAS,2)+'x'+wowDelta(trueROAS,'roas'),     'True Revenue ÷ Paid Spend', roasCls(trueROAS, 1.65)),
-    kpi('Est. True Profit',    cur(profit)+wowDelta(profit,'profit'),             'True Rev − Ads − FF − GW − App − TaxAds', profit >= 0 ? 'green' : 'red'),
-    kpi('Fulfillment (29%)',   cur(fulfillment),          'True Rev × 29%', 'warn'),
-    kpi('Gateway Fee (7%)',    cur(gatewayFee),           'True Rev × 7%', 'pink'),
-    kpi('OpenAI / API',        cur(appApiCost),
-    nf((DATA.openAI || {}).totalItems || 0, 0) + ' items · '
-    + cur((DATA.openAI || {}).spentPerItem || 0) + '/item', 'pink'),
-    kpi('TaxAds TXG 07 (12%)', cur(taxAds),               'TXG 07 Spend × 12%', 'pink'),
-    kpi('True Orders',         nf(o.orders||0)+wowDelta(o.orders||0,'orders'),   'Số đơn hàng thực tế', 'blue'),
+    kpi('Paid Ads Spend',      cur(totalSpend) + wowDelta(totalSpend,'spend'),   'FB ' + cur(b.fb_spend || 0) + ' + GG ' + cur(b.gg_spend || 0)),
+    kpi('Shopify Order Revenue', cur(totalRevInp) + wowDelta(totalRevInp,'revenue'),'Includes shipping', 'green'),
+    kpi('Store ROAS',          nf(trueROAS,2)+'x'+wowDelta(trueROAS,'roas'),     'Shopify order revenue ÷ paid spend', roasCls(trueROAS, 1.65)),
+    kpi('FB Attr.Revenue',     cur((d.fbTotals || {}).revenue || 0), 'Meta-attributed', 'blue'),
+    kpi('Google Attr.Revenue', cur((d.ggTotals || {}).revenue || 0), 'Google-attributed', 'blue'),
+    kpi('Shopify Orders',      nf(o.orders||0)+wowDelta(o.orders||0,'orders'),   'Đơn hàng thực tế', 'blue'),
     kpi('Shipping Revenue',    cur(o.shipping || 0),      'Tiền khách trả ship', 'blue'),
-    kpi('AOV',                 cur(o.aov || 0),           'True Rev ÷ True Orders', 'blue'),
+    kpi('AOV',                 cur(o.aov || 0),           'Shopify Order Revenue ÷ Shopify Orders', 'blue'),
     kpi('Retention Rate',      pct(o.retentionRate || 0), 'Tỷ lệ khách cũ', (o.retentionRate > 15 ? 'green' : 'warn')),
   ].join('');
 
@@ -870,7 +813,27 @@ function renderOverview(d) {
     ];
   });
   document.getElementById('ov-market-tbl').innerHTML = mkTable(
-    ['Market', 'Paid Spend ($)', 'True Revenue ($)', 'True ROAS', 'Attr Revenue ($)', 'Attr Purchases'], mktRows
+    ['Market', 'Paid Spend ($)', 'Shopify Order Revenue · incl. shipping ($)', 'Store ROAS', 'Attr.Revenue ($)', 'Attr.Order'], mktRows
+  );
+
+  var fb = d.fbTotals || {}, gg = d.ggTotals || {};
+  var channelRows = [
+    ['Facebook Ads', fb], ['Google Ads', gg]
+  ].map(function(item) {
+    var name = item[0], m = item[1] || {};
+    var spend = m.spend || 0;
+    return [
+      '<strong>' + name + '</strong>',
+      '<span class="num">' + cur(spend) + '</span>',
+      '<span class="num">' + pct(totalSpend > 0 ? spend / totalSpend * 100 : 0) + '</span>',
+      '<span class="num">' + cur(m.revenue || 0) + '</span>',
+      '<span class="num">' + nf(m.purchases || 0, 1) + '</span>',
+      '<span class="num">' + nf(m.roas || 0, 2) + 'x</span>',
+      '<span class="num">' + cur(m.cpa || 0) + '</span>'
+    ];
+  });
+  document.getElementById('ov-channel-tbl').innerHTML = mkTable(
+    ['Channel', 'Spend ($)', 'Spend Share', 'Attr.Revenue ($)', 'Attr.Order', 'Attr.ROAS', 'Attr.CPA'], channelRows
   );
 
   // Daily trend
@@ -890,21 +853,13 @@ function renderOverview(d) {
     data: {
       labels: allDates.map(fd),
       datasets: [
-        { label: 'True Revenue ($)',
+        { label: 'Shopify Order Revenue · incl. shipping ($)',
           data: allDates.map(function(dt) { return revMap[dt] || 0; }),
           yAxisID: 'yR', borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.08)',
           fill: true, pointRadius: 2, tension: .3 },
-        { label: 'Paid Spend ($)',
+        { label: 'Paid Ads Spend ($)',
           data: allDates.map(function(dt) { return spendMap[dt] ? spendMap[dt].spend : 0; }),
-          yAxisID: 'yR', borderColor: '#f87171', pointRadius: 2, tension: .3 },
-        { label: 'Est. True Profit',
-          data: allDates.map(function(dt) {
-            var trv = revMap[dt] || 0;
-            var sp  = spendMap[dt] ? spendMap[dt].spend : 0;
-            // Rev - Ads - FF(29%) - GW(7%) - App(2.8%) - TaxAds(txg07Ratio×12% of sp)
-            return r2(trv - sp - trv * 0.388 - sp * txg07Ratio * 0.12);
-          }),
-          yAxisID: 'yR', borderColor: '#a78bfa', borderDash: [4, 3], pointRadius: 2, tension: .3 }
+          yAxisID: 'yR', borderColor: '#f87171', pointRadius: 2, tension: .3 }
       ]
     },
     options: {
@@ -917,12 +872,8 @@ function renderOverview(d) {
 
   // FIX #4: Donut với % trong tooltip và legend
   var donutItems = [
-    { label: 'Paid Ads',      val: totalSpend,         color: '#3b82f6' },
-    { label: 'Fulfillment',   val: fulfillment,         color: '#f59e0b' },
-    { label: 'Gateway Fee',   val: gatewayFee,          color: '#8b5cf6' },
-    { label: 'APP API',       val: appApiCost,          color: '#ec4899' },
-    { label: 'TaxAds TXG07', val: taxAds,              color: '#06b6d4' },
-    { label: 'Profit',        val: Math.max(0, profit), color: '#22c55e' }
+    { label: 'Facebook Ads', val: (d.fbTotals || {}).spend || 0, color: '#3b82f6' },
+    { label: 'Google Ads',   val: (d.ggTotals || {}).spend || 0, color: '#22c55e' }
   ];
   var donutTotal = donutItems.reduce(function(s, x) { return s + x.val; }, 0);
   mkCh('ch-ov-donut', {
@@ -972,19 +923,19 @@ function renderOverview(d) {
   var gapColor, gapLabel, gapNote;
   if (gap >= 0) {
     gapColor = '#4ade80';
-    gapLabel = 'Organic / Shipping / Unattributed';
-    gapNote  = 'ℹ️ Shopify thu thêm <strong style="color:#fbbf24">' + cur(gap) + '</strong> so với Ads claim → organic / ship / direct.';
+    gapLabel = 'Unattributed / timing / order-level differences';
+    gapNote  = 'Shopify Order Revenue cao hơn tổng Attr.Revenue <strong style="color:#fbbf24">' + cur(gap) + '</strong>. Chênh lệch có thể đến từ organic/direct, attribution window, thời điểm ghi nhận hoặc shipping trong Shopify order revenue.';
   } else {
     gapColor = '#f87171';
-    gapLabel = 'Double-count hoặc FX gap';
-    gapNote  = '⚠️ Ads claim nhiều hơn Shopify <strong style="color:#f87171">' + cur(Math.abs(gap)) + '</strong> → double-attribution hoặc tỷ giá cố định 1.1 vs thị trường.';
+    gapLabel = 'Attribution / timing difference';
+    gapNote  = 'Tổng Attr.Revenue cao hơn Shopify Order Revenue <strong style="color:#f87171">' + cur(Math.abs(gap)) + '</strong>. Facebook và Google có thể cùng ghi nhận một đơn; ngoài ra attribution window và thời điểm ghi nhận cũng tạo chênh lệch.';
   }
 
   document.getElementById('ov-gap').innerHTML =
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;text-align:center;padding:8px 0 16px">'
-    + '<div><div style="font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">True Revenue</div>'
+    + '<div><div style="font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Shopify Order Revenue</div>'
     + '<div style="font-size:24px;font-weight:800;color:#4ade80">' + cur(totalRevInp) + '</div></div>'
-    + '<div><div style="font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Attr Revenue (FB+GG)</div>'
+    + '<div><div style="font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Combined Attr.Revenue (FB+GG)</div>'
     + '<div style="font-size:24px;font-weight:800;color:#a78bfa">' + cur(b.revenue || 0) + '</div></div>'
     + '<div><div style="font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Gap ($)</div>'
     + '<div style="font-size:24px;font-weight:800;color:' + gapColor + '">' + (gap >= 0 ? '+' : '') + cur(gap) + '</div>'
@@ -1293,7 +1244,7 @@ function renderStore(d) {
     return ST_PROD_SORT.dir * ((av || 0) - (bv || 0));
   });
 
-  var stHeads = ['#', 'ID', 'Preview', 'Product Created At', 'Product', 'Type', 'Market', 'True Orders', 'True Revenue ($)'];
+  var stHeads = ['#', 'ID', 'Preview', 'Product Created At', 'Product', 'Type', 'Market', 'Shopify Order Lines', 'Shopify Product Revenue ($)'];
   var headerHtml = '<thead><tr>' + stHeads.map(function(h, i) {
     if (i < 7) return '<th>' + h + '</th>';
     var ind = (ST_PROD_SORT.col === i) ? (ST_PROD_SORT.dir === 1 ? ' ▲' : ' ▼') : '';
@@ -1494,6 +1445,9 @@ function renderCampaign(d) {
   renderFilterPills('cp-occasion-pills', 'Occasion', fo.occasions || [], CP_OCCASIONS, 'setCampaignOccasion');
   renderFilterPills('cp-interest-pills', 'Interest', fo.interests || [], CP_INTERESTS, 'setCampaignInterest');
 
+  renderFbHierarchy(d);
+  renderTopCreatives(d);
+
   if ((d.adsRows || []).length && (CP_MARKETS.length || CP_TYPES.length || CP_OCCASIONS.length || CP_INTERESTS.length)) {
     renderCampaignFromRows(d);
     return;
@@ -1659,24 +1613,226 @@ function renderCampaign(d) {
     ['Market', 'Spend', '% Spend', 'Attr Revenue', 'Attr ROAS', 'Attr Purchases'], cpMktRows
   );
 
-  var creas    = (d.topCreatives || []).slice(0, 20);
+}
+
+function renderFacebookAds(d) {
+  var rows = (d.adsRows || []).filter(function(r) { return r.source === 'FB'; });
+  var totals = {}, daily = {}, markets = {};
+  rows.forEach(function(r) {
+    addMetric(totals, r);
+    var date = r.date || '';
+    if (!daily[date]) daily[date] = {};
+    addMetric(daily[date], r);
+    var market = (r.country || 'Unknown').toUpperCase();
+    if (!markets[market]) markets[market] = {};
+    addMetric(markets[market], r);
+  });
+  var ctr = totals.impressions > 0 ? totals.clicks / totals.impressions * 100 : 0;
+  var cpm = totals.impressions > 0 ? totals.spend / totals.impressions * 1000 : 0;
+  var cpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
+
+  document.getElementById('fb-kpis').innerHTML = rows.length ? [
+    kpi('Facebook Spend', cur(totals.spend), 'All active accounts'),
+    kpi('Attr.Revenue', cur(totals.revenue), 'Meta-reported purchase value', 'blue'),
+    kpi('Attr.Order', nf(totals.purchases, 1), 'Meta-reported purchases', 'blue'),
+    kpi('Attr.ROAS', nf(totals.roas, 2) + 'x', 'Attr.Revenue ÷ Facebook Spend', roasCls(totals.roas, 1.65)),
+    kpi('Attr.CPA', cur(totals.cpa), 'Spend ÷ Attr.Order'),
+    kpi('Impressions', nf(totals.impressions, 0), 'CTR ' + pct(ctr)),
+    kpi('Clicks', nf(totals.clicks, 0), 'CPC ' + cur(cpc)),
+    kpi('CPM', cur(cpm), 'Spend ÷ impressions × 1,000')
+  ].join('') : '<div class="placeholder"><div class="ph-title">Không có Facebook delivery trong khoảng ngày này</div></div>';
+
+  var dates = Object.keys(daily).sort();
+  mkCh('ch-fb-daily', {
+    type: 'line',
+    data: { labels: dates.map(fd), datasets: [
+      { label: 'Facebook Spend ($)', data: dates.map(function(k) { return daily[k].spend || 0; }),
+        borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,.08)', fill: true, tension: .3, pointRadius: 2 },
+      { label: 'Attr.Revenue ($)', data: dates.map(function(k) { return daily[k].revenue || 0; }),
+        borderColor: '#a78bfa', tension: .3, pointRadius: 2 }
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' } }, scales: { y: { grid: GRID, ticks: TICK_Y } } }
+  });
+  var mktKeys = Object.keys(markets).filter(function(k) { return k !== 'UNKNOWN'; });
+  mkCh('ch-fb-market', {
+    type: 'doughnut',
+    data: { labels: mktKeys, datasets: [{ data: mktKeys.map(function(k) { return markets[k].spend || 0; }),
+      backgroundColor: ['#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#f87171'], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right' }, tooltip: { callbacks: { label: function(ctx) { return ' ' + cur(ctx.raw) + ' spend'; } } } } }
+  });
+
+  renderFbHierarchy(d);
+  renderTopCreatives(d);
+}
+
+function renderGoogleAds(d) {
+  var rows = (d.adsRows || []).filter(function(r) { return r.source === 'GG'; });
+  var totals = {}, daily = {}, campaigns = {}, products = {}, shopifyProducts = {};
+  (d.shopifyRows || []).forEach(function(r) {
+    if (!r.productId || isServiceType(r.type)) return;
+    if (!shopifyProducts[r.productId]) shopifyProducts[r.productId] = { revenue: 0, units: 0, title: r.title, imageUrl: r.imageUrl, fullUrl: r.fullUrl };
+    shopifyProducts[r.productId].revenue += r.revenue || 0;
+    shopifyProducts[r.productId].units += r.unitsSold || 0;
+  });
+  rows.forEach(function(r) {
+    addMetric(totals, r);
+    var date = r.date || '';
+    if (!daily[date]) daily[date] = {};
+    addMetric(daily[date], r);
+    var camp = r.campaignName || r.campaign || 'Campaign unavailable';
+    var campKey = (r.account || 'Google Ads') + '|' + camp;
+    if (!campaigns[campKey]) campaigns[campKey] = { name: camp, account: r.account || 'Google Ads', spend: 0, revenue: 0, purchases: 0, clicks: 0, impressions: 0 };
+    addMetric(campaigns[campKey], r);
+    var productKey = r.productId || r.sku || r.title || 'Unmapped';
+    if (!products[productKey]) products[productKey] = {
+      productId: r.productId || '', sku: r.sku || '', title: r.title || '', type: r.type || 'Unknown',
+      imageUrl: r.imageUrl || '', fullUrl: '', spend: 0, revenue: 0, purchases: 0, clicks: 0, impressions: 0
+    };
+    addMetric(products[productKey], r);
+  });
+
+  var ctr = totals.impressions > 0 ? totals.clicks / totals.impressions * 100 : 0;
+  var cpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
+  document.getElementById('gg-kpis').innerHTML = rows.length ? [
+    kpi('Google Spend', cur(totals.spend), 'Shopping / PMax rows in selected period'),
+    kpi('Attr.Revenue', cur(totals.revenue), 'Google conversion value', 'blue'),
+    kpi('Attr.Order', nf(totals.purchases, 1), 'Google conversions', 'blue'),
+    kpi('Attr.ROAS', nf(totals.roas, 2) + 'x', 'Attr.Revenue ÷ Google Spend', roasCls(totals.roas, 1.65)),
+    kpi('Attr.CPA', cur(totals.cpa), 'Spend ÷ Attr.Order'),
+    kpi('Impressions', nf(totals.impressions, 0), 'CTR ' + pct(ctr)),
+    kpi('Clicks', nf(totals.clicks, 0), 'CPC ' + cur(cpc))
+  ].join('') : '<div class="placeholder"><div class="ph-title">Không có Google Ads delivery trong khoảng ngày này</div><div class="ph-note">Kiểm tra date range hoặc dữ liệu GOOGLE_ADS.</div></div>';
+
+  var dates = Object.keys(daily).sort();
+  mkCh('ch-gg-daily', {
+    type: 'line', data: { labels: dates.map(fd), datasets: [
+      { label: 'Google Spend ($)', data: dates.map(function(k) { return daily[k].spend || 0; }),
+        borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,.08)', fill: true, tension: .3, pointRadius: 2 },
+      { label: 'Attr.Revenue ($)', data: dates.map(function(k) { return daily[k].revenue || 0; }),
+        borderColor: '#fbbf24', tension: .3, pointRadius: 2 }
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' } }, scales: { y: { grid: GRID, ticks: TICK_Y } } }
+  });
+
+  var campaignRows = Object.values(campaigns).sort(function(a, b) { return b.spend - a.spend; }).map(function(m) {
+    var rowCtr = m.impressions > 0 ? m.clicks / m.impressions * 100 : 0;
+    return ['<strong>' + escHtml(m.name) + '</strong><br><span style="font-size:10px;color:#64748b">' + escHtml(m.account) + '</span>', '<span class="num">' + cur(m.spend) + '</span>',
+      '<span class="num">' + cur(m.revenue) + '</span>', '<span class="num">' + nf(m.purchases, 1) + '</span>',
+      '<span class="num">' + nf(m.roas, 2) + 'x</span>', '<span class="num">' + cur(m.cpa) + '</span>',
+      '<span class="num">' + nf(m.impressions, 0) + '</span>', '<span class="num">' + nf(m.clicks, 0) + '</span>',
+      '<span class="num">' + pct(rowCtr) + '</span>'];
+  });
+  document.getElementById('gg-campaigns-tbl').innerHTML = mkTable(
+    ['Campaign / Account', 'Spend ($)', 'Attr.Revenue ($)', 'Attr.Order', 'Attr.ROAS', 'Attr.CPA', 'Impressions', 'Clicks', 'CTR'], campaignRows
+  );
+
+  GG_PRODUCT_ROWS = Object.values(products).map(function(p) {
+    var shop = p.productId ? shopifyProducts[p.productId] : null;
+    p.fullUrl = (shop && shop.fullUrl) || p.fullUrl || '';
+    p.imageUrl = (shop && shop.imageUrl) || p.imageUrl || '';
+    p.shopifyRevenue = shop ? shop.revenue : 0;
+    p.shopifyUnits = shop ? shop.units : 0;
+    p.productTrueRoas = p.spend > 0 ? p.shopifyRevenue / p.spend : 0;
+    return p;
+  }).sort(function(a, b) { return b.spend - a.spend; });
+  renderGoogleProductTable();
+}
+
+function renderGoogleProductTable() {
+  var query = ((document.getElementById('gg-product-search') || {}).value || '').toLowerCase().trim();
+  var rows = GG_PRODUCT_ROWS.filter(function(p) {
+    return !query || (p.title + ' ' + p.sku + ' ' + p.productId).toLowerCase().indexOf(query) >= 0;
+  });
+  var shown = rows.slice(0, 100).map(function(p) {
+    var productUrl = p.fullUrl || (p.productId ? productUrlFromFullUrl('', p.productId) : '');
+    var thumb = p.imageUrl ? '<img src="' + escHtml(p.imageUrl) + '" alt="" loading="lazy" style="width:42px;height:42px;object-fit:cover;border-radius:5px">' : '–';
+    var product = p.title ? escHtml(p.title) : '<span style="color:#fbbf24">Chưa map sản phẩm Shopify</span>';
+    if (productUrl && p.title) product = '<a href="' + escHtml(productUrl) + '" target="_blank" rel="noopener">' + product + '</a>';
+    return [thumb, product + '<br><span style="font-size:10px;color:#64748b">' + escHtml(p.sku || p.productId || 'Unmapped') + '</span>',
+      '<span class="num">' + cur(p.spend) + '</span>', '<span class="num">' + cur(p.revenue) + '</span>',
+      '<span class="num">' + nf(p.purchases, 1) + '</span>', '<span class="num">' + nf(p.roas, 2) + 'x</span>',
+      '<span class="num">' + cur(p.shopifyRevenue) + '</span>', '<span class="num">' + (p.productId ? nf(p.productTrueRoas, 2) + 'x' : '–') + '</span>'];
+  });
+  document.getElementById('gg-products-tbl').innerHTML = mkTable(
+    ['Preview', 'Product / SKU', 'Google Spend', 'Attr.Revenue', 'Attr.Order', 'Attr.ROAS', 'Shopify Product Revenue', 'Product True ROAS'], shown
+  );
+  var count = document.getElementById('gg-product-count');
+  if (count) count.textContent = rows.length + ' products' + (rows.length > 100 ? ' · showing top 100 by spend' : '');
+}
+
+function renderTopCreatives(d) {
+  var creas = (d.topCreatives || []).slice(0, 25);
   var creaRows = creas.map(function(c) {
-    var u = c.fullUrl
-      ? c.fullUrl.replace(/^https?:\/\/[^/]+/, '').slice(0, 48)
-      : (c.ad || '').slice(0, 48);
+    var title = c.creativeId ? 'Creative ' + c.creativeId : (c.ad || c.fullUrl || 'Creative');
+    var preview = c.thumbnailUrl
+      ? '<a href="' + escHtml(c.previewUrl || c.thumbnailUrl) + '" target="_blank" rel="noopener"><img src="' + escHtml(c.thumbnailUrl) + '" alt="" style="width:52px;height:40px;object-fit:cover;border-radius:4px"></a>'
+      : '–';
+    var titleCell = c.previewUrl
+      ? '<a href="' + escHtml(c.previewUrl) + '" target="_blank" rel="noopener">' + escHtml(title) + '</a>'
+      : escHtml(title);
+    var destination = c.fullUrl || c.landingUrl || '';
     return [
-      '<span style="font-size:11px;color:#94a3b8" title="' + (c.fullUrl || '') + '">' + u + '</span>',
-      '<span style="font-size:10px;color:#a78bfa">' + (c.prodType || '–') + '</span>',
-      '<span class="num">' + cur(c.spend)   + '</span>',
+      preview,
+      '<span style="font-size:11px">' + titleCell + '</span><br><span style="font-size:9px;color:#64748b">' + escHtml(c.creativeId || 'ID unavailable') + '</span>',
+      '<span style="font-size:10px;color:#a78bfa">' + escHtml(c.prodType || '–') + '</span>',
+      '<span class="num">' + cur(c.spend) + '</span>',
       '<span class="num">' + cur(c.revenue) + '</span>',
-      '<span class="num" style="' + roasStyle(c.roas, c.beRoas || 1.63) + '">' + nf(c.roas, 2) + 'x</span>',
+      '<span class="num">' + nf(c.roas, 2) + 'x</span>',
       '<span class="num">' + nf(c.purchases, 1) + '</span>',
-      '<span class="num">' + nf(c.impressions)  + '</span>'
+      '<a href="' + escHtml(destination || '#') + '" target="_blank" rel="noopener">Destination</a>'
     ];
   });
   document.getElementById('cp-crea-tbl').innerHTML = mkTable(
-    ['Creative URL', 'Type', 'Spend', 'Attr Revenue', 'Attr ROAS', 'Attr Purchases', 'Impressions'], creaRows
+    ['Preview', 'Creative ID / Ad', 'Product Type', 'Spend', 'Attr.Revenue', 'Attr.ROAS', 'Attr.Order', 'Landing Page'], creaRows
   );
+}
+
+function renderFbHierarchy(d) {
+  var root = document.getElementById('cp-fb-hierarchy');
+  var campaigns = d.fbHierarchy || [];
+  var available = d.fbStructureAvailable || {};
+  var notice = (!available.FB_ADS || !available.FB_CREATIVE_ASSETS)
+    ? '<div style="margin-bottom:8px;padding:8px 10px;background:#1e293b;color:#fbbf24;border-radius:5px;font-size:11px">Hierarchy metrics are available from FB_AD_DATA. Run FB_REFRESH_STRUCTURE() to populate current statuses, Ads Manager links, and flexible creative assets.</div>'
+    : '';
+  if (!campaigns.length) {
+    var hint = available.FB_ADS ? 'No Facebook ad delivery rows in this date range.'
+      : 'Campaign metadata sheets are not populated yet. Run FB_REFRESH_STRUCTURE() in the Facebook Ads script.';
+    root.innerHTML = notice + '<div class="cbox" style="color:#94a3b8;font-size:12px">' + escHtml(hint) + '</div>';
+    return;
+  }
+  root.innerHTML = notice + campaigns.map(function(c) {
+    var cm = c.metrics || {};
+    var adsetHtml = (c.adsets || []).map(function(s) {
+      var sm = s.metrics || {};
+      var adRows = (s.ads || []).map(function(a) {
+        var m = a.metrics || {};
+        var img = a.thumbnailUrl
+          ? '<a href="' + escHtml(a.previewUrl || a.thumbnailUrl) + '" target="_blank" rel="noopener"><img src="' + escHtml(a.thumbnailUrl) + '" alt="" style="width:48px;height:36px;object-fit:cover;border-radius:4px"></a>'
+          : '–';
+        var adName = a.previewUrl
+          ? '<a href="' + escHtml(a.previewUrl) + '" target="_blank" rel="noopener">' + escHtml(a.name || a.id || 'Ad') + '</a>'
+          : escHtml(a.name || a.id || 'Ad');
+        var assetSummary = (a.assets || []).slice(0, 4).map(function(x) {
+          return x.previewUrl ? '<a href="' + escHtml(x.previewUrl) + '" target="_blank" rel="noopener">' + escHtml(x.type || x.label || 'Asset') + '</a>' : escHtml(x.type || x.label || 'Asset');
+        }).join(', ');
+        return [img, adName + '<br><span style="font-size:9px;color:#64748b">Creative ' + escHtml(a.creativeId || '–') + '</span>',
+          '<span class="num">' + cur(m.spend) + '</span>', '<span class="num">' + cur(m.revenue) + '</span>',
+          '<span class="num">' + nf(m.roas, 2) + 'x</span>', '<span class="num">' + cur(m.cpa) + '</span>',
+          '<span class="num">' + nf(m.purchases, 1) + '</span>', '<span class="num">' + nf(m.impressions) + '</span>',
+          '<span class="num">' + pct(m.ctr) + '</span>', '<span class="num">' + nf(m.clicks) + '</span>', assetSummary || '–'];
+      });
+      var table = mkTable(['Preview', 'Ad / Creative ID', 'Spend', 'Attr.Revenue', 'Attr.ROAS', 'Attr.CPA', 'Attr.Order', 'Impressions', 'CTR', 'Clicks', 'Creative Assets'], adRows);
+      var state = s.status ? ' · ' + escHtml(s.status) : '';
+      var budget = s.dailyBudget ? ' · Daily budget ' + cur(s.dailyBudget) : '';
+      return '<details style="margin:8px 0 8px 18px"><summary style="cursor:pointer;color:#bfdbfe">Ad set: ' + escHtml(s.name || s.id || 'Unknown') + state + budget + ' · Spend ' + cur(sm.spend) + ' · Attr.ROAS ' + nf(sm.roas, 2) + 'x · Attr.Order ' + nf(sm.purchases, 1) + '</summary><div style="padding:8px 0">' + table + '</div></details>';
+    }).join('');
+    var state = c.status ? ' · ' + escHtml(c.status) : '';
+    var objective = c.objective ? ' · ' + escHtml(c.objective) : '';
+    return '<details style="margin:6px 0;padding:8px 10px;background:#0b1729;border:1px solid #1e293b;border-radius:6px"><summary style="cursor:pointer;color:#e2e8f0"><strong>' + escHtml(c.name || c.id || 'Campaign') + '</strong> · ' + escHtml(c.account || '') + state + objective + ' · Spend ' + cur(cm.spend) + ' · Attr.Revenue ' + cur(cm.revenue) + ' · Attr.ROAS ' + nf(cm.roas, 2) + 'x · Attr.CPA ' + cur(cm.cpa) + ' · Attr.Order ' + nf(cm.purchases, 1) + ' · CTR ' + pct(cm.ctr) + '</summary>' + (adsetHtml || '<div style="padding:8px 20px;color:#94a3b8">No ad sets in the selected period.</div>') + '</details>';
+  }).join('');
 }
 
 function renderCampaignFromRows(d) {
@@ -1826,7 +1982,6 @@ function renderCampaignFromRows(d) {
     return ['<span class="badge b-' + k.toLowerCase() + '">' + k + '</span>', '<span class="num">' + cur(m.spend) + '</span>', '<span class="num" style="color:#94a3b8;font-size:11px">' + pct(spendPct) + '</span>', '<span class="num">' + cur(m.revenue) + '</span>', '<span class="num" style="' + roasStyle(m.roas, 1.65) + '">' + nf(m.roas, 2) + 'x</span>', '<span class="num">' + nf(m.purchases, 1) + '</span>'];
   });
   document.getElementById('cp-mkt-tbl').innerHTML = mkTable(['Market', 'Spend', '% Spend', 'Attr Revenue', 'Attr ROAS', 'Attr Purchases'], cpMktRows);
-  document.getElementById('cp-crea-tbl').innerHTML = mkTable(['Note', 'Filtered Rows'], [['Creative URL detail', rows.length + ' ads rows matched filter']]);
 }
 
 function showTypeDetailFiltered(type, rows) {
@@ -2242,7 +2397,7 @@ function renderPITable() {
   var pageRows = filtered.slice(startIdx, startIdx + PI_PAGE_SIZE);
   if (countEl) countEl.textContent = filtered.length + ' sản phẩm · Trang ' + PI_PAGE + '/' + totalPages;
 
-  var headers = ['#','ID','Preview','Product Created At','Product','Type','Market','Spend','True Revenue ($)','True ROAS','Attr Revenue ($)','Attr ROAS','True Purch','FB/GG'];
+  var headers = ['#','ID','Preview','Product Created At','Product','Type','Market','Paid Spend','Shopify Product Revenue ($)','Product True ROAS','Attr.Revenue ($)','Attr.ROAS','Shopify Order Lines','FB/GG Spend'];
   var sortableIdx = [3,7,8,9,10,11,12]; // Created, Spend, True Rev, True ROAS, Attr Rev, Attr ROAS, True Purch
 
   var headerHtml = '<thead><tr>' + headers.map(function(h, i) {
@@ -2426,7 +2581,7 @@ function renderPITypesTable() {
     return dir * ((av||0) - (bv||0));
   });
 
-  var heads = ['Type','BE','Spend','True Revenue ($)','True ROAS','Attr Revenue ($)','Attr ROAS','vs BE','True Purch','True CPA','FB/GG'];
+  var heads = ['Type','BE (provisional)','Paid Spend','Shopify Product Revenue ($)','Product True ROAS','Attr.Revenue ($)','Attr.ROAS','vs BE (provisional)','Shopify Order Lines','Product CPA','FB/GG Spend'];
   var sortableCols = [2,3,4,5,6,7,8,9];
   var headerHtml = '<thead><tr>' + heads.map(function(h, i) {
     if (sortableCols.indexOf(i) === -1) return '<th>' + h + '</th>';
