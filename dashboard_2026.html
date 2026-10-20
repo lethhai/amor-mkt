@@ -298,20 +298,25 @@ thead th.sortable:hover{color:#a78bfa}
       <div class="infobox">Attr.Revenue và Attr.Order dùng attribution của từng nền tảng; có thể trùng đơn, nên không cộng hai kênh để thay cho Shopify Order Revenue.</div>
       <div id="ov-channel-tbl" class="twrap"></div>
     </div>
-    <div class="g2">
-      <div>
-        <div class="st">Marketing performance theo ngày</div>
-        <div class="cbox">
-          <div class="ctitle">Shopify Order Revenue (incl. shipping) vs Paid Spend ($)</div>
-          <div class="chart-container"><canvas id="ch-ov-daily"></canvas></div>
+    <div class="section">
+      <div class="st">Marketing performance theo ngày</div>
+      <div class="cbox">
+        <div id="ov-market-filter" class="filter-bar" style="margin-bottom:10px">
+          <span style="font-size:11px;color:#94a3b8;font-weight:600">Store market:</span>
+          <button class="filter-btn active" data-overview-market="all" onclick="setOverviewMarket('all')">🌍 Tất cả</button>
+          <button class="filter-btn" data-overview-market="ES" onclick="setOverviewMarket('ES')">🇪🇸 ES</button>
+          <button class="filter-btn" data-overview-market="IT" onclick="setOverviewMarket('IT')">🇮🇹 IT</button>
         </div>
+        <div class="ctitle" id="ov-daily-title">Revenue · Ads Spend · Profit theo ngày</div>
+        <div class="infobox" style="margin-bottom:10px">Profit ước tính = Shopify Revenue − Ads Spend − 30% fulfillment − 7% chi phí cố định − chi phí GPT/Gemini. Khi chọn riêng ES hoặc IT, chi phí AI được phân bổ theo tỷ trọng Shopify revenue của market đó trong từng ngày.</div>
+        <div class="chart-container-lg"><canvas id="ch-ov-daily"></canvas></div>
       </div>
-      <div>
-        <div class="st">Paid spend theo kênh</div>
-        <div class="cbox">
-          <div class="ctitle">Facebook vs Google Spend</div>
-          <div class="chart-container"><canvas id="ch-ov-donut"></canvas></div>
-        </div>
+    </div>
+    <div class="section">
+      <div class="st">Paid spend theo kênh</div>
+      <div class="cbox">
+        <div class="ctitle">Facebook vs Google Spend</div>
+        <div class="chart-container-sm"><canvas id="ch-ov-donut"></canvas></div>
       </div>
     </div>
     <div class="section">
@@ -389,15 +394,25 @@ thead th.sortable:hover{color:#a78bfa}
 
   <!-- TAB 4 — PRODUCT INTELLIGENCE -->
   <div class="tab-panel" id="tab-products">
+    <div class="section">
+      <div class="st">Bộ lọc Product ROAS</div>
+      <div class="infobox">Các bộ lọc bên dưới áp dụng đồng thời cho KPI, biểu đồ theo ngày và cả hai bảng. Search, ngày tạo sản phẩm và lọc BE chỉ áp dụng cho bảng sản phẩm.</div>
+      <div class="filter-bar" id="pi-market-pills"></div>
+      <div class="filter-bar" id="pi-type-pills"></div>
+      <div class="filter-bar" id="pi-occasion-pills"></div>
+      <div class="filter-bar" id="pi-interest-pills"></div>
+      <div class="filter-bar" id="pi-recipient-pills"></div>
+    </div>
     <div id="pi-kpis" class="kpi-grid"></div>
+    <div class="section">
+      <div class="st">Shopify Product Revenue · Paid Spend · Product True ROAS theo ngày</div>
+      <div class="infobox">Revenue = doanh thu sản phẩm từ Shopify; Paid Spend = chi tiêu FB + Google đã map sản phẩm; Product True ROAS = Shopify product revenue ÷ paid spend.</div>
+      <div class="cbox"><div class="chart-container-lg"><canvas id="ch-pi-daily"></canvas></div></div>
+    </div>
     <div class="section">
       <div class="st">Product Types — Product True ROAS vs BE ROAS (provisional)</div>
       <div class="infobox">Product True ROAS = Shopify product revenue ÷ mapped FB/Google spend. Revenue theo sản phẩm không gồm shipping. BE ROAS hiện là ngưỡng tạm thời; cấu hình <code>BE_ROAS_CONFIG</code> đang chờ cập nhật, nên chưa dùng để kết luận đạt/chưa đạt.</div>
       <div id="pi-types-tbl" class="twrap"></div>
-    </div>
-    <div class="section">
-      <div class="st">Top Products — Spend vs Product True ROAS (bubble size = Shopify Product Revenue)</div>
-      <div class="cbox"><div class="chart-container-lg"><canvas id="ch-pi-bubble"></canvas></div></div>
     </div>
     <div class="section">
       <div class="st">Products — Shopify sales matched to ad spend</div>
@@ -408,14 +423,10 @@ thead th.sortable:hover{color:#a78bfa}
         <span style="color:#475569">→</span>
         <input type="date" id="pi-created-to" onchange="setProductCreatedFilter()">
         <button class="filter-btn" onclick="clearProductCreatedFilter()">Tất cả ngày tạo</button>
-        <span id="pi-market-pills"></span>
         <button class="filter-btn" data-roas="below" onclick="setRoasFilter(this,'below')">⚠️ Dưới BE tạm</button>
         <button class="filter-btn" data-roas="above" onclick="setRoasFilter(this,'above')">✅ Trên BE tạm</button>
         <span style="font-size:11px;color:#475569;margin-left:4px" id="pi-count"></span>
       </div>
-      <div class="filter-bar" style="margin-bottom:12px" id="pi-type-pills"></div>
-      <div class="filter-bar" style="margin-bottom:12px" id="pi-occasion-pills"></div>
-      <div class="filter-bar" style="margin-bottom:12px" id="pi-interest-pills"></div>
       <div id="pi-top-tbl" class="twrap"></div>
       <div id="pi-pager" class="filter-bar" style="justify-content:flex-end;margin-top:-6px"></div>
     </div>
@@ -626,7 +637,7 @@ function isServiceType(t) {
 // ═══════════════════════════════════════
 // CONFIG & STATE
 // ═══════════════════════════════════════
-var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyUbMxs6rsIE_a9I91xDxlKFt1XZWxaWUQY5LR9cuf5as9_ng1HuKFhvuCaz53jTkUK/exec';
+var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyb_dR66b_LhILys2bu7pVmXZojt_1etps8CrWz0XFdEz9Bw21HgMaBLHMaqBSRJhkW/exec';
 function getGasUrl() { return localStorage.getItem('gas_url') || DEFAULT_GAS_URL; }
 
 Chart.defaults.color       = '#64748b';
@@ -639,6 +650,7 @@ var GG_PRODUCT_ROWS = [];
 var CH      = {};
 var WOW_ON  = false;   // Week-over-Week toggle state
 var WOW_DATA= null;    // previous period data
+var OV_MARKET = 'all'; // Marketing Overview chart store selector
 
 // ═══════════════════════════════════════
 // DATE UTILS
@@ -846,39 +858,7 @@ function renderOverview(d) {
     ['Channel', 'Spend ($)', 'Spend Share', 'Attr.Revenue ($)', 'Attr.Order', 'Attr.ROAS', 'Attr.CPA'], channelRows
   );
 
-  // Daily trend
-  var dtAds = d.dailyTrend       || [];
-  var dtO   = d.shopifyOrderDaily || [];
-  var revMap = {}, spendMap = {};
-  dtO.forEach(function(row)   { revMap[row.date]   = row.totalRevenue; });
-  dtAds.forEach(function(row) { spendMap[row.date] = row; });
-  var allDates = []; var dateSet = {};
-  dtAds.concat(dtO).forEach(function(r) {
-    if (!dateSet[r.date]) { dateSet[r.date] = 1; allDates.push(r.date); }
-  });
-  allDates.sort();
-
-  mkCh('ch-ov-daily', {
-    type: 'line',
-    data: {
-      labels: allDates.map(fd),
-      datasets: [
-        { label: 'Shopify Order Revenue · incl. shipping ($)',
-          data: allDates.map(function(dt) { return revMap[dt] || 0; }),
-          yAxisID: 'yR', borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.08)',
-          fill: true, pointRadius: 2, tension: .3 },
-        { label: 'Paid Ads Spend ($)',
-          data: allDates.map(function(dt) { return spendMap[dt] ? spendMap[dt].spend : 0; }),
-          yAxisID: 'yR', borderColor: '#f87171', pointRadius: 2, tension: .3 }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { position: 'top' } },
-      scales: { yR: { grid: GRID, ticks: TICK_Y } }
-    }
-  });
+  renderOverviewDailyChart(d);
 
   // FIX #4: Donut với % trong tooltip và legend
   var donutItems = [
@@ -952,6 +932,131 @@ function renderOverview(d) {
     + '<div style="font-size:10px;color:' + gapColor + ';margin-top:2px">' + gapLabel + '</div></div>'
     + '</div>'
     + '<div style="border-top:1px solid #252840;padding-top:10px;font-size:11px;color:#475569">' + gapNote + '</div>';
+}
+
+function setOverviewMarket(mkt) {
+  OV_MARKET = mkt || 'all';
+  document.querySelectorAll('#ov-market-filter .filter-btn').forEach(function(btn) {
+    btn.classList.toggle('active', btn.getAttribute('data-overview-market') === OV_MARKET);
+  });
+  renderOverviewDailyChart(DATA);
+}
+
+function renderOverviewDailyChart(d) {
+  if (!d) return;
+
+  var selectedMarket = OV_MARKET || 'all';
+  var allRevenueByDay = {};
+  var marketRevenueByDay = {};
+  var dailyCountry = d.shopifyOrderDailyByCountry || {};
+  (d.shopifyOrderDaily || []).forEach(function(row) {
+    allRevenueByDay[row.date] = Number(row.totalRevenue) || 0;
+  });
+  Object.keys(dailyCountry).forEach(function(date) {
+    var dayMarkets = dailyCountry[date] || {};
+    marketRevenueByDay[date] = {};
+    Object.keys(dayMarkets).forEach(function(mkt) {
+      marketRevenueByDay[date][mkt.toUpperCase()] = Number(dayMarkets[mkt].totalRevenue) || 0;
+    });
+  });
+
+  var spendByDay = {};
+  (d.adsRows || []).forEach(function(row) {
+    var date = row.date;
+    if (!date) return;
+    var spend = Number(row.spend) || 0;
+    if (selectedMarket === 'all') {
+      spendByDay[date] = (spendByDay[date] || 0) + spend;
+      return;
+    }
+
+    var rowMarkets = Array.isArray(row.markets) ? row.markets.map(function(m) {
+      return String(m || '').toUpperCase();
+    }).filter(function(m) { return m && m !== 'UNKNOWN'; }) : [];
+    if (rowMarkets.length) {
+      if (rowMarkets.indexOf(selectedMarket) !== -1) {
+        spendByDay[date] = (spendByDay[date] || 0) + spend / rowMarkets.length;
+      }
+    } else if (String(row.country || '').toUpperCase() === selectedMarket) {
+      spendByDay[date] = (spendByDay[date] || 0) + spend;
+    }
+  });
+
+  var aiSpendByDay = {};
+  ((d.openAI || {}).daily || []).forEach(function(row) {
+    if (row.date) aiSpendByDay[row.date] = (aiSpendByDay[row.date] || 0) + (Number(row.spend) || 0);
+  });
+
+  var from = d.fromDate || '';
+  var to = d.toDate || from;
+  var dates = [];
+  if (from && to && from <= to) {
+    for (var date = from, guard = 0; date <= to && guard < 1100; date = addDays(date, 1), guard++) dates.push(date);
+  } else {
+    var dateSet = {};
+    [allRevenueByDay, spendByDay, aiSpendByDay].forEach(function(map) {
+      Object.keys(map).forEach(function(date) { dateSet[date] = true; });
+    });
+    dates = Object.keys(dateSet).sort();
+  }
+
+  var revenues = [], spends = [], profits = [];
+  dates.forEach(function(date) {
+    var dayMarkets = marketRevenueByDay[date] || {};
+    var allStoreRevenue = Number(allRevenueByDay[date]) || 0;
+    var revenue = selectedMarket === 'all'
+      ? allStoreRevenue : (Number(dayMarkets[selectedMarket]) || 0);
+    var adSpend = Number(spendByDay[date]) || 0;
+    var aiSpend = Number(aiSpendByDay[date]) || 0;
+
+    // AI tools have no market split in API; for ES/IT allocate daily cost by
+    // each market's share of the day's ES+IT Shopify order revenue.
+    if (selectedMarket !== 'all') {
+      var esItRevenue = (Number(dayMarkets.ES) || 0) + (Number(dayMarkets.IT) || 0);
+      aiSpend = esItRevenue > 0 ? aiSpend * revenue / esItRevenue : 0;
+    }
+
+    revenues.push(r2(revenue));
+    spends.push(r2(adSpend));
+    profits.push(r2(revenue - adSpend - revenue * 0.30 - revenue * 0.07 - aiSpend));
+  });
+
+  var labelMarket = selectedMarket === 'all' ? 'Tất cả market' : 'Store ' + selectedMarket;
+  var title = document.getElementById('ov-daily-title');
+  if (title) title.textContent = labelMarket + ' · ' + fdFull(from) + ' → ' + fdFull(to);
+
+  mkCh('ch-ov-daily', {
+    type: 'line',
+    data: {
+      labels: dates.map(fd),
+      datasets: [
+        { label: 'Shopify Revenue ($)', data: revenues,
+          borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.10)',
+          fill: true, pointRadius: 2, pointHoverRadius: 5, tension: .28 },
+        { label: 'Ads Spend ($)', data: spends,
+          borderColor: '#f87171', backgroundColor: 'rgba(248,113,113,.08)',
+          borderDash: [6, 4], fill: false, pointRadius: 2, pointHoverRadius: 5, tension: .28 },
+        { label: 'Estimated Profit ($)', data: profits,
+          borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,.08)',
+          fill: false, pointRadius: 2, pointHoverRadius: 5, tension: .28 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: { callbacks: { label: function(ctx) {
+          return ' ' + ctx.dataset.label + ': ' + cur(ctx.raw || 0);
+        } } }
+      },
+      scales: {
+        y: { grid: GRID, ticks: { callback: function(v) { return '$' + nf(v); } },
+          title: { display: true, text: 'USD ($)' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
 }
 
 // ═══════════════════════════════════════
@@ -2118,6 +2223,7 @@ var CP_INTERESTS = [];
 var PI_TYPES_FILTER = [];
 var PI_OCCASIONS_FILTER = [];
 var PI_INTERESTS_FILTER = [];
+var PI_RECIPIENTS_FILTER = [];
 
 function arrHasAny(arr, selected) {
   if (!selected || selected.length === 0) return true;
@@ -2216,6 +2322,7 @@ function rowMatchesFilters(row, opts) {
   if (opts.types && opts.types.length && opts.types.indexOf(row.type) === -1) return false;
   if (opts.occasions && opts.occasions.length && !arrHasAny(row.occasions, opts.occasions)) return false;
   if (opts.interests && opts.interests.length && !arrHasAny(row.interests, opts.interests)) return false;
+  if (opts.recipients && opts.recipients.length && !arrHasAny(row.recipients, opts.recipients)) return false;
   return true;
 }
 
@@ -2261,132 +2368,96 @@ function addTrueMetric(target, src) {
 }
 
 function renderProducts(d) {
-  var types    = d.byProductType || {};
-  var top      = d.topProducts   || [];
-  var orderedProducts = (d.shopifyTopProducts || []).filter(function(p) {
-    return !isServiceType(p.type) && (p.orderLines || 0) >= 1;
-  });
-  var typeList = Object.entries(types).sort(function(a, b) { return b[1].spend - a[1].spend; });
   var fo = d.filterOptions || {};
   renderFilterPills('pi-market-pills', 'Market', fo.markets || [], PI_MKT_FILTER === 'all' ? [] : [PI_MKT_FILTER], 'setProductMarket');
-  renderFilterPills('pi-type-pills', 'Type', fo.types || [], PI_TYPES_FILTER, 'setProductType');
+  renderFilterPills('pi-type-pills', 'Product Type', fo.types || [], PI_TYPES_FILTER, 'setProductType');
   renderFilterPills('pi-occasion-pills', 'Occasion', fo.occasions || [], PI_OCCASIONS_FILTER, 'setProductOccasion');
   renderFilterPills('pi-interest-pills', 'Interest', fo.interests || [], PI_INTERESTS_FILTER, 'setProductInterest');
-
-     var qualified = typeList.filter(function(x) {
-  return x[0] !== 'Unknown' && x[1].spend > 50;
-});
-var best  = qualified.slice().sort(function(a,b) {
-  return (b[1].true_roas||0) - (a[1].true_roas||0);
-})[0];
-var worst = qualified.slice().sort(function(a,b) {
-  return (a[1].true_roas||0) - (b[1].true_roas||0);
-})[0];
-
-  document.getElementById('pi-kpis').innerHTML = [
-    kpi('Product Types',     typeList.length, 'Từ SHOPIFY_PRODUCT metafield (cột M)'),
-    kpi('Products w/ Orders', orderedProducts.length, 'Có từ 1 order trong date range'),
-    best  ? kpi('Best: '  + best[0],  nf(best[1].true_roas,  2) + 'x', cur(best[1].spend),  'green') : '',
-    worst ? kpi('Worst: ' + worst[0], nf(worst[1].true_roas, 2) + 'x', cur(worst[1].spend), 'red')   : '',
-  ].join('');
-
-  // ── Product Types table — Unknown đánh dấu ⚠️ ──
-  var tRows = typeList.map(function(item) {
-    var type = item[0], m = item[1], be = m.beRoas || 1.63;
-    var gap  = m.spend > 0 ? (m.true_roas - be) / be * 100 : 0;
-    var isUnk = type === 'Unknown';
-    var typeCell = isUnk
-      ? '<strong style="color:#94a3b8">' + type + '</strong>'
-        + '<span class="unknown-badge">⚠️ Review</span>'
-        + '<div style="font-size:10px;color:#78350f;margin-top:2px">Ads chưa map được URL sản phẩm</div>'
-      : '<strong>' + type + '</strong>';
-    return [
-      typeCell,
-      '<span style="font-size:10px;color:#475569">BE ' + nf(be, 2) + 'x</span>',
-      '<span class="num">' + cur(m.spend)   + '</span>',
-      '<span class="num" style="color:#4ade80">' + cur(m.true_revenue) + '</span>',
-      '<span class="num" style="' + roasStyle(m.true_roas, be) + '">' + nf(m.true_roas, 2) + 'x'
-        + (m.true_roas > 10 && m.spend < 50 ? '<span class="roas-anomaly" title="ROAS cao bất thường — spend thấp, cần verify">⚠️</span>' : '')
-        + '</span>',
-      '<span class="num" style="color:' + (gap >= 0 ? '#4ade80' : '#f87171') + '">'
-        + (gap >= 0 ? '+' : '') + nf(gap, 1) + '%</span>',
-      '<span class="num">' + nf(m.true_purchases, 1) + '</span>',
-      '<span class="num">' + cur(m.true_cpa) + '</span>',
-      '<span style="font-size:10px"><span style="color:#60a5fa">FB ' + cur(m.fb_spend || 0) + '</span>'
-        + '/<span style="color:#4ade80">GG ' + cur(m.gg_spend || 0) + '</span></span>'
-    ];
+  renderFilterPills('pi-recipient-pills', 'Recipient', fo.recipients || [], PI_RECIPIENTS_FILTER, 'setProductRecipient');
+  var filter = { market: PI_MKT_FILTER, types: PI_TYPES_FILTER, occasions: PI_OCCASIONS_FILTER,
+    interests: PI_INTERESTS_FILTER, recipients: PI_RECIPIENTS_FILTER };
+  var shopRows = (d.shopifyRows || []).filter(function(r) { return !isServiceType(r.type) && rowMatchesFilters(r, filter); });
+  var adRows = (d.adsRows || []).filter(function(r) { return rowMatchesFilters(r, filter); });
+  // Product True ROAS uses only spend that can be joined to a Shopify product.
+  var mappedAdRows = adRows.filter(function(r) { return !!(r.productId || (r.title && r.type !== 'Unknown')); });
+  var byProduct = {}, adByProduct = {}, byType = {};
+  function typeMetrics(type) {
+    type = type || 'Unknown';
+    if (!byType[type]) byType[type] = { spend: 0, revenue: 0, purchases: 0, fb_spend: 0, gg_spend: 0,
+      true_revenue: 0, true_purchases: 0, beRoas: 1.63 };
+    return byType[type];
+  }
+  shopRows.forEach(function(r) {
+    var key = r.productId || r.title;
+    if (!key) return;
+    if (!byProduct[key]) byProduct[key] = { productId: r.productId || '', title: r.title || r.productId || '',
+      fullUrl: r.fullUrl || '', imageUrl: r.imageUrl || '', productCreatedAt: r.productCreatedAt || '',
+      type: r.type || 'Unknown', markets: r.markets || [], interests: r.interests || [], occasions: r.occasions || [],
+      recipients: r.recipients || [], unitsSold: 0, revenue: 0, orderLines: 0 };
+    var p = byProduct[key];
+    p.unitsSold += Number(r.unitsSold || 0); p.revenue += Number(r.revenue || 0); p.orderLines += Number(r.orderLines || 0);
+    var tm = typeMetrics(p.type); tm.true_revenue += Number(r.revenue || 0); tm.true_purchases += Number(r.unitsSold || 0);
   });
-  // Lưu data types để sort — FIX: không reset sort state khi re-render
+  mappedAdRows.forEach(function(r) {
+    var key = r.productId || r.title;
+    if (key) {
+      if (!adByProduct[key]) adByProduct[key] = { spend: 0, revenue: 0, purchases: 0, fb_spend: 0, gg_spend: 0, beRoas: r.beRoas || 1.63 };
+      var ap = adByProduct[key]; ap.spend += Number(r.spend || 0); ap.revenue += Number(r.revenue || 0); ap.purchases += Number(r.purchases || 0);
+      if (r.source === 'FB') ap.fb_spend += Number(r.spend || 0);
+      if (r.source === 'GG') ap.gg_spend += Number(r.spend || 0);
+      if (r.beRoas) ap.beRoas = r.beRoas;
+    }
+    var tm = typeMetrics(r.type); tm.spend += Number(r.spend || 0); tm.revenue += Number(r.revenue || 0); tm.purchases += Number(r.purchases || 0);
+    if (r.source === 'FB') tm.fb_spend += Number(r.spend || 0);
+    if (r.source === 'GG') tm.gg_spend += Number(r.spend || 0);
+    if (r.beRoas) tm.beRoas = r.beRoas;
+  });
+  Object.keys(byType).forEach(function(type) {
+    var m = byType[type]; m.true_revenue = r2(m.true_revenue); m.true_purchases = r2(m.true_purchases);
+    m.true_roas = m.spend > 0 ? r2(m.true_revenue / m.spend) : 0;
+    m.roas = m.spend > 0 ? r2(m.revenue / m.spend) : 0;
+    m.true_cpa = m.true_purchases > 0 ? r2(m.spend / m.true_purchases) : 0;
+  });
+  var typeList = Object.keys(byType).map(function(type) { return [type, byType[type]]; }).sort(function(a,b) { return b[1].spend-a[1].spend; });
+  var qualified = typeList.filter(function(x) { return x[0] !== 'Unknown' && x[1].spend > 50; });
+  var best = qualified.slice().sort(function(a,b) { return b[1].true_roas-a[1].true_roas; })[0];
+  var worst = qualified.slice().sort(function(a,b) { return a[1].true_roas-b[1].true_roas; })[0];
+  var soldProductKeys = Object.keys(byProduct).filter(function(key) { return byProduct[key].unitsSold > 0; });
+  document.getElementById('pi-kpis').innerHTML = [
+    kpi('Product Types', typeList.length, 'Theo bộ lọc đang chọn'),
+    kpi('Products w/ Sales', soldProductKeys.length, 'Có Shopify item sales trong date range'),
+    best ? kpi('Best: ' + best[0], nf(best[1].true_roas, 2) + 'x', cur(best[1].spend), 'green') : '',
+    worst ? kpi('Worst: ' + worst[0], nf(worst[1].true_roas, 2) + 'x', cur(worst[1].spend), 'red') : ''
+  ].join('');
   PI_TYPES_DATA = typeList.map(function(item) { return { key: item[0], m: item[1] }; });
   renderPITypesTable();
 
-  // ── Bubble chart ──
-  var sl = top.slice(0, 30);
-  mkCh('ch-pi-bubble', {
-    type: 'bubble',
-    data: { datasets: [{
-      label: 'Products',
-      data: sl.map(function(p) {
-        return { x: p.spend, y: p.true_roas, r: Math.max(5, Math.min(28, Math.sqrt(p.true_revenue || 0) / 7)),
-                 title: p.title, beRoas: p.beRoas };
-      }),
-      backgroundColor: sl.map(function(p) {
-        var be = p.beRoas || 1.63;
-        if (p.true_roas >= be * 1.15) return 'rgba(74,222,128,.65)';
-        if (p.true_roas >= be)        return 'rgba(251,191,36,.65)';
-        return 'rgba(248,113,113,.65)';
-      }), borderWidth: 0
-    }] },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false },
-        tooltip: { callbacks: { label: function(ctx) {
-          var p = ctx.raw;
-          return [(p.title || '').slice(0, 40), 'Spend: ' + cur(p.x),
-                  'True ROAS: ' + nf(p.y, 2) + 'x  BE: ' + nf(p.beRoas, 2) + 'x'];
-        }}}},
-      scales: {
-        x: { title: { display: true, text: 'Spend ($)' }, grid: GRID, ticks: TICK_Y },
-        y: { title: { display: true, text: 'True ROAS' }, grid: GRID, min: 0 }
-      }
-    }
-  });
+  var dailyRev = {}, dailySpend = {};
+  shopRows.forEach(function(r) { dailyRev[r.date] = (dailyRev[r.date] || 0) + Number(r.revenue || 0); });
+  mappedAdRows.forEach(function(r) { dailySpend[r.date] = (dailySpend[r.date] || 0) + Number(r.spend || 0); });
+  var dates = [], day = d.fromDate, to = d.toDate;
+  if (day && to && day <= to) {
+    for (var guard = 0; day <= to && guard < 400; guard++, day = addDays(day, 1)) dates.push(day);
+  } else dates = Array.from(new Set(Object.keys(dailyRev).concat(Object.keys(dailySpend)))).sort();
+  mkCh('ch-pi-daily', { type: 'bar', data: { labels: dates.map(fd), datasets: [
+    { type: 'bar', label: 'Paid Spend ($)', data: dates.map(function(x) { return r2(dailySpend[x] || 0); }), yAxisID: 'yS', backgroundColor: 'rgba(96,165,250,.58)', borderRadius: 3 },
+    { type: 'line', label: 'Shopify Product Revenue ($)', data: dates.map(function(x) { return r2(dailyRev[x] || 0); }), yAxisID: 'yS', borderColor: '#4ade80', pointRadius: 2, tension: .3 },
+    { type: 'line', label: 'Product True ROAS', data: dates.map(function(x) { var s = dailySpend[x] || 0; return s > 0 ? r2((dailyRev[x] || 0) / s) : 0; }), yAxisID: 'yR', borderColor: '#fbbf24', pointRadius: 2, tension: .3 }
+  ] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: {
+      x: { grid: GRID, ticks: { autoSkip: true, maxTicksLimit: 12 } }, yS: { position: 'left', grid: GRID, ticks: TICK_Y, title: { display: true, text: 'USD ($)' } },
+      yR: { position: 'right', grid: { drawOnChartArea: false }, min: 0, title: { display: true, text: 'True ROAS (x)' } }
+  } } });
 
-  // ── Lưu data gốc để sort/filter/page
-  // Bảng Product lấy theo Shopify true orders, sau đó merge thêm ads metrics nếu có.
-  var adByProduct = {};
-  (top || []).forEach(function(p) {
-    var key = p.productId || p.title;
-    if (key) adByProduct[key] = p;
+  PI_DATA = soldProductKeys.map(function(key, i) {
+    var p = byProduct[key], ad = adByProduct[p.productId || p.title] || {}, spend = r2(ad.spend || 0), trueRev = r2(p.revenue || 0);
+    return { idx: i + 1, productId: p.productId, title: p.title, fullUrl: p.fullUrl, imageUrl: p.imageUrl,
+      productCreatedAt: isoDateOnly(p.productCreatedAt), type: p.type, markets: p.markets, occasions: p.occasions,
+      interests: p.interests, recipients: p.recipients, spend: spend, trueRev: trueRev,
+      trueRoas: spend > 0 ? r2(trueRev / spend) : 0, attrRev: r2(ad.revenue || 0),
+      attrRoas: ad.spend > 0 ? r2(ad.revenue / ad.spend) : 0, truePurch: r2(p.unitsSold || 0),
+      fbSpend: r2(ad.fb_spend || 0), ggSpend: r2(ad.gg_spend || 0), beRoas: ad.beRoas || 1.63 };
   });
-
-  PI_DATA = orderedProducts.map(function(p, i) {
-    var ad = adByProduct[p.productId] || adByProduct[p.title] || {};
-    var spend = ad.spend || 0;
-    var trueRev = p.revenue || 0;
-    return {
-      idx:       i + 1,
-      productId: p.productId || '',
-      title:     p.title || p.productId || '',
-      fullUrl:   p.fullUrl || '',   
-      imageUrl:  p.imageUrl || '',
-      productCreatedAt: isoDateOnly(p.productCreatedAt || ''),
-      type:      p.type || '',
-      markets:   p.markets || [],
-      occasions: p.occasions || [],
-      interests: p.interests || [],
-      spend:     spend,
-      trueRev:   trueRev,
-      trueRoas:  spend > 0 ? r2(trueRev / spend) : 0,
-      attrRev:   ad.revenue || 0,
-      attrRoas:  ad.roas || 0,
-      truePurch: p.orderLines || 0,
-      fbSpend:   ad.fb_spend || 0,
-      ggSpend:   ad.gg_spend || 0,
-      beRoas:    ad.beRoas || 1.63
-    };
-  });
-
   renderPITable();
 }
 
@@ -2395,15 +2466,11 @@ function renderPITable() {
   var search   = (document.getElementById('pi-search') || {}).value || '';
   var filtered = PI_DATA.filter(function(p) {
     var matchSearch = !search || p.title.toLowerCase().indexOf(search.toLowerCase()) > -1;
-    var matchMkt    = PI_MKT_FILTER === 'all' || p.markets.indexOf(PI_MKT_FILTER) > -1;
-    var matchType   = PI_TYPES_FILTER.length === 0 || PI_TYPES_FILTER.indexOf(p.type) > -1;
-    var matchOcc    = arrHasAny(p.occasions, PI_OCCASIONS_FILTER);
-    var matchInt    = arrHasAny(p.interests, PI_INTERESTS_FILTER);
     var matchCreated= dateInRange(p.productCreatedAt, PI_CREATED_FROM, PI_CREATED_TO);
     var matchRoas   = !PI_ROAS_FILTER
       || (PI_ROAS_FILTER === 'below' && p.trueRoas < p.beRoas)
       || (PI_ROAS_FILTER === 'above' && p.trueRoas >= p.beRoas);
-    return matchSearch && matchMkt && matchType && matchOcc && matchInt && matchCreated && matchRoas;
+    return matchSearch && matchCreated && matchRoas;
   });
 
   // Sort
@@ -2423,7 +2490,7 @@ function renderPITable() {
   var pageRows = filtered.slice(startIdx, startIdx + PI_PAGE_SIZE);
   if (countEl) countEl.textContent = filtered.length + ' sản phẩm · Trang ' + PI_PAGE + '/' + totalPages;
 
-  var headers = ['#','ID','Preview','Product Created At','Product','Type','Market','Paid Spend','Shopify Product Revenue ($)','Product True ROAS','Attr.Revenue ($)','Attr.ROAS','Shopify Order Lines','FB/GG Spend'];
+  var headers = ['#','ID','Preview','Product Created At','Product','Type','Market','Paid Spend','Shopify Product Revenue ($)','Product True ROAS','Attr.Revenue ($)','Attr.ROAS','Shopify Items Sold','FB/GG Spend'];
   var sortableIdx = [3,7,8,9,10,11,12]; // Created, Spend, True Rev, True ROAS, Attr Rev, Attr ROAS, True Purch
 
   var headerHtml = '<thead><tr>' + headers.map(function(h, i) {
@@ -2607,7 +2674,7 @@ function renderPITypesTable() {
     return dir * ((av||0) - (bv||0));
   });
 
-  var heads = ['Type','BE (provisional)','Paid Spend','Shopify Product Revenue ($)','Product True ROAS','Attr.Revenue ($)','Attr.ROAS','vs BE (provisional)','Shopify Order Lines','Product CPA','FB/GG Spend'];
+  var heads = ['Type','BE (provisional)','Paid Spend','Shopify Product Revenue ($)','Product True ROAS','Attr.Revenue ($)','Attr.ROAS','vs BE (provisional)','Shopify Items Sold','Spend per Item','FB/GG Spend'];
   var sortableCols = [2,3,4,5,6,7,8,9];
   var headerHtml = '<thead><tr>' + heads.map(function(h, i) {
     if (sortableCols.indexOf(i) === -1) return '<th>' + h + '</th>';
@@ -2687,6 +2754,12 @@ function setProductOccasion(btn, value) {
 
 function setProductInterest(btn, value) {
   PI_INTERESTS_FILTER = toggleFilterValue(PI_INTERESTS_FILTER, value);
+  PI_PAGE = 1;
+  renderProducts(DATA);
+}
+
+function setProductRecipient(btn, value) {
+  PI_RECIPIENTS_FILTER = toggleFilterValue(PI_RECIPIENTS_FILTER, value);
   PI_PAGE = 1;
   renderProducts(DATA);
 }
