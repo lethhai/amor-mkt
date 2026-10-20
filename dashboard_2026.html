@@ -1243,7 +1243,7 @@ function renderStore(d) {
   // Sort top products
   var ST_PROD_SORT = window._stProdSort || { col: 8, dir: -1 };
   var sortedProds = prods.slice().sort(function(a, b) {
-    var keys = ['', 'productId', 'imageUrl', 'productCreatedAt', 'title', 'type', 'markets', 'orderLines', 'revenue'];
+    var keys = ['', 'productId', 'imageUrl', 'productCreatedAt', 'title', 'type', 'markets', 'unitsSold', 'revenue'];
     var av = a[keys[ST_PROD_SORT.col]] || 0;
     var bv = b[keys[ST_PROD_SORT.col]] || 0;
     if (keys[ST_PROD_SORT.col] === 'productCreatedAt') {
@@ -1254,7 +1254,7 @@ function renderStore(d) {
     return ST_PROD_SORT.dir * ((av || 0) - (bv || 0));
   });
 
-  var stHeads = ['#', 'ID', 'Preview', 'Product Created At', 'Product', 'Type', 'Market', 'Shopify Order Lines', 'Shopify Product Revenue ($)'];
+  var stHeads = ['#', 'ID', 'Preview', 'Product Created At', 'Product', 'Type', 'Market', 'Items Sold', 'Shopify Product Revenue ($)'];
   var headerHtml = '<thead><tr>' + stHeads.map(function(h, i) {
     if (i < 7) return '<th>' + h + '</th>';
     var ind = (ST_PROD_SORT.col === i) ? (ST_PROD_SORT.dir === 1 ? ' ▲' : ' ▼') : '';
@@ -1289,7 +1289,7 @@ function renderStore(d) {
       + '<td><span style="font-size:11px" title="' + escHtml(p.title || '') + '">' + escHtml(title) + '</span></td>'
       + '<td><span style="font-size:10px;color:#a78bfa">' + escHtml(p.type||'–') + '</span></td>'
       + '<td>' + markets + '</td>'
-      + '<td class="num">' + nf(p.orderLines) + '</td>'
+      + '<td class="num">' + nf(p.unitsSold) + '</td>'
       + '<td class="num">' + cur(p.revenue) + '</td>'
       + '</tr>';
   }).join('') + '</tbody>';
