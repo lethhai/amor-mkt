@@ -2423,9 +2423,19 @@ function renderProducts(d) {
   var best = qualified.slice().sort(function(a,b) { return b[1].true_roas-a[1].true_roas; })[0];
   var worst = qualified.slice().sort(function(a,b) { return a[1].true_roas-b[1].true_roas; })[0];
   var soldProductKeys = Object.keys(byProduct).filter(function(key) { return byProduct[key].unitsSold > 0; });
+  var filteredSpend = 0, filteredRevenue = 0;
+  soldProductKeys.forEach(function(key) {
+    filteredRevenue += Number(byProduct[key].revenue || 0);
+  });
+  Object.keys(adByProduct).forEach(function(key) { filteredSpend += Number(adByProduct[key].spend || 0); });
+  filteredSpend = r2(filteredSpend);
+  filteredRevenue = r2(filteredRevenue);
+  var filteredRoas = filteredSpend > 0 ? r2(filteredRevenue / filteredSpend) : 0;
   document.getElementById('pi-kpis').innerHTML = [
-    kpi('Product Types', typeList.length, 'Theo bộ lọc đang chọn'),
-    kpi('Products w/ Sales', soldProductKeys.length, 'Có Shopify item sales trong date range'),
+    kpi('Filtered Products', soldProductKeys.length, 'Sản phẩm có item sales trong date range'),
+    kpi('Paid Spend', cur(filteredSpend), 'FB + Google · spend map được sản phẩm theo bộ lọc', 'blue'),
+    kpi('Shopify Product Revenue', cur(filteredRevenue), 'Tổng revenue của các sản phẩm đang lọc', 'green'),
+    kpi('Product True ROAS', nf(filteredRoas, 2) + 'x', 'Shopify product revenue ÷ mapped paid spend', filteredRoas >= 1.65 ? 'green' : 'red'),
     best ? kpi('Best: ' + best[0], nf(best[1].true_roas, 2) + 'x', cur(best[1].spend), 'green') : '',
     worst ? kpi('Worst: ' + worst[0], nf(worst[1].true_roas, 2) + 'x', cur(worst[1].spend), 'red') : ''
   ].join('');
