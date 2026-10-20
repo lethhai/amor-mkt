@@ -379,13 +379,16 @@ thead th.sortable:hover{color:#a78bfa}
       <div><div class="st">Attr.Revenue và Spend theo ngày</div><div class="cbox"><div class="chart-container"><canvas id="ch-fb-daily"></canvas></div></div></div>
       <div><div class="st">Phân bổ spend theo market</div><div class="cbox"><div class="chart-container-sm"><canvas id="ch-fb-market"></canvas></div></div></div>
     </div>
+    <div id="fb-focus" class="infobox" style="display:none"></div>
     <div class="section"><div class="st">Facebook Campaign → Ad Set → Ad</div><div id="cp-fb-hierarchy" class="twrap"></div></div>
+    <div class="section"><div class="st">Tín hiệu cần xem lại ở cấp ad</div><div class="infobox">Frequency là trung bình ngày có trọng số theo impressions; không phải frequency cộng dồn của toàn khoảng ngày. CPC so với CPC của cùng tài khoản trong khoảng ngày đã chọn. Cảnh báo chỉ để ưu tiên kiểm tra.</div><div id="fb-signals" class="twrap"></div></div>
     <div class="section"><div class="st">Creative hiệu quả theo Creative ID</div><div id="cp-crea-tbl" class="twrap"></div></div>
   </div>
 
   <!-- TAB 4 — GOOGLE ADS -->
   <div class="tab-panel" id="tab-google">
-    <div class="disclaimer"><div class="di">ⓘ</div><p><strong>Google Ads · Conversion attribution</strong> “Attr.*” là conversions và conversion value Google ghi nhận. Product True ROAS so sánh doanh thu dòng sản phẩm Shopify với spend đã map; đây là góc nhìn theo sản phẩm, không phải attribution của Google.</p></div>
+    <div class="disclaimer"><div class="di">ⓘ</div><p><strong>Google Ads · Conversion attribution</strong> “Attr.*” là conversions và conversion value Google ghi nhận. Các chỉ số trong tab này chỉ phản ánh attribution của Google.</p></div>
+    <div id="gg-focus" class="infobox" style="display:none"></div>
     <div id="gg-kpis" class="kpi-grid"></div>
     <div class="section"><div class="st">Google Ads theo ngày</div><div class="cbox"><div class="chart-container"><canvas id="ch-gg-daily"></canvas></div></div></div>
     <div class="section"><div class="st">Hiệu quả theo Campaign</div><div id="gg-campaigns-tbl" class="twrap"></div></div>
@@ -404,6 +407,7 @@ thead th.sortable:hover{color:#a78bfa}
       <div class="filter-bar" id="pi-recipient-pills"></div>
     </div>
     <div id="pi-kpis" class="kpi-grid"></div>
+    <div class="section"><div class="st">Shopify sales chưa có spend map theo sản phẩm</div><div class="infobox">Đây là doanh thu dòng sản phẩm không tìm thấy FB/Google spend gắn cùng Product ID trong khoảng ngày đã chọn; có thể là đơn organic hoặc quảng cáo chưa map. Không tính shipping.</div><div id="pi-unmatched" class="twrap"></div></div>
     <div class="section">
       <div class="st">Shopify Product Revenue · Paid Spend · Product True ROAS theo ngày</div>
       <div class="infobox">Revenue = doanh thu sản phẩm từ Shopify; Paid Spend = chi tiêu FB + Google đã map sản phẩm; Product True ROAS = Shopify product revenue ÷ paid spend.</div>
@@ -423,8 +427,8 @@ thead th.sortable:hover{color:#a78bfa}
         <span style="color:#475569">→</span>
         <input type="date" id="pi-created-to" onchange="setProductCreatedFilter()">
         <button class="filter-btn" onclick="clearProductCreatedFilter()">Tất cả ngày tạo</button>
-        <button class="filter-btn" data-roas="below" onclick="setRoasFilter(this,'below')">⚠️ Dưới BE tạm</button>
-        <button class="filter-btn" data-roas="above" onclick="setRoasFilter(this,'above')">✅ Trên BE tạm</button>
+        <button class="filter-btn" data-roas="below" disabled title="Chờ chuẩn hóa BE_ROAS_CONFIG">Dưới BE · chờ cấu hình</button>
+        <button class="filter-btn" data-roas="above" disabled title="Chờ chuẩn hóa BE_ROAS_CONFIG">Trên BE · chờ cấu hình</button>
         <span style="font-size:11px;color:#475569;margin-left:4px" id="pi-count"></span>
       </div>
       <div id="pi-top-tbl" class="twrap"></div>
@@ -637,7 +641,7 @@ function isServiceType(t) {
 // ═══════════════════════════════════════
 // CONFIG & STATE
 // ═══════════════════════════════════════
-var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyb_dR66b_LhILys2bu7pVmXZojt_1etps8CrWz0XFdEz9Bw21HgMaBLHMaqBSRJhkW/exec';
+var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwFiCOhNDSkmcdZXVbSrjYvhvo0OFEeQJMwC136S1vcrTV_1MhCEiA2HxN6lAJqJ-yu/exec';
 function getGasUrl() { return localStorage.getItem('gas_url') || DEFAULT_GAS_URL; }
 
 Chart.defaults.color       = '#64748b';
@@ -647,6 +651,7 @@ Chart.defaults.font.size   = 11;
 var DATA    = null;
 var MD_DATA = null;
 var GG_PRODUCT_ROWS = [];
+var AD_PRODUCT_FOCUS = '';
 var CH      = {};
 var WOW_ON  = false;   // Week-over-Week toggle state
 var WOW_DATA= null;    // previous period data
@@ -1199,7 +1204,6 @@ function renderStore(d) {
 
   document.getElementById('st-kpis').innerHTML = [
     kpi('True Revenue',    cur(o.totalRevenue || t.revenue || 0), 'Shopify · Bao gồm ship · USD', 'green'),
-    kpi('Shipping',         cur(o.shipping  || 0),                 'Tiền ship thu của khách', 'blue'),
     kpi('True Orders',      nf(o.orders || 0),                     'Số đơn thực tế', 'blue'),
     kpi('True Items Sold',  nf(displayUnits),                       'Excl. Shipping Protection'),
     kpi('AOV',              cur(o.aov || 0),                       'Giá trị TB đơn', 'blue'),
@@ -1457,7 +1461,6 @@ function renderStoreFromRows(d) {
 
   document.getElementById('st-kpis').innerHTML = [
     kpi('True Revenue', cur(totals.revenue), 'Filtered Shopify rows', 'green'),
-    kpi('Shipping', cur(0), 'Không phân bổ trong product filter', 'blue'),
     kpi('True Orders', nf(totals.orderLines), 'Order lines theo filter', 'blue'),
     kpi('True Items Sold', nf(totals.unitsSold), 'Filtered items'),
     kpi('AOV', cur(aov), 'True Rev / Order Lines', 'blue'),
@@ -1731,7 +1734,10 @@ function renderCampaign(d) {
 }
 
 function renderFacebookAds(d) {
-  var rows = (d.adsRows || []).filter(function(r) { return r.source === 'FB'; });
+  var rows = (d.adsRows || []).filter(function(r) { return r.source === 'FB' && (!AD_PRODUCT_FOCUS || String(r.productId) === AD_PRODUCT_FOCUS); });
+  var focus = document.getElementById('fb-focus');
+  focus.style.display = AD_PRODUCT_FOCUS ? '' : 'none';
+  if (AD_PRODUCT_FOCUS) focus.innerHTML = 'Đang xem Facebook Ads của Product ID <strong>' + escHtml(AD_PRODUCT_FOCUS) + '</strong> · <button class="filter-btn" onclick="clearAdProductFocus()">Xem tất cả</button>';
   var totals = {}, daily = {}, markets = {};
   rows.forEach(function(r) {
     addMetric(totals, r);
@@ -1780,17 +1786,16 @@ function renderFacebookAds(d) {
 
   renderFbHierarchy(d);
   renderTopCreatives(d);
+  renderFBSignals(rows, (d.adsRows || []).filter(function(r) { return r.source === 'FB'; }));
 }
 
 function renderGoogleAds(d) {
-  var rows = (d.adsRows || []).filter(function(r) { return r.source === 'GG'; });
-  var totals = {}, daily = {}, campaigns = {}, products = {}, shopifyProducts = {};
-  (d.shopifyRows || []).forEach(function(r) {
-    if (!r.productId || isServiceType(r.type)) return;
-    if (!shopifyProducts[r.productId]) shopifyProducts[r.productId] = { revenue: 0, units: 0, title: r.title, imageUrl: r.imageUrl, fullUrl: r.fullUrl };
-    shopifyProducts[r.productId].revenue += r.revenue || 0;
-    shopifyProducts[r.productId].units += r.unitsSold || 0;
-  });
+  var rows = (d.adsRows || []).filter(function(r) { return r.source === 'GG' && (!AD_PRODUCT_FOCUS || String(r.productId) === AD_PRODUCT_FOCUS); });
+  var focus = document.getElementById('gg-focus');
+  focus.style.display = AD_PRODUCT_FOCUS ? '' : 'none';
+  if (AD_PRODUCT_FOCUS) focus.innerHTML = 'Đang xem Google Ads của Product ID <strong>' + escHtml(AD_PRODUCT_FOCUS) + '</strong> · <button class="filter-btn" onclick="clearAdProductFocus()">Xem tất cả</button>';
+  if (AD_PRODUCT_FOCUS) document.getElementById('gg-product-search').value = '';
+  var totals = {}, daily = {}, campaigns = {}, products = {};
   rows.forEach(function(r) {
     addMetric(totals, r);
     var date = r.date || '';
@@ -1844,15 +1849,7 @@ function renderGoogleAds(d) {
     ['Campaign / Account', 'Spend ($)', 'Attr.Revenue ($)', 'Attr.Order', 'Attr.ROAS', 'Attr.CPA', 'Impressions', 'Clicks', 'CTR'], campaignRows
   );
 
-  GG_PRODUCT_ROWS = Object.values(products).map(function(p) {
-    var shop = p.productId ? shopifyProducts[p.productId] : null;
-    p.fullUrl = (shop && shop.fullUrl) || p.fullUrl || '';
-    p.imageUrl = (shop && shop.imageUrl) || p.imageUrl || '';
-    p.shopifyRevenue = shop ? shop.revenue : 0;
-    p.shopifyUnits = shop ? shop.units : 0;
-    p.productTrueRoas = p.spend > 0 ? p.shopifyRevenue / p.spend : 0;
-    return p;
-  }).sort(function(a, b) { return b.spend - a.spend; });
+  GG_PRODUCT_ROWS = Object.values(products).sort(function(a, b) { return b.spend - a.spend; });
   renderGoogleProductTable();
 }
 
@@ -1868,11 +1865,10 @@ function renderGoogleProductTable() {
     if (productUrl && p.title) product = '<a href="' + escHtml(productUrl) + '" target="_blank" rel="noopener">' + product + '</a>';
     return [thumb, product + '<br><span style="font-size:10px;color:#64748b">' + escHtml(p.sku || p.productId || 'Unmapped') + '</span>',
       '<span class="num">' + cur(p.spend) + '</span>', '<span class="num">' + cur(p.revenue) + '</span>',
-      '<span class="num">' + nf(p.purchases, 1) + '</span>', '<span class="num">' + nf(p.roas, 2) + 'x</span>',
-      '<span class="num">' + cur(p.shopifyRevenue) + '</span>', '<span class="num">' + (p.productId ? nf(p.productTrueRoas, 2) + 'x' : '–') + '</span>'];
+      '<span class="num">' + nf(p.purchases, 1) + '</span>', '<span class="num">' + nf(p.roas, 2) + 'x</span>'];
   });
   document.getElementById('gg-products-tbl').innerHTML = mkTable(
-    ['Preview', 'Product / SKU', 'Google Spend', 'Attr.Revenue', 'Attr.Order', 'Attr.ROAS', 'Shopify Product Revenue', 'Product True ROAS'], shown
+    ['Preview', 'Product / SKU', 'Google Spend', 'Attr.Revenue', 'Attr.Order', 'Attr.ROAS'], shown
   );
   var count = document.getElementById('gg-product-count');
   if (count) count.textContent = rows.length + ' products' + (rows.length > 100 ? ' · showing top 100 by spend' : '');
@@ -1887,7 +1883,20 @@ function fbAdManagerUrl(accountId, adId) {
 }
 
 function renderTopCreatives(d) {
-  var creas = (d.topCreatives || []).slice(0, 25);
+  var creas = AD_PRODUCT_FOCUS ? Object.values((d.adsRows || []).filter(function(r) {
+    return r.source === 'FB' && String(r.productId) === AD_PRODUCT_FOCUS;
+  }).reduce(function(map, r) {
+    var key = (r.accountId || r.account || '') + '|' + (r.creativeId || r.adId || '');
+    if (!map[key]) map[key] = { creativeId: r.creativeId, adId: r.adId, accountId: r.accountId,
+      ad: r.ad, prodType: r.type, thumbnailUrl: r.thumbnailUrl, previewUrl: r.previewUrl,
+      fullUrl: r.landingUrl, spend: 0, revenue: 0, purchases: 0 };
+    map[key].spend += r.spend || 0;
+    map[key].revenue += r.revenue || 0;
+    map[key].purchases += r.purchases || 0;
+    return map;
+  }, {})).map(function(c) { c.roas = c.spend > 0 ? c.revenue / c.spend : 0; return c; })
+    .sort(function(a,b) { return b.spend-a.spend; }).slice(0,25)
+    : (d.topCreatives || []).slice(0, 25);
   var creaRows = creas.map(function(c) {
     var title = c.creativeId ? 'Creative ' + c.creativeId : (c.ad || c.fullUrl || 'Creative');
     var openUrl = c.previewUrl || fbAdManagerUrl(c.accountId, c.adId);
@@ -1919,6 +1928,28 @@ function renderTopCreatives(d) {
 
 function renderFbHierarchy(d) {
   var root = document.getElementById('cp-fb-hierarchy');
+  if (AD_PRODUCT_FOCUS) {
+    var focused = (d.adsRows || []).filter(function(r) { return r.source === 'FB' && String(r.productId) === AD_PRODUCT_FOCUS; });
+    var ads = {};
+    focused.forEach(function(r) {
+      var key = (r.accountId || r.account || '') + '|' + (r.adId || r.ad || '');
+      if (!ads[key]) ads[key] = { account: r.account, accountId: r.accountId, campaign: r.campaign,
+        adset: r.adset, ad: r.ad, adId: r.adId, creativeId: r.creativeId,
+        previewUrl: r.previewUrl, spend: 0, revenue: 0, purchases: 0 };
+      ads[key].spend += r.spend || 0;
+      ads[key].revenue += r.revenue || 0;
+      ads[key].purchases += r.purchases || 0;
+    });
+    root.innerHTML = mkTable(['Campaign / Ad set / Ad', 'Creative', 'Spend', 'Attr.Revenue', 'Attr.ROAS', 'Attr.Order'],
+      Object.values(ads).sort(function(a,b) { return b.spend-a.spend; }).map(function(a) {
+        var url = a.previewUrl || fbAdManagerUrl(a.accountId, a.adId);
+        var ad = escHtml(a.ad || a.adId || 'Ad');
+        if (url) ad = '<a href="' + escHtml(url) + '" target="_blank" rel="noopener">' + ad + '</a>';
+        return [escHtml(a.campaign || '') + '<br>' + escHtml(a.adset || '') + '<br><strong>' + ad + '</strong>',
+          escHtml(a.creativeId || '–'), cur(a.spend), cur(a.revenue), nf(a.spend ? a.revenue/a.spend : 0,2)+'x', nf(a.purchases,1)];
+      }));
+    return;
+  }
   var campaigns = d.fbHierarchy || [];
   var available = d.fbStructureAvailable || {};
   var notice = (!available.FB_ADS || !available.FB_CREATIVE_ASSETS)
@@ -1964,6 +1995,48 @@ function renderFbHierarchy(d) {
     var objective = c.objective ? ' · ' + escHtml(c.objective) : '';
     return '<details style="margin:6px 0;padding:8px 10px;background:#0b1729;border:1px solid #1e293b;border-radius:6px"><summary style="cursor:pointer;color:#e2e8f0"><strong>' + escHtml(c.name || c.id || 'Campaign') + '</strong> · ' + escHtml(c.account || '') + state + objective + ' · Spend ' + cur(cm.spend) + ' · Attr.Revenue ' + cur(cm.revenue) + ' · Attr.ROAS ' + nf(cm.roas, 2) + 'x · Attr.CPA ' + cur(cm.cpa) + ' · Attr.Order ' + nf(cm.purchases, 1) + ' · CTR ' + pct(cm.ctr) + '</summary>' + (adsetHtml || '<div style="padding:8px 20px;color:#94a3b8">No ad sets in the selected period.</div>') + '</details>';
   }).join('');
+}
+
+function renderFBSignals(rows, allRows) {
+  var accountTotals = {}, ads = {};
+  allRows.forEach(function(r) {
+    var account = r.accountId || r.account || 'Unknown';
+    if (!accountTotals[account]) accountTotals[account] = { spend: 0, clicks: 0 };
+    accountTotals[account].spend += r.spend || 0;
+    accountTotals[account].clicks += r.clicks || 0;
+  });
+  rows.forEach(function(r) {
+    var account = r.accountId || r.account || 'Unknown';
+    var key = account + '|' + (r.adId || r.ad || '');
+    if (!ads[key]) ads[key] = { account: account, accountName: r.account, accountId: r.accountId,
+      campaign: r.campaign, adset: r.adset, ad: r.ad, adId: r.adId, previewUrl: r.previewUrl,
+      spend: 0, clicks: 0, impressions: 0, freqWeight: 0, freqImpressions: 0 };
+    var a = ads[key];
+    a.spend += r.spend || 0; a.clicks += r.clicks || 0; a.impressions += r.impressions || 0;
+    if ((r.frequency || 0) > 0 && (r.impressions || 0) > 0) {
+      a.freqWeight += r.frequency * r.impressions;
+      a.freqImpressions += r.impressions;
+    }
+  });
+  var flagged = Object.values(ads).map(function(a) {
+    a.cpc = a.clicks > 0 ? a.spend/a.clicks : 0;
+    var account = accountTotals[a.account];
+    a.accountCpc = account.clicks > 0 ? account.spend/account.clicks : 0;
+    a.frequency = a.freqImpressions > 0 ? a.freqWeight/a.freqImpressions : 0;
+    a.highFrequency = a.impressions >= 1000 && a.frequency >= 3;
+    a.highCpc = a.clicks >= 10 && a.spend >= 20 && a.accountCpc > 0 && a.cpc >= 2*a.accountCpc;
+    return a;
+  }).filter(function(a) { return a.highFrequency || a.highCpc; })
+    .sort(function(a,b) { return b.spend-a.spend; }).slice(0,50);
+  document.getElementById('fb-signals').innerHTML = flagged.length ? mkTable(
+    ['Ad', 'Tín hiệu', 'Spend', 'Clicks', 'CPC', 'CPC tài khoản', 'Frequency TB/ngày'], flagged.map(function(a) {
+      var url = a.previewUrl || fbAdManagerUrl(a.accountId,a.adId);
+      var name = escHtml(a.ad || a.adId || 'Ad');
+      if (url) name = '<a href="'+escHtml(url)+'" target="_blank" rel="noopener">'+name+'</a>';
+      return [escHtml(a.campaign || '')+'<br>'+escHtml(a.adset || '')+'<br><strong>'+name+'</strong>',
+        (a.highFrequency ? '🔁 Lặp cao ' : '')+(a.highCpc ? '⚠️ CPC ≥ 2× TB ' : ''),
+        cur(a.spend),nf(a.clicks),cur(a.cpc),cur(a.accountCpc),a.frequency ? nf(a.frequency,2)+'x' : '–'];
+    })) : '<div class="cbox" style="color:#94a3b8">Không có ad vượt ngưỡng cảnh báo trong khoảng ngày này.</div>';
 }
 
 function renderCampaignFromRows(d) {
@@ -2428,6 +2501,19 @@ function renderProducts(d) {
     filteredRevenue += Number(byProduct[key].revenue || 0);
   });
   Object.keys(adByProduct).forEach(function(key) { filteredSpend += Number(adByProduct[key].spend || 0); });
+  var unmatched = {};
+  soldProductKeys.forEach(function(key) {
+    if ((adByProduct[key] || {}).spend > 0) return;
+    var p = byProduct[key], type = p.type || 'Unknown';
+    if (!unmatched[type]) unmatched[type] = { products: 0, items: 0, revenue: 0 };
+    unmatched[type].products += 1;
+    unmatched[type].items += p.unitsSold || 0;
+    unmatched[type].revenue += p.revenue || 0;
+  });
+  var unmatchedRows = Object.keys(unmatched).map(function(type) { return { type: type, m: unmatched[type] }; })
+    .sort(function(a,b) { return b.m.revenue-a.m.revenue; });
+  document.getElementById('pi-unmatched').innerHTML = mkTable(['Product Type','Sản phẩm','Items','Shopify Product Revenue'],
+    unmatchedRows.map(function(x) { return [escHtml(x.type),nf(x.m.products),nf(x.m.items),cur(x.m.revenue)]; }));
   filteredSpend = r2(filteredSpend);
   filteredRevenue = r2(filteredRevenue);
   var filteredRoas = filteredSpend > 0 ? r2(filteredRevenue / filteredSpend) : 0;
@@ -2435,9 +2521,9 @@ function renderProducts(d) {
     kpi('Filtered Products', soldProductKeys.length, 'Sản phẩm có item sales trong date range'),
     kpi('Paid Spend', cur(filteredSpend), 'FB + Google · spend map được sản phẩm theo bộ lọc', 'blue'),
     kpi('Shopify Product Revenue', cur(filteredRevenue), 'Tổng revenue của các sản phẩm đang lọc', 'green'),
-    kpi('Product True ROAS', nf(filteredRoas, 2) + 'x', 'Shopify product revenue ÷ mapped paid spend', filteredRoas >= 1.65 ? 'green' : 'red'),
-    best ? kpi('Best: ' + best[0], nf(best[1].true_roas, 2) + 'x', cur(best[1].spend), 'green') : '',
-    worst ? kpi('Worst: ' + worst[0], nf(worst[1].true_roas, 2) + 'x', cur(worst[1].spend), 'red') : ''
+    kpi('Product True ROAS', nf(filteredRoas, 2) + 'x', 'Shopify product revenue ÷ mapped paid spend'),
+    best ? kpi('Highest ROAS: ' + best[0], nf(best[1].true_roas, 2) + 'x', cur(best[1].spend)) : '',
+    worst ? kpi('Lowest ROAS: ' + worst[0], nf(worst[1].true_roas, 2) + 'x', cur(worst[1].spend)) : ''
   ].join('');
   PI_TYPES_DATA = typeList.map(function(item) { return { key: item[0], m: item[1] }; });
   renderPITypesTable();
@@ -2500,7 +2586,7 @@ function renderPITable() {
   var pageRows = filtered.slice(startIdx, startIdx + PI_PAGE_SIZE);
   if (countEl) countEl.textContent = filtered.length + ' sản phẩm · Trang ' + PI_PAGE + '/' + totalPages;
 
-  var headers = ['#','ID','Preview','Product Created At','Product','Type','Market','Paid Spend','Shopify Product Revenue ($)','Product True ROAS','Attr.Revenue ($)','Attr.ROAS','Shopify Items Sold','FB/GG Spend'];
+  var headers = ['#','ID','Preview','Product Created At','Product','Type','Market','Paid Spend','Shopify Product Revenue ($)','Product True ROAS','Attr.Revenue ($)','Attr.ROAS','Shopify Items Sold','FB/GG Spend','Xem Ads'];
   var sortableIdx = [3,7,8,9,10,11,12]; // Created, Spend, True Rev, True ROAS, Attr Rev, Attr ROAS, True Purch
 
   var headerHtml = '<thead><tr>' + headers.map(function(h, i) {
@@ -2546,13 +2632,15 @@ function renderPITable() {
       + '<td>' + mkts + '</td>'
       + '<td class="num">' + cur(p.spend) + '</td>'
       + '<td class="num" style="color:#4ade80">' + cur(p.trueRev) + '</td>'
-      + '<td class="num" style="' + roasStyle(p.trueRoas, be) + '">'
+      + '<td class="num">'
         + nf(p.trueRoas, 2) + 'x' + roasAnomaly + '</td>'
       + '<td class="num" style="color:#94a3b8">' + cur(p.attrRev) + '</td>'
       + '<td class="num" style="color:#94a3b8">' + nf(p.attrRoas, 2) + 'x</td>'
       + '<td class="num">' + nf(p.truePurch, 1) + '</td>'
       + '<td style="font-size:10px"><span style="color:#60a5fa">' + cur(p.fbSpend) + '</span>'
         + '/<span style="color:#4ade80">' + cur(p.ggSpend) + '</span></td>'
+      + '<td>' + (p.productId ? '<button class="filter-btn" onclick="openProductAds(this,\'facebook\')" data-product-id="' + escHtml(p.productId) + '">FB</button> '
+        + '<button class="filter-btn" onclick="openProductAds(this,\'google\')" data-product-id="' + escHtml(p.productId) + '">GG</button>' : '–') + '</td>'
       + '</tr>';
   }).join('') + '</tbody>';
 
@@ -2576,6 +2664,22 @@ function renderPITable() {
       + pageBtns.join('')
       + '<button class="filter-btn" onclick="setPIPage(' + (PI_PAGE + 1) + ')" ' + (PI_PAGE >= totalPages ? 'disabled style="opacity:.45;cursor:not-allowed"' : '') + '>Sau</button>';
   }
+}
+
+function openProductAds(button, channel) {
+  AD_PRODUCT_FOCUS = String(button.getAttribute('data-product-id') || '');
+  if (!AD_PRODUCT_FOCUS || !DATA) return;
+  renderFacebookAds(DATA);
+  renderGoogleAds(DATA);
+  var tab = document.querySelector('.tab-btn[data-tab="' + channel + '"]');
+  if (tab) { tab.click(); window.scrollTo({top: 0, behavior: 'smooth'}); }
+}
+
+function clearAdProductFocus() {
+  AD_PRODUCT_FOCUS = '';
+  if (!DATA) return;
+  renderFacebookAds(DATA);
+  renderGoogleAds(DATA);
 }
 
 function sortPI(colIdx) {
@@ -2707,12 +2811,12 @@ function renderPITypesTable() {
       + '<td><span style="font-size:10px;color:#475569">BE ' + nf(be,2) + 'x</span></td>'
       + '<td class="num">' + cur(m.spend) + '</td>'
       + '<td class="num" style="color:#4ade80">' + cur(m.true_revenue) + '</td>'
-      + '<td class="num" style="' + roasStyle(m.true_roas,be) + '">' + nf(m.true_roas,2) + 'x'
+      + '<td class="num">' + nf(m.true_roas,2) + 'x'
         + (m.true_roas > 10 && m.spend < 50 ? '<span class="roas-anomaly" title="ROAS cao bất thường">⚠️</span>' : '')
         + '</td>'
       + '<td class="num" style="color:#94a3b8">' + cur(m.revenue || 0) + '</td>'
       + '<td class="num" style="color:#94a3b8">' + nf(m.roas || 0,2) + 'x</td>'
-      + '<td class="num" style="color:' + (gap>=0?'#4ade80':'#f87171') + '">'
+      + '<td class="num">'
         + (gap>=0?'+':'') + nf(gap,1) + '%</td>'
       + '<td class="num">' + nf(m.true_purchases,1) + '</td>'
       + '<td class="num">' + cur(m.true_cpa) + '</td>'
