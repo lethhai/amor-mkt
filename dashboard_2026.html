@@ -290,7 +290,7 @@ thead th.sortable:hover{color:#a78bfa}
     <div id="ov-kpis" class="kpi-grid"></div>
     <div class="section">
       <div class="st">Hiệu quả theo Market — ES vs IT</div>
-      <div class="infobox">💱 <strong>Shopify Order Revenue</strong> là tổng cấp store có shipping. <strong>Attr.*</strong> là số platform tự ghi nhận, có thể trùng attribution giữa Facebook và Google. Product ROAS dùng doanh thu dòng sản phẩm Shopify và không cộng shipping.</div>
+      <div class="infobox">💱 <strong>Shopify Order Revenue</strong> là tổng cấp đơn theo Shopify. Product Revenue dùng giá niêm yết × số lượng, không trừ discount và không cộng shipping/tip. Discount và tip được hiển thị riêng ở cấp đơn/store. <strong>Attr.*</strong> là số platform tự ghi nhận, có thể trùng attribution giữa Facebook và Google.</div>
       <div id="ov-market-tbl" class="twrap"></div>
     </div>
     <div class="section">
@@ -339,7 +339,7 @@ thead th.sortable:hover{color:#a78bfa}
     <div class="disclaimer">
       <div class="di">🛒</div>
       <p><strong>Dữ liệu thuần Shopify — Cấp độ Order &amp; Sản phẩm · Currency: USD ($)</strong>
-      Shopify Order Revenue là tổng cấp đơn hàng (có shipping và discount theo số liệu Shopify). Doanh thu theo sản phẩm ở tab Product ROAS chỉ cộng giá trị dòng sản phẩm, không phân bổ shipping. Items Sold đã loại trừ sản phẩm dịch vụ; AOV và Retention tính theo đơn Shopify.</p>
+      Shopify Order Revenue là tổng từ Shopify ở cấp đơn. Discount và tip được tách thành chỉ số cấp đơn/store; doanh thu sản phẩm là giá niêm yết × số lượng, không trừ discount, shipping hay tip. Items Sold loại trừ dịch vụ và tip.</p>
     </div>
     <div id="st-kpis" class="kpi-grid"></div>
     <div class="g2">
@@ -641,7 +641,7 @@ function isServiceType(t) {
 // ═══════════════════════════════════════
 // CONFIG & STATE
 // ═══════════════════════════════════════
-var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwFiCOhNDSkmcdZXVbSrjYvhvo0OFEeQJMwC136S1vcrTV_1MhCEiA2HxN6lAJqJ-yu/exec';
+var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzx8J7l92zlH06QeMhqsL92SHkDdSBeEDQTjvbp99HBQPmTCi3DItM3J7fzNEA1lTg9/exec';
 function getGasUrl() { return localStorage.getItem('gas_url') || DEFAULT_GAS_URL; }
 
 Chart.defaults.color       = '#64748b';
@@ -1076,6 +1076,8 @@ function renderStore(d) {
   var t  = d.shopifyTotals      || {};
   var sm = d.shopifyByMarket    || {};
   var st = d.shopifyByType      || {};
+  var orderLevelDiscount = o.discount || 0;
+  var orderLevelTip = o.tip || 0;
   
   // ── Render Product Type pills ──
   var allTypes = Object.keys(st).filter(function(k) {
@@ -1137,6 +1139,8 @@ function renderStore(d) {
     var byC     = d.shopifyOrderByCountry || {};
     var mktData = byC[mkt] || {};
     var dailyByC = d.shopifyOrderDailyByCountry || {};
+    orderLevelDiscount = mktData.discount || 0;
+    orderLevelTip = mktData.tip || 0;
 
     // Override totals — trừ service items theo tỷ lệ market
     var mktRevRatio = (d.shopifyOrderTotals || {}).totalRevenue > 0
@@ -1203,7 +1207,9 @@ function renderStore(d) {
     : Math.max(0, (t.unitsSold || 0) - serviceUnits);
 
   document.getElementById('st-kpis').innerHTML = [
-    kpi('True Revenue',    cur(o.totalRevenue || t.revenue || 0), 'Shopify · Bao gồm ship · USD', 'green'),
+    kpi('True Revenue',    cur(o.totalRevenue || t.revenue || 0), 'Shopify order total · USD', 'green'),
+    kpi('Order Discounts', '-' + cur(orderLevelDiscount), 'Cấp đơn/store · không phân bổ vào sản phẩm', 'warn'),
+    kpi('Tips',            cur(orderLevelTip), 'Cấp đơn/store · không tính là doanh thu sản phẩm', 'blue'),
     kpi('True Orders',      nf(o.orders || 0),                     'Số đơn thực tế', 'blue'),
     kpi('True Items Sold',  nf(displayUnits),                       'Excl. Shipping Protection'),
     kpi('AOV',              cur(o.aov || 0),                       'Giá trị TB đơn', 'blue'),
@@ -1458,9 +1464,15 @@ function renderStoreFromRows(d) {
   });
   var aov = totals.orderLines > 0 ? r2(totals.revenue / totals.orderLines) : 0;
   var aoq = totals.orderLines > 0 ? r2(totals.unitsSold / totals.orderLines) : 0;
+  var orderTotals = d.shopifyOrderTotals || {};
+  var countryTotals = (d.shopifyOrderByCountry || {})[ST_MARKET] || {};
+  var orderLevelDiscount = ST_MARKET !== 'all' ? (countryTotals.discount || 0) : (orderTotals.discount || 0);
+  var orderLevelTip = ST_MARKET !== 'all' ? (countryTotals.tip || 0) : (orderTotals.tip || 0);
 
   document.getElementById('st-kpis').innerHTML = [
-    kpi('True Revenue', cur(totals.revenue), 'Filtered Shopify rows', 'green'),
+    kpi('True Revenue', cur(totals.revenue), 'Filtered gross product sales', 'green'),
+    kpi('Order Discounts', '-' + cur(orderLevelDiscount), 'Cấp đơn/store · không phân bổ vào sản phẩm', 'warn'),
+    kpi('Tips', cur(orderLevelTip), 'Cấp đơn/store · không tính là doanh thu sản phẩm', 'blue'),
     kpi('True Orders', nf(totals.orderLines), 'Order lines theo filter', 'blue'),
     kpi('True Items Sold', nf(totals.unitsSold), 'Filtered items'),
     kpi('AOV', cur(aov), 'True Rev / Order Lines', 'blue'),
