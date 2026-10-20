@@ -1773,15 +1773,27 @@ function renderGoogleProductTable() {
   if (count) count.textContent = rows.length + ' products' + (rows.length > 100 ? ' · showing top 100 by spend' : '');
 }
 
+function fbAdManagerUrl(accountId, adId) {
+  var act = String(accountId || '').replace(/^act_/i, '');
+  var ad = String(adId || '');
+  if (!act || !ad) return '';
+  return 'https://www.facebook.com/adsmanager/manage/ads?act=' + encodeURIComponent(act) +
+    '&selected_ad_ids=' + encodeURIComponent(ad);
+}
+
 function renderTopCreatives(d) {
   var creas = (d.topCreatives || []).slice(0, 25);
   var creaRows = creas.map(function(c) {
     var title = c.creativeId ? 'Creative ' + c.creativeId : (c.ad || c.fullUrl || 'Creative');
+    var openUrl = c.previewUrl || fbAdManagerUrl(c.accountId, c.adId);
+    var openLabel = c.previewUrl ? 'Open Meta preview' : 'Open this ad in Ads Manager';
     var preview = c.thumbnailUrl
-      ? '<a href="' + escHtml(c.previewUrl || c.thumbnailUrl) + '" target="_blank" rel="noopener"><img src="' + escHtml(c.thumbnailUrl) + '" alt="" style="width:52px;height:40px;object-fit:cover;border-radius:4px"></a>'
+      ? (openUrl
+        ? '<a href="' + escHtml(openUrl) + '" target="_blank" rel="noopener" title="' + openLabel + '"><img src="' + escHtml(c.thumbnailUrl) + '" alt="" style="width:52px;height:40px;object-fit:cover;border-radius:4px"></a>'
+        : '<img src="' + escHtml(c.thumbnailUrl) + '" alt="" title="Ad ID/account ID unavailable" style="width:52px;height:40px;object-fit:cover;border-radius:4px">')
       : '–';
-    var titleCell = c.previewUrl
-      ? '<a href="' + escHtml(c.previewUrl) + '" target="_blank" rel="noopener">' + escHtml(title) + '</a>'
+    var titleCell = openUrl
+      ? '<a href="' + escHtml(openUrl) + '" target="_blank" rel="noopener" title="' + openLabel + '">' + escHtml(title) + '</a>'
       : escHtml(title);
     var destination = c.fullUrl || c.landingUrl || '';
     return [
@@ -1805,7 +1817,7 @@ function renderFbHierarchy(d) {
   var campaigns = d.fbHierarchy || [];
   var available = d.fbStructureAvailable || {};
   var notice = (!available.FB_ADS || !available.FB_CREATIVE_ASSETS)
-    ? '<div style="margin-bottom:8px;padding:8px 10px;background:#1e293b;color:#fbbf24;border-radius:5px;font-size:11px">Hierarchy metrics are available from FB_AD_DATA. Run FB_REFRESH_STRUCTURE() to populate current statuses, Ads Manager links, and flexible creative assets.</div>'
+    ? '<div style="margin-bottom:8px;padding:8px 10px;background:#1e293b;color:#fbbf24;border-radius:5px;font-size:11px">Hierarchy metrics are available from FB_AD_DATA. Run FB_REFRESH_STRUCTURE() to populate current statuses, Meta shareable previews, and flexible creative assets.</div>'
     : '';
   if (!campaigns.length) {
     var hint = available.FB_ADS ? 'No Facebook ad delivery rows in this date range.'
@@ -1819,11 +1831,15 @@ function renderFbHierarchy(d) {
       var sm = s.metrics || {};
       var adRows = (s.ads || []).map(function(a) {
         var m = a.metrics || {};
+        var adOpenUrl = a.previewUrl || fbAdManagerUrl(c.accountId, a.id);
+        var adOpenLabel = a.previewUrl ? 'Open Meta preview' : 'Open this ad in Ads Manager';
         var img = a.thumbnailUrl
-          ? '<a href="' + escHtml(a.previewUrl || a.thumbnailUrl) + '" target="_blank" rel="noopener"><img src="' + escHtml(a.thumbnailUrl) + '" alt="" style="width:48px;height:36px;object-fit:cover;border-radius:4px"></a>'
+          ? (adOpenUrl
+            ? '<a href="' + escHtml(adOpenUrl) + '" target="_blank" rel="noopener" title="' + adOpenLabel + '"><img src="' + escHtml(a.thumbnailUrl) + '" alt="" style="width:48px;height:36px;object-fit:cover;border-radius:4px"></a>'
+            : '<img src="' + escHtml(a.thumbnailUrl) + '" alt="" title="Ad ID/account ID unavailable" style="width:48px;height:36px;object-fit:cover;border-radius:4px">')
           : '–';
-        var adName = a.previewUrl
-          ? '<a href="' + escHtml(a.previewUrl) + '" target="_blank" rel="noopener">' + escHtml(a.name || a.id || 'Ad') + '</a>'
+        var adName = adOpenUrl
+          ? '<a href="' + escHtml(adOpenUrl) + '" target="_blank" rel="noopener" title="' + adOpenLabel + '">' + escHtml(a.name || a.id || 'Ad') + '</a>'
           : escHtml(a.name || a.id || 'Ad');
         var assetSummary = (a.assets || []).slice(0, 4).map(function(x) {
           return x.previewUrl ? '<a href="' + escHtml(x.previewUrl) + '" target="_blank" rel="noopener">' + escHtml(x.type || x.label || 'Asset') + '</a>' : escHtml(x.type || x.label || 'Asset');
