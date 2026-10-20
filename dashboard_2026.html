@@ -626,7 +626,7 @@ function isServiceType(t) {
 // ═══════════════════════════════════════
 // CONFIG & STATE
 // ═══════════════════════════════════════
-var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxGW1u73H_1seWovFyY7BBR6tM9fiqP5Usfl_ztCMSk58mUeKUNhn4n1CGuKQj303E/exec';
+var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyUbMxs6rsIE_a9I91xDxlKFt1XZWxaWUQY5LR9cuf5as9_ng1HuKFhvuCaz53jTkUK/exec';
 function getGasUrl() { return localStorage.getItem('gas_url') || DEFAULT_GAS_URL; }
 
 Chart.defaults.color       = '#64748b';
@@ -748,6 +748,7 @@ function renderAll() {
 function renderOverview(d) {
   var b  = d.blended            || {};
   var o  = d.shopifyOrderTotals || {};
+  var mo = d.marketingOverview  || {};
   var bc = d.blendedByCountry   || {};
   var sm = d.shopifyOrderByCountry || {};
 
@@ -780,16 +781,25 @@ function renderOverview(d) {
       + 'Kiểm tra lại GAS script đã chạy sync chưa, hoặc thử chọn <strong>Hôm qua</strong> hoặc <strong>7N</strong> để xem dữ liệu gần nhất.</div>';
   }
 
+  var overviewAdsSpend = mo.adsSpend !== undefined ? mo.adsSpend : totalSpend;
+  var overviewRevenue = mo.shopifyRevenue !== undefined ? mo.shopifyRevenue : totalRevInp;
+  var overviewOrders = mo.shopifyOrders !== undefined ? mo.shopifyOrders : (o.orders || 0);
+  var overviewAov = mo.aov !== undefined ? mo.aov : (o.aov || 0);
+  var overviewRoas = mo.roas !== undefined ? mo.roas : trueROAS;
+  var overviewProfit = mo.profit || 0;
+  var overviewSpendPct = mo.spendAdsPct || 0;
+  var aiSpend = mo.aiToolSpend || 0;
+  var fulfillmentCost = mo.fulfillmentCost || 0;
+  var fixedCost = mo.fixedCost || 0;
+
   document.getElementById('ov-kpis').innerHTML = noDataBanner + [
-    kpi('Paid Ads Spend',      cur(totalSpend) + wowDelta(totalSpend,'spend'),   'FB ' + cur(b.fb_spend || 0) + ' + GG ' + cur(b.gg_spend || 0)),
-    kpi('Shopify Order Revenue', cur(totalRevInp) + wowDelta(totalRevInp,'revenue'),'Includes shipping', 'green'),
-    kpi('Store ROAS',          nf(trueROAS,2)+'x'+wowDelta(trueROAS,'roas'),     'Shopify order revenue ÷ paid spend', roasCls(trueROAS, 1.65)),
-    kpi('FB Attr.Revenue',     cur((d.fbTotals || {}).revenue || 0), 'Meta-attributed', 'blue'),
-    kpi('Google Attr.Revenue', cur((d.ggTotals || {}).revenue || 0), 'Google-attributed', 'blue'),
-    kpi('Shopify Orders',      nf(o.orders||0)+wowDelta(o.orders||0,'orders'),   'Đơn hàng thực tế', 'blue'),
-    kpi('Shipping Revenue',    cur(o.shipping || 0),      'Tiền khách trả ship', 'blue'),
-    kpi('AOV',                 cur(o.aov || 0),           'Shopify Order Revenue ÷ Shopify Orders', 'blue'),
-    kpi('Retention Rate',      pct(o.retentionRate || 0), 'Tỷ lệ khách cũ', (o.retentionRate > 15 ? 'green' : 'warn')),
+    kpi('Ads Spend', cur(overviewAdsSpend) + wowDelta(overviewAdsSpend,'spend'), 'Facebook + Google'),
+    kpi('Shopify Revenue', cur(overviewRevenue) + wowDelta(overviewRevenue,'revenue'), 'Shopify order revenue · includes shipping', 'green'),
+    kpi('Shopify Orders', nf(overviewOrders) + wowDelta(overviewOrders,'orders'), 'Đơn hàng thực tế', 'blue'),
+    kpi('AOV', cur(overviewAov), 'Shopify Revenue ÷ Shopify Orders', 'blue'),
+    kpi('ROAS', nf(overviewRoas, 2) + 'x' + wowDelta(overviewRoas,'roas'), 'Shopify Revenue ÷ Ads Spend', roasCls(overviewRoas, 1.65)),
+    kpi('Profit', cur(overviewProfit), 'Fulfillment ' + cur(fulfillmentCost) + ' · Fixed ' + cur(fixedCost) + ' · AI ' + cur(aiSpend), overviewProfit >= 0 ? 'green' : 'red'),
+    kpi('% Spend Ads', pct(overviewSpendPct), 'Ads Spend ÷ Shopify Revenue'),
   ].join('');
 
   // Market table
