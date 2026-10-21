@@ -313,10 +313,18 @@ thead th.sortable:hover{color:#a78bfa}
       </div>
     </div>
     <div class="section">
-      <div class="st">Paid spend theo kênh</div>
-      <div class="cbox">
-        <div class="ctitle">Facebook vs Google Spend</div>
-        <div class="chart-container-sm"><canvas id="ch-ov-donut"></canvas></div>
+      <div class="st">Phân rã Shopify Revenue</div>
+      <div class="infobox">Shopify Revenue lấy từ tổng đơn Shopify. Các phần chi phí và profit bên dưới dùng cùng công thức Overview: Ads Spend + Profit + Fulfillment + API cost + Fixed costs. API cost/order = (GPT + Gemini) ÷ Shopify orders.</div>
+      <div class="g2">
+        <div class="cbox">
+          <div class="ctitle">Shopify Revenue gồm những phần nào</div>
+          <div id="ov-revenue-donut-note" class="infobox" style="display:none"></div>
+          <div class="chart-container-sm" id="ov-revenue-donut-wrap"><canvas id="ch-ov-revenue-donut"></canvas></div>
+        </div>
+        <div class="cbox">
+          <div class="ctitle">Paid spend theo kênh · Facebook vs Google</div>
+          <div class="chart-container-sm"><canvas id="ch-ov-donut"></canvas></div>
+        </div>
       </div>
     </div>
     <div class="section">
@@ -809,14 +817,24 @@ function renderOverview(d) {
   var aiSpend = mo.aiToolSpend || 0;
   var fulfillmentCost = mo.fulfillmentCost || 0;
   var fixedCost = mo.fixedCost || 0;
+  var productGrossSales = (d.shopifyTotals || {}).revenue || 0;
+  var shippingCollected = o.shipping || 0;
+  var orderDiscounts = o.discount || 0;
+  var orderTips = o.tip || 0;
+  var apiCostPerOrder = overviewOrders > 0 ? r2(aiSpend / overviewOrders) : 0;
 
   document.getElementById('ov-kpis').innerHTML = noDataBanner + [
     kpi('Ads Spend', cur(overviewAdsSpend) + wowDelta(overviewAdsSpend,'spend'), 'Facebook + Google'),
-    kpi('Shopify Revenue', cur(overviewRevenue) + wowDelta(overviewRevenue,'revenue'), 'Shopify order revenue · includes shipping', 'green'),
+    kpi('Shopify Revenue', cur(overviewRevenue) + wowDelta(overviewRevenue,'revenue'), 'Shopify total cấp đơn', 'green'),
+    kpi('Product Gross Sales', cur(productGrossSales), 'Giá niêm yết × items sold; chưa trừ discount', 'green'),
+    kpi('Shipping Collected', cur(shippingCollected), 'Phí ship thu từ khách', 'blue'),
+    kpi('Order Discounts', '-' + cur(orderDiscounts), 'Discount cấp đơn/store', 'warn'),
+    kpi('Tips', cur(orderTips), 'Tip ghi nhận riêng từ Shopify', 'blue'),
     kpi('Shopify Orders', nf(overviewOrders) + wowDelta(overviewOrders,'orders'), 'Đơn hàng thực tế', 'blue'),
     kpi('AOV', cur(overviewAov), 'Shopify Revenue ÷ Shopify Orders', 'blue'),
     kpi('ROAS', nf(overviewRoas, 2) + 'x' + wowDelta(overviewRoas,'roas'), 'Shopify Revenue ÷ Ads Spend', roasCls(overviewRoas, 1.65)),
     kpi('Profit', cur(overviewProfit), 'Fulfillment ' + cur(fulfillmentCost) + ' · Fixed ' + cur(fixedCost) + ' · AI ' + cur(aiSpend), overviewProfit >= 0 ? 'green' : 'red'),
+    kpi('API Cost / Order', cur(apiCostPerOrder), 'GPT + Gemini ÷ Shopify Orders'),
     kpi('% Spend Ads', pct(overviewSpendPct), 'Ads Spend ÷ Shopify Revenue'),
   ].join('');
 
@@ -830,6 +848,7 @@ function renderOverview(d) {
     var revM    = sm[mkt] ? (sm[mkt].totalRevenue  || 0) : 0;
     var trueR   = spendM > 0 ? r2(revM / spendM) : 0;
     var adsRevM = bc[mkt] ? (bc[mkt].revenue  || 0) : 0;
+    var attrRoasM = spendM > 0 ? r2(adsRevM / spendM) : 0;
     var purch   = bc[mkt] ? (bc[mkt].purchases || 0) : 0;
     return [
       '<span class="badge b-' + mkt.toLowerCase() + '">' + mkt + '</span>',
@@ -837,11 +856,12 @@ function renderOverview(d) {
       '<span class="num">' + cur(revM)    + '</span>',
       '<span class="num" style="' + roasStyle(trueR, 1.65) + '">' + nf(trueR, 2) + 'x</span>',
       '<span class="num" style="color:#475569">' + cur(adsRevM) + '</span>',
+      '<span class="num" style="color:#475569">' + nf(attrRoasM, 2) + 'x</span>',
       '<span class="num" style="color:#475569">' + nf(purch, 1) + '</span>'
     ];
   });
   document.getElementById('ov-market-tbl').innerHTML = mkTable(
-    ['Market', 'Paid Spend ($)', 'Shopify Order Revenue · incl. shipping ($)', 'Store ROAS', 'Attr.Revenue ($)', 'Attr.Order'], mktRows
+    ['Market', 'Paid Spend ($)', 'Shopify Order Revenue ($)', 'Store ROAS', 'Attr.Revenue ($)', 'Attr.ROAS', 'Attr.Order'], mktRows
   );
 
   var fb = d.fbTotals || {}, gg = d.ggTotals || {};
@@ -865,6 +885,48 @@ function renderOverview(d) {
   );
 
   renderOverviewDailyChart(d);
+
+  // Revenue allocation: profit is the remainder after ads, fulfillment,
+  // API and fixed costs. A loss cannot be represented as a positive donut slice.
+  var revenueDonutNote = document.getElementById('ov-revenue-donut-note');
+  var revenueDonutWrap = document.getElementById('ov-revenue-donut-wrap');
+  if (overviewProfit < 0) {
+    if (CH['ch-ov-revenue-donut']) { CH['ch-ov-revenue-donut'].destroy(); delete CH['ch-ov-revenue-donut']; }
+    if (revenueDonutWrap) revenueDonutWrap.style.display = 'none';
+    if (revenueDonutNote) {
+      revenueDonutNote.style.display = 'block';
+      revenueDonutNote.textContent = 'Khoảng ngày này đang lỗ ' + cur(Math.abs(overviewProfit)) + '. Vì chi phí vượt Shopify Revenue, không thể biểu diễn chúng thành các phần dương của revenue.';
+    }
+  } else {
+    if (revenueDonutWrap) revenueDonutWrap.style.display = 'block';
+    if (revenueDonutNote) revenueDonutNote.style.display = 'none';
+    var revenueParts = [
+      { label: 'Ads Spend', val: overviewAdsSpend, color: '#60a5fa' },
+      { label: 'Profit', val: overviewProfit, color: '#4ade80' },
+      { label: 'Fulfillment', val: fulfillmentCost, color: '#f59e0b' },
+      { label: 'API Cost · GPT + Gemini', val: aiSpend, color: '#a78bfa' },
+      { label: 'Fixed Costs', val: fixedCost, color: '#f87171' }
+    ];
+    mkCh('ch-ov-revenue-donut', {
+      type: 'doughnut',
+      data: {
+        labels: revenueParts.map(function(x) { return x.label; }),
+        datasets: [{ data: revenueParts.map(function(x) { return Math.max(0, Number(x.val) || 0); }),
+          backgroundColor: revenueParts.map(function(x) { return x.color; }), borderWidth: 0 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right', labels: { color: '#94a3b8' } },
+          tooltip: { callbacks: { label: function(ctx) {
+            var val = Number(ctx.raw) || 0;
+            var share = overviewRevenue > 0 ? r2(val / overviewRevenue * 100) : 0;
+            return ' ' + ctx.label + ': ' + cur(val) + ' (' + share + '% revenue)';
+          } } }
+        }
+      }
+    });
+  }
 
   // FIX #4: Donut với % trong tooltip và legend
   var donutItems = [
