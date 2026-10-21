@@ -290,7 +290,7 @@ thead th.sortable:hover{color:#a78bfa}
     <div id="ov-kpis" class="kpi-grid"></div>
     <div class="section">
       <div class="st">Hiệu quả theo Market — ES vs IT</div>
-      <div class="infobox">💱 <strong>Shopify Order Revenue</strong> là tổng cấp đơn theo Shopify. Product Revenue dùng giá niêm yết × số lượng, không trừ discount và không cộng shipping/tip. Discount và tip được hiển thị riêng ở cấp đơn/store. <strong>Attr.*</strong> là số platform tự ghi nhận, có thể trùng attribution giữa Facebook và Google.</div>
+      <div class="infobox">💱 <strong>Shopify Order Revenue</strong> là tổng cấp đơn theo Shopify. <strong>Shopify Product Gross Sales</strong> = giá bán niêm yết × số item bán; không trừ discount và không cộng shipping/tip. Discount được theo dõi riêng ở cấp store. <strong>Attr.*</strong> là số platform tự ghi nhận, có thể trùng attribution giữa Facebook và Google.</div>
       <div id="ov-market-tbl" class="twrap"></div>
     </div>
     <div class="section">
@@ -339,7 +339,7 @@ thead th.sortable:hover{color:#a78bfa}
     <div class="disclaimer">
       <div class="di">🛒</div>
       <p><strong>Dữ liệu thuần Shopify — Cấp độ Order &amp; Sản phẩm · Currency: USD ($)</strong>
-      Shopify Order Revenue là tổng từ Shopify ở cấp đơn. Discount và tip được tách thành chỉ số cấp đơn/store; doanh thu sản phẩm là giá niêm yết × số lượng, không trừ discount, shipping hay tip. Items Sold loại trừ dịch vụ và tip.</p>
+      Shopify Order Revenue là tổng từ Shopify ở cấp đơn. Shopify Product Gross Sales = giá bán niêm yết × số item bán, không trừ discount và không gồm shipping/tip. Discount được theo dõi riêng ở cấp store. Items Sold loại trừ dịch vụ và tip.</p>
     </div>
     <div id="st-kpis" class="kpi-grid"></div>
     <div class="g2">
@@ -409,17 +409,18 @@ thead th.sortable:hover{color:#a78bfa}
     <div id="pi-kpis" class="kpi-grid"></div>
     <div class="section"><div class="st">Shopify sales chưa có spend map theo sản phẩm</div><div class="infobox">Đây là doanh thu dòng sản phẩm không tìm thấy FB/Google spend gắn cùng Product ID trong khoảng ngày đã chọn; có thể là đơn organic hoặc quảng cáo chưa map. Không tính shipping.</div><div id="pi-unmatched" class="twrap"></div></div>
     <div class="section">
-      <div class="st">Shopify Product Revenue · Paid Spend · Product True ROAS theo ngày</div>
-      <div class="infobox">Revenue = doanh thu sản phẩm từ Shopify; Paid Spend = chi tiêu FB + Google đã map sản phẩm; Product True ROAS = Shopify product revenue ÷ paid spend.</div>
+      <div class="st">Shopify Product Gross Sales · Paid Spend · Product Gross ROAS theo ngày</div>
+      <div class="infobox">Product Gross Sales = giá bán niêm yết × số item bán, không trừ discount; Paid Spend = chi tiêu FB + Google đã map sản phẩm; Product Gross ROAS = Shopify Product Gross Sales ÷ paid spend. Không gồm shipping hoặc tip.</div>
       <div class="cbox"><div class="chart-container-lg"><canvas id="ch-pi-daily"></canvas></div></div>
     </div>
     <div class="section">
-      <div class="st">Product Types — Product True ROAS vs BE ROAS (provisional)</div>
-      <div class="infobox">Product True ROAS = Shopify product revenue ÷ mapped FB/Google spend. Revenue theo sản phẩm không gồm shipping. BE ROAS hiện là ngưỡng tạm thời; cấu hình <code>BE_ROAS_CONFIG</code> đang chờ cập nhật, nên chưa dùng để kết luận đạt/chưa đạt.</div>
+      <div class="st">Product Types — Product Gross ROAS vs BE ROAS (provisional)</div>
+      <div class="infobox">Product Gross ROAS = Shopify Product Gross Sales ÷ mapped FB/Google spend. Gross sales theo sản phẩm không gồm shipping, tip hoặc discount. BE ROAS hiện là ngưỡng tạm thời; cấu hình <code>BE_ROAS_CONFIG</code> đang chờ cập nhật, nên chưa dùng để kết luận đạt/chưa đạt.</div>
       <div id="pi-types-tbl" class="twrap"></div>
     </div>
     <div class="section">
-      <div class="st">Products — Shopify sales matched to ad spend</div>
+      <div class="st">Products — Shopify items sold, ad spend mapped where available</div>
+      <div class="infobox">Danh sách gốc gồm sản phẩm có ít nhất 1 Shopify item sold trong khoảng ngày đang chọn, sau đó áp dụng các bộ lọc hiện có. Sản phẩm có spend nhưng 0 item sold không xuất hiện; sản phẩm đã bán nhưng chưa map được spend vẫn có thể xuất hiện với spend bằng 0. Spend được ghép theo Product ID.</div>
       <div class="filter-bar">
         <input type="text" id="pi-search" placeholder="🔍 Tìm tên sản phẩm..." oninput="filterProducts()">
         <span style="font-size:11px;color:#475569;font-weight:600">Created:</span>
@@ -1369,7 +1370,7 @@ function renderStore(d) {
     return ST_PROD_SORT.dir * ((av || 0) - (bv || 0));
   });
 
-  var stHeads = ['#', 'ID', 'Preview', 'Product Created At', 'Product', 'Type', 'Market', 'Items Sold', 'Shopify Product Revenue ($)'];
+  var stHeads = ['#', 'ID', 'Preview', 'Product Created At', 'Product', 'Type', 'Market', 'Items Sold', 'Shopify Product Gross Sales ($)'];
   var headerHtml = '<thead><tr>' + stHeads.map(function(h, i) {
     if (i < 7) return '<th>' + h + '</th>';
     var ind = (ST_PROD_SORT.col === i) ? (ST_PROD_SORT.dir === 1 ? ' ▲' : ' ▼') : '';
@@ -1470,7 +1471,7 @@ function renderStoreFromRows(d) {
   var orderLevelTip = ST_MARKET !== 'all' ? (countryTotals.tip || 0) : (orderTotals.tip || 0);
 
   document.getElementById('st-kpis').innerHTML = [
-    kpi('True Revenue', cur(totals.revenue), 'Filtered gross product sales', 'green'),
+    kpi('Product Gross Sales', cur(totals.revenue), 'Filtered listed item price × items sold; discounts excluded', 'green'),
     kpi('Order Discounts', '-' + cur(orderLevelDiscount), 'Cấp đơn/store · không phân bổ vào sản phẩm', 'warn'),
     kpi('Tips', cur(orderLevelTip), 'Cấp đơn/store · không tính là doanh thu sản phẩm', 'blue'),
     kpi('True Orders', nf(totals.orderLines), 'Order lines theo filter', 'blue'),
@@ -2293,7 +2294,7 @@ var PI_TYPES_DATA  = [];   // raw type rows for sort
 var PI_TYPES_SORT  = { col: 2, dir: -1 };
 var PI_MKT_FILTER = 'all';
 var PI_ROAS_FILTER= null;
-var PI_SORT       = { col: 8, dir: -1 }; // default: sort by True Revenue desc
+var PI_SORT       = { col: 9, dir: -1 }; // default: sort by Product Gross Sales desc
 var PI_PAGE       = 1;
 var PI_PAGE_SIZE  = 25;
 var PI_CREATED_FROM = '';
@@ -2463,7 +2464,7 @@ function renderProducts(d) {
     interests: PI_INTERESTS_FILTER, recipients: PI_RECIPIENTS_FILTER };
   var shopRows = (d.shopifyRows || []).filter(function(r) { return !isServiceType(r.type) && rowMatchesFilters(r, filter); });
   var adRows = (d.adsRows || []).filter(function(r) { return rowMatchesFilters(r, filter); });
-  // Product True ROAS uses only spend that can be joined to a Shopify product.
+  // Product Gross ROAS uses spend that can be joined to a Shopify product.
   var mappedAdRows = adRows.filter(function(r) { return !!(r.productId || (r.title && r.type !== 'Unknown')); });
   var byProduct = {}, adByProduct = {}, byType = {};
   function typeMetrics(type) {
@@ -2524,7 +2525,7 @@ function renderProducts(d) {
   });
   var unmatchedRows = Object.keys(unmatched).map(function(type) { return { type: type, m: unmatched[type] }; })
     .sort(function(a,b) { return b.m.revenue-a.m.revenue; });
-  document.getElementById('pi-unmatched').innerHTML = mkTable(['Product Type','Sản phẩm','Items','Shopify Product Revenue'],
+  document.getElementById('pi-unmatched').innerHTML = mkTable(['Product Type','Sản phẩm','Items','Shopify Product Gross Sales'],
     unmatchedRows.map(function(x) { return [escHtml(x.type),nf(x.m.products),nf(x.m.items),cur(x.m.revenue)]; }));
   filteredSpend = r2(filteredSpend);
   filteredRevenue = r2(filteredRevenue);
@@ -2532,8 +2533,8 @@ function renderProducts(d) {
   document.getElementById('pi-kpis').innerHTML = [
     kpi('Filtered Products', soldProductKeys.length, 'Sản phẩm có item sales trong date range'),
     kpi('Paid Spend', cur(filteredSpend), 'FB + Google · spend map được sản phẩm theo bộ lọc', 'blue'),
-    kpi('Shopify Product Revenue', cur(filteredRevenue), 'Tổng revenue của các sản phẩm đang lọc', 'green'),
-    kpi('Product True ROAS', nf(filteredRoas, 2) + 'x', 'Shopify product revenue ÷ mapped paid spend'),
+    kpi('Shopify Product Gross Sales', cur(filteredRevenue), 'Listed item price × items sold; discounts excluded', 'green'),
+    kpi('Product Gross ROAS', nf(filteredRoas, 2) + 'x', 'Shopify Product Gross Sales ÷ mapped paid spend'),
     best ? kpi('Highest ROAS: ' + best[0], nf(best[1].true_roas, 2) + 'x', cur(best[1].spend)) : '',
     worst ? kpi('Lowest ROAS: ' + worst[0], nf(worst[1].true_roas, 2) + 'x', cur(worst[1].spend)) : ''
   ].join('');
@@ -2549,8 +2550,8 @@ function renderProducts(d) {
   } else dates = Array.from(new Set(Object.keys(dailyRev).concat(Object.keys(dailySpend)))).sort();
   mkCh('ch-pi-daily', { type: 'bar', data: { labels: dates.map(fd), datasets: [
     { type: 'bar', label: 'Paid Spend ($)', data: dates.map(function(x) { return r2(dailySpend[x] || 0); }), yAxisID: 'yS', backgroundColor: 'rgba(96,165,250,.58)', borderRadius: 3 },
-    { type: 'line', label: 'Shopify Product Revenue ($)', data: dates.map(function(x) { return r2(dailyRev[x] || 0); }), yAxisID: 'yS', borderColor: '#4ade80', pointRadius: 2, tension: .3 },
-    { type: 'line', label: 'Product True ROAS', data: dates.map(function(x) { var s = dailySpend[x] || 0; return s > 0 ? r2((dailyRev[x] || 0) / s) : 0; }), yAxisID: 'yR', borderColor: '#fbbf24', pointRadius: 2, tension: .3 }
+    { type: 'line', label: 'Shopify Product Gross Sales ($)', data: dates.map(function(x) { return r2(dailyRev[x] || 0); }), yAxisID: 'yS', borderColor: '#4ade80', pointRadius: 2, tension: .3 },
+    { type: 'line', label: 'Product Gross ROAS', data: dates.map(function(x) { var s = dailySpend[x] || 0; return s > 0 ? r2((dailyRev[x] || 0) / s) : 0; }), yAxisID: 'yR', borderColor: '#fbbf24', pointRadius: 2, tension: .3 }
   ] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
     plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: {
       x: { grid: GRID, ticks: { autoSkip: true, maxTicksLimit: 12 } }, yS: { position: 'left', grid: GRID, ticks: TICK_Y, title: { display: true, text: 'USD ($)' } },
@@ -2583,7 +2584,7 @@ function renderPITable() {
 
   // Sort
   var col = PI_SORT.col, dir = PI_SORT.dir;
-  var colKeys = ['idx','productId','imageUrl','productCreatedAt','title','type','markets','spend','trueRev','trueRoas','attrRev','attrRoas','truePurch','fbSpend'];
+  var colKeys = ['idx','productId','imageUrl','productCreatedAt','title','type','markets','spend','truePurch','trueRev','trueRoas','attrRev','attrRoas','fbSpend'];
   filtered.sort(function(a, b) {
     var av = a[colKeys[col]], bv = b[colKeys[col]];
     if (typeof av === 'string') return dir * av.localeCompare(bv);
@@ -2598,8 +2599,8 @@ function renderPITable() {
   var pageRows = filtered.slice(startIdx, startIdx + PI_PAGE_SIZE);
   if (countEl) countEl.textContent = filtered.length + ' sản phẩm · Trang ' + PI_PAGE + '/' + totalPages;
 
-  var headers = ['#','ID','Preview','Product Created At','Product','Type','Market','Paid Spend','Shopify Product Revenue ($)','Product True ROAS','Attr.Revenue ($)','Attr.ROAS','Shopify Items Sold','FB/GG Spend','Xem Ads'];
-  var sortableIdx = [3,7,8,9,10,11,12]; // Created, Spend, True Rev, True ROAS, Attr Rev, Attr ROAS, True Purch
+  var headers = ['#','ID','Preview','Product Created At','Product','Type','Market','Paid Spend','Shopify Items Sold','Shopify Product Gross Sales ($)','Product Gross ROAS','Attr.Revenue ($)','Attr.ROAS','FB/GG Spend','Xem Ads'];
+  var sortableIdx = [3,7,8,9,10,11,12]; // Created, Spend, Items Sold, Gross Sales, Gross ROAS, Attr Rev, Attr ROAS
 
   var headerHtml = '<thead><tr>' + headers.map(function(h, i) {
     var isSortable = sortableIdx.indexOf(i) > -1;
@@ -2643,12 +2644,11 @@ function renderPITable() {
       + '<td><span style="font-size:10px;color:#a78bfa">' + escHtml(p.type) + '</span></td>'
       + '<td>' + mkts + '</td>'
       + '<td class="num">' + cur(p.spend) + '</td>'
+      + '<td class="num">' + nf(p.truePurch, 1) + '</td>'
       + '<td class="num" style="color:#4ade80">' + cur(p.trueRev) + '</td>'
-      + '<td class="num">'
-        + nf(p.trueRoas, 2) + 'x' + roasAnomaly + '</td>'
+      + '<td class="num">' + nf(p.trueRoas, 2) + 'x' + roasAnomaly + '</td>'
       + '<td class="num" style="color:#94a3b8">' + cur(p.attrRev) + '</td>'
       + '<td class="num" style="color:#94a3b8">' + nf(p.attrRoas, 2) + 'x</td>'
-      + '<td class="num">' + nf(p.truePurch, 1) + '</td>'
       + '<td style="font-size:10px"><span style="color:#60a5fa">' + cur(p.fbSpend) + '</span>'
         + '/<span style="color:#4ade80">' + cur(p.ggSpend) + '</span></td>'
       + '<td>' + (p.productId ? '<button class="filter-btn" onclick="openProductAds(this,\'facebook\')" data-product-id="' + escHtml(p.productId) + '">FB</button> '
@@ -2800,7 +2800,7 @@ function renderPITypesTable() {
     return dir * ((av||0) - (bv||0));
   });
 
-  var heads = ['Type','BE (provisional)','Paid Spend','Shopify Product Revenue ($)','Product True ROAS','Attr.Revenue ($)','Attr.ROAS','vs BE (provisional)','Shopify Items Sold','Spend per Item','FB/GG Spend'];
+  var heads = ['Type','BE (provisional)','Paid Spend','Shopify Product Gross Sales ($)','Product Gross ROAS','Attr.Revenue ($)','Attr.ROAS','vs BE (provisional)','Shopify Items Sold','Spend per Item','FB/GG Spend'];
   var sortableCols = [2,3,4,5,6,7,8,9];
   var headerHtml = '<thead><tr>' + heads.map(function(h, i) {
     if (sortableCols.indexOf(i) === -1) return '<th>' + h + '</th>';
