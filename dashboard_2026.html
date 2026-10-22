@@ -421,7 +421,7 @@ thead th.sortable:hover{color:#a78bfa}
       <div class="st">Creative Performance · Facebook</div>
       <div class="infobox">Dùng khoảng ngày ở thanh trên. Mỗi creative được gộp theo market + Ad ID. Spend, purchase, Add to Cart và doanh thu ghi nhận bởi Meta; Attr.ROAS = Attr.Revenue ÷ Spend. Đây là tín hiệu vận hành để rà soát trong Ads Manager, không phải ROAS từ Shopify hay lệnh tự động tắt/tăng ngân sách.</div>
       <div class="creative-controls">
-        <select id="creative-scope" onchange="creativeFilterChanged()" aria-label="Lọc phạm vi campaign"><option value="all">Tất cả campaign</option><option value="xmas">Chỉ XMas2026 (theo sheet mẫu)</option></select>
+        <select id="creative-campaign" onchange="creativeFilterChanged()" aria-label="Lọc campaign theo tài khoản"><option value="all">Tất cả campaign</option></select>
         <select id="creative-market" onchange="creativeFilterChanged()" aria-label="Lọc market"><option value="all">Tất cả market</option></select>
         <select id="creative-type" onchange="creativeFilterChanged()" aria-label="Lọc product type"><option value="all">Tất cả product type</option></select>
         <input id="creative-search" type="search" placeholder="Tìm ad, creative, ad set, ID..." oninput="creativeFilterChanged()" aria-label="Tìm creative">
@@ -2037,7 +2037,9 @@ function buildFacebookCreativeRows(d) {
     if (!c) c = grouped[key] = {
       market: market, accountId: r.accountId || '', account: r.account || '',
       adId: r.adId || '', creativeId: r.creativeId || '', ad: r.ad || '',
-      adset: r.adset || '', campaign: r.campaign || '', prodType: r.type || 'Unknown',
+      adset: r.adset || '', campaignId: r.campaignId || '', campaign: r.campaign || '',
+      campaignKey: account + '|' + String(r.campaignId || r.campaign || 'Unknown'),
+      prodType: r.type || 'Unknown',
       productId: r.productId || '', thumbnailUrl: r.thumbnailUrl || '',
       previewUrl: r.previewUrl || '', landingUrl: r.landingUrl || '',
       spend: 0, revenue: 0, purchases: 0, atc: 0, impressions: 0,
@@ -2177,8 +2179,10 @@ function renderTopCreatives(d) {
 function renderCreativePerformance(d) {
   if (!d) return;
   if (!CREATIVE_ROWS.length) CREATIVE_ROWS = buildFacebookCreativeRows(d);
+  var campaignEl = document.getElementById('creative-campaign');
   var marketEl = document.getElementById('creative-market');
   var typeEl = document.getElementById('creative-type');
+  var selectedCampaign = campaignEl.value || 'all';
   var selectedMarket = marketEl.value || 'all';
   var selectedType = typeEl.value || 'all';
   function fillSelect(el, allText, items, selected) {
@@ -2188,14 +2192,24 @@ function renderCreativePerformance(d) {
     el.innerHTML = options.join('');
     el.value = items.indexOf(selected) >= 0 ? selected : 'all';
   }
+  var campaignMap = {};
+  CREATIVE_ROWS.forEach(function(c) {
+    if (!campaignMap[c.campaignKey]) campaignMap[c.campaignKey] =
+      { key: c.campaignKey, label: (c.account || c.accountId || 'Unknown account') + ' · ' + (c.campaign || c.campaignId || 'Unknown campaign') };
+  });
+  var campaigns = Object.keys(campaignMap).map(function(k) { return campaignMap[k]; })
+    .sort(function(a, b) { return a.label.localeCompare(b.label, 'vi'); });
+  campaignEl.innerHTML = '<option value="all">Tất cả campaign</option>' + campaigns.map(function(c) {
+    return '<option value="' + escHtml(c.key) + '">' + escHtml(c.label) + '</option>';
+  }).join('');
+  campaignEl.value = campaignMap[selectedCampaign] ? selectedCampaign : 'all';
   var markets = Array.from(new Set(CREATIVE_ROWS.map(function(c) { return c.market; }))).sort();
   var types = Array.from(new Set(CREATIVE_ROWS.map(function(c) { return c.prodType || 'Unknown'; }))).sort();
   fillSelect(marketEl, 'Tất cả market', markets, selectedMarket);
   fillSelect(typeEl, 'Tất cả product type', types, selectedType);
   var query = (document.getElementById('creative-search').value || '').trim().toLowerCase();
-  var campaignScope = document.getElementById('creative-scope').value || 'all';
   var base = CREATIVE_ROWS.filter(function(c) {
-    return (campaignScope === 'all' || /XMas2026/i.test(c.campaign || ''))
+    return (campaignEl.value === 'all' || c.campaignKey === campaignEl.value)
       && (marketEl.value === 'all' || c.market === marketEl.value)
       && (typeEl.value === 'all' || c.prodType === typeEl.value)
       && (!query || [c.ad, c.adset, c.campaign, c.adId, c.creativeId, c.productId]
@@ -2210,7 +2224,7 @@ function renderCreativePerformance(d) {
       + subset.length + '</strong><span>' + cur(spend) + ' spend</span></button>';
   }).join('');
   var filtered = CREATIVE_GROUP === 'all' ? base : base.filter(function(c) { return c.group === CREATIVE_GROUP; });
-  document.getElementById('creative-filter-note').textContent = 'Ngưỡng theo sheet phân tích 12–22/10: spend $20; scale khi có ≥2 purchase và Attr.ROAS ≥1.8; 1 purchase với ROAS ≥1.8 là tín hiệu tốt nhưng mẫu nhỏ. Sheet mẫu chỉ tính campaign XMas2026, có thể chọn phạm vi này ở bộ lọc. ROAS 1.8 là ngưỡng theo dõi Meta, chưa phải BE ROAS. Product Type “Unknown” nghĩa là URL đích chưa map được sản phẩm.';
+  document.getElementById('creative-filter-note').textContent = 'Danh sách campaign lấy từ các ads có dữ liệu trong khoảng ngày đang chọn; mặc định tính tất cả campaign. Ngưỡng tham khảo theo sheet phân tích 12–22/10: spend $20; scale khi có ≥2 purchase và Attr.ROAS ≥1.8; 1 purchase với ROAS ≥1.8 là tín hiệu tốt nhưng mẫu nhỏ. ROAS 1.8 là ngưỡng theo dõi Meta, chưa phải BE ROAS. Product Type “Unknown” nghĩa là URL đích chưa map được sản phẩm.';
   document.getElementById('creative-count').textContent = filtered.length + ' / ' + base.length + ' creative · ' + (d.fromDate || '') + ' → ' + (d.toDate || '');
   document.getElementById('creative-table').innerHTML = creativeTableMarkup(filtered, 'performance');
 }
