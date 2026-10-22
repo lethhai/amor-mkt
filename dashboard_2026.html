@@ -125,6 +125,27 @@ tbody tr:hover{background:#181b2e}
 .badge{display:inline-block;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:700}
 .b-es{background:#2d1a1a;color:#f87171}.b-it{background:#1a2a1a;color:#4ade80}
 .b-fb{background:#1a2b42;color:#60a5fa}.b-gg{background:#1a2a1a;color:#4ade80}
+.creative-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.creative-controls select,.creative-controls input{background:#1a1d30;border:1px solid #2d3154;color:#e2e8f0;
+  border-radius:6px;padding:7px 9px;font-size:11px;max-width:100%}
+.creative-controls input{min-width:220px}
+.creative-controls select:focus,.creative-controls input:focus{outline:none;border-color:#6366f1}
+.creative-status{display:inline-block;border-radius:20px;padding:4px 8px;font-size:10px;font-weight:700;white-space:nowrap}
+.creative-status.scale{background:#052e1c;color:#4ade80}.creative-status.promising{background:#11243d;color:#93c5fd}
+.creative-status.below{background:#352009;color:#fbbf24}.creative-status.atc{background:#30203e;color:#d8b4fe}
+.creative-status.weak{background:#3d1117;color:#f87171}.creative-status.insufficient{background:#202638;color:#94a3b8}
+.creative-group-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:9px;margin:0 0 14px}
+.creative-group-card{background:#131626;border:1px solid #252840;border-radius:8px;padding:10px 12px;
+  color:#cbd5e1;text-align:left;cursor:pointer;font-size:11px}
+.creative-group-card strong{display:block;font-size:19px;color:#e2e8f0;margin:3px 0}
+.creative-group-card.active{border-color:#a78bfa;background:#1d1834}
+.creative-group-card:hover{border-color:#6366f1}
+.creative-sort{background:transparent;border:0;color:inherit;font:inherit;letter-spacing:inherit;text-transform:inherit;
+  cursor:pointer;text-align:inherit;white-space:nowrap}
+.creative-sort:hover{color:#c4b5fd}
+.creative-pager{display:flex;align-items:center;justify-content:flex-end;gap:9px;margin:10px 0 16px;color:#94a3b8;font-size:11px}
+.creative-pager button{background:#1a1d30;border:1px solid #2d3154;color:#cbd5e1;border-radius:6px;padding:5px 9px;cursor:pointer}
+.creative-pager button:disabled{opacity:.35;cursor:default}
 /* ── LOADING OVERLAY ── */
 #overlay{position:fixed;inset:0;background:rgba(13,15,26,.93);
          display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999}
@@ -279,6 +300,7 @@ thead th.sortable:hover{color:#a78bfa}
   <button class="tab-btn active" data-tab="overview">📈 Marketing Overview</button>
   <button class="tab-btn" data-tab="store">🛒 Store</button>
   <button class="tab-btn" data-tab="facebook">📘 Facebook Ads</button>
+  <button class="tab-btn" data-tab="creative">🎯 Creative Performance</button>
   <button class="tab-btn" data-tab="google">🔎 Google Ads</button>
   <button class="tab-btn" data-tab="products">🔬 Product ROAS</button>
 </div>
@@ -390,10 +412,29 @@ thead th.sortable:hover{color:#a78bfa}
     <div id="fb-focus" class="infobox" style="display:none"></div>
     <div class="section"><div class="st">Facebook Campaign → Ad Set → Ad</div><div id="cp-fb-hierarchy" class="twrap"></div></div>
     <div class="section"><div class="st">Tín hiệu cần xem lại ở cấp ad</div><div class="infobox">Frequency là trung bình ngày có trọng số theo impressions; không phải frequency cộng dồn của toàn khoảng ngày. CPC so với CPC của cùng tài khoản trong khoảng ngày đã chọn. Cảnh báo chỉ để ưu tiên kiểm tra.</div><div id="fb-signals" class="twrap"></div></div>
-    <div class="section"><div class="st">Creative hiệu quả theo Creative ID</div><div id="cp-crea-tbl" class="twrap"></div></div>
+    <div class="section"><div class="st">Creative hiệu quả theo Ad / Creative ID</div><div class="infobox">Một dòng = một market + Ad ID trong khoảng ngày đang chọn. Nhấn tiêu đề Spend, Attr.ROAS hoặc các chỉ số khác để sắp xếp. Nhãn hiệu quả được tính lại khi đổi khoảng ngày.</div><div id="cp-crea-tbl" class="twrap"></div><div id="cp-crea-pager" class="creative-pager"></div></div>
   </div>
 
-  <!-- TAB 4 — GOOGLE ADS -->
+  <!-- TAB 4 — CREATIVE PERFORMANCE -->
+  <div class="tab-panel" id="tab-creative">
+    <div class="section">
+      <div class="st">Creative Performance · Facebook</div>
+      <div class="infobox">Dùng khoảng ngày ở thanh trên. Mỗi creative được gộp theo market + Ad ID. Spend, purchase, Add to Cart và doanh thu ghi nhận bởi Meta; Attr.ROAS = Attr.Revenue ÷ Spend. Đây là tín hiệu vận hành để rà soát trong Ads Manager, không phải ROAS từ Shopify hay lệnh tự động tắt/tăng ngân sách.</div>
+      <div class="creative-controls">
+        <select id="creative-scope" onchange="creativeFilterChanged()" aria-label="Lọc phạm vi campaign"><option value="all">Tất cả campaign</option><option value="xmas">Chỉ XMas2026 (theo sheet mẫu)</option></select>
+        <select id="creative-market" onchange="creativeFilterChanged()" aria-label="Lọc market"><option value="all">Tất cả market</option></select>
+        <select id="creative-type" onchange="creativeFilterChanged()" aria-label="Lọc product type"><option value="all">Tất cả product type</option></select>
+        <input id="creative-search" type="search" placeholder="Tìm ad, creative, ad set, ID..." oninput="creativeFilterChanged()" aria-label="Tìm creative">
+      </div>
+      <div id="creative-groups" class="creative-group-grid"></div>
+      <div id="creative-filter-note" class="infobox"></div>
+      <div id="creative-count" style="color:#94a3b8;font-size:11px;margin-bottom:8px"></div>
+      <div id="creative-table" class="twrap"></div>
+      <div id="creative-pager" class="creative-pager"></div>
+    </div>
+  </div>
+
+  <!-- TAB 5 — GOOGLE ADS -->
   <div class="tab-panel" id="tab-google">
     <div class="disclaimer"><div class="di">ⓘ</div><p><strong>Google Ads · Conversion attribution</strong> “Attr.*” là conversions và conversion value Google ghi nhận. Các chỉ số trong tab này chỉ phản ánh attribution của Google.</p></div>
     <div id="gg-focus" class="infobox" style="display:none"></div>
@@ -661,6 +702,12 @@ var DATA    = null;
 var MD_DATA = null;
 var GG_PRODUCT_ROWS = [];
 var AD_PRODUCT_FOCUS = '';
+var CREATIVE_ROWS = [];
+var CREATIVE_GROUP = 'all';
+var CREATIVE_VIEW = {
+  facebook: { sort: 'spend', dir: -1, page: 0, pageSize: 50 },
+  performance: { sort: 'spend', dir: -1, page: 0, pageSize: 50 }
+};
 var CH      = {};
 var WOW_ON  = false;   // Week-over-Week toggle state
 var WOW_DATA= null;    // previous period data
@@ -763,6 +810,7 @@ function renderAll() {
   renderOverview(DATA);
   renderStore(DATA);
   renderFacebookAds(DATA);
+  renderCreativePerformance(DATA);
   renderGoogleAds(DATA);
   renderProducts(DATA);
 }
@@ -1957,48 +2005,214 @@ function fbAdManagerUrl(accountId, adId) {
     '&selected_ad_ids=' + encodeURIComponent(ad);
 }
 
-function renderTopCreatives(d) {
-  var creas = AD_PRODUCT_FOCUS ? Object.values((d.adsRows || []).filter(function(r) {
-    return r.source === 'FB' && String(r.productId) === AD_PRODUCT_FOCUS;
-  }).reduce(function(map, r) {
-    var key = (r.accountId || r.account || '') + '|' + (r.creativeId || r.adId || '');
-    if (!map[key]) map[key] = { creativeId: r.creativeId, adId: r.adId, accountId: r.accountId,
-      ad: r.ad, prodType: r.type, thumbnailUrl: r.thumbnailUrl, previewUrl: r.previewUrl,
-      fullUrl: r.landingUrl, spend: 0, revenue: 0, purchases: 0 };
-    map[key].spend += r.spend || 0;
-    map[key].revenue += r.revenue || 0;
-    map[key].purchases += r.purchases || 0;
-    return map;
-  }, {})).map(function(c) { c.roas = c.spend > 0 ? c.revenue / c.spend : 0; return c; })
-    .sort(function(a,b) { return b.spend-a.spend; }).slice(0,25)
-    : (d.topCreatives || []).slice(0, 25);
-  var creaRows = creas.map(function(c) {
-    var title = c.creativeId ? 'Creative ' + c.creativeId : (c.ad || c.fullUrl || 'Creative');
-    var openUrl = c.previewUrl || fbAdManagerUrl(c.accountId, c.adId);
-    var openLabel = c.previewUrl ? 'Open Meta preview' : 'Open this ad in Ads Manager';
-    var preview = c.thumbnailUrl
-      ? (openUrl
-        ? '<a href="' + escHtml(openUrl) + '" target="_blank" rel="noopener" title="' + openLabel + '"><img src="' + escHtml(c.thumbnailUrl) + '" alt="" style="width:52px;height:40px;object-fit:cover;border-radius:4px"></a>'
-        : '<img src="' + escHtml(c.thumbnailUrl) + '" alt="" title="Ad ID/account ID unavailable" style="width:52px;height:40px;object-fit:cover;border-radius:4px">')
-      : '–';
-    var titleCell = openUrl
-      ? '<a href="' + escHtml(openUrl) + '" target="_blank" rel="noopener" title="' + openLabel + '">' + escHtml(title) + '</a>'
-      : escHtml(title);
-    var destination = c.fullUrl || c.landingUrl || '';
-    return [
-      preview,
-      '<span style="font-size:11px">' + titleCell + '</span><br><span style="font-size:9px;color:#64748b">' + escHtml(c.creativeId || 'ID unavailable') + '</span>',
-      '<span style="font-size:10px;color:#a78bfa">' + escHtml(c.prodType || '–') + '</span>',
-      '<span class="num">' + cur(c.spend) + '</span>',
-      '<span class="num">' + cur(c.revenue) + '</span>',
-      '<span class="num">' + nf(c.roas, 2) + 'x</span>',
-      '<span class="num">' + nf(c.purchases, 1) + '</span>',
-      '<a href="' + escHtml(destination || '#') + '" target="_blank" rel="noopener">Destination</a>'
-    ];
+var CREATIVE_GROUPS = [
+  { key: 'scale', label: 'Đạt tiêu chí scale', hint: '≥$20 · ≥2 purchase · ROAS ≥1.8' },
+  { key: 'promising', label: 'Tín hiệu tốt, ít mẫu', hint: '1 purchase · ROAS ≥1.8' },
+  { key: 'below', label: 'Có purchase, ROAS thấp', hint: 'ROAS <1.8' },
+  { key: 'atc', label: 'Có ATC, chưa purchase', hint: '0 purchase · ≥1 ATC' },
+  { key: 'weak', label: 'Tín hiệu yếu', hint: '≥$20 · 0 ATC · 0 purchase' },
+  { key: 'insufficient', label: 'Chưa đủ dữ liệu', hint: 'Spend <$20' }
+];
+
+function creativeGroup(c) {
+  // The $20 and 1.8 thresholds come from the FB Dashboard 12-22 Oct review sheet.
+  // 1.8 is an operational Meta ROAS threshold, not a validated BE ROAS.
+  if (c.spend < 20) return 'insufficient';
+  if (c.purchases >= 2 && c.roas >= 1.8) return 'scale';
+  if (c.purchases >= 1 && c.purchases < 2 && c.roas >= 1.8) return 'promising';
+  if (c.purchases >= 1) return 'below';
+  if (c.atc >= 1) return 'atc';
+  return 'weak';
+}
+
+function buildFacebookCreativeRows(d) {
+  var grouped = {};
+  (d.adsRows || []).forEach(function(r) {
+    if (r.source !== 'FB') return;
+    var market = String(r.country || 'Unknown').toUpperCase();
+    var account = String(r.accountId || r.account || 'Unknown');
+    var adKey = String(r.adId || (r.creativeId ? 'creative:' + r.creativeId : r.ad || r.landingUrl || 'Unknown'));
+    var key = [market, account, adKey].join('|');
+    var c = grouped[key];
+    if (!c) c = grouped[key] = {
+      market: market, accountId: r.accountId || '', account: r.account || '',
+      adId: r.adId || '', creativeId: r.creativeId || '', ad: r.ad || '',
+      adset: r.adset || '', campaign: r.campaign || '', prodType: r.type || 'Unknown',
+      productId: r.productId || '', thumbnailUrl: r.thumbnailUrl || '',
+      previewUrl: r.previewUrl || '', landingUrl: r.landingUrl || '',
+      spend: 0, revenue: 0, purchases: 0, atc: 0, impressions: 0,
+      outboundClicks: 0, landingPageViews: 0
+    };
+    c.spend += Number(r.spend) || 0;
+    c.revenue += Number(r.revenue) || 0;
+    c.purchases += Number(r.purchases) || 0;
+    c.atc += Number(r.atc) || 0;
+    c.impressions += Number(r.impressions) || 0;
+    c.outboundClicks += Number(r.outboundClicks) || 0;
+    c.landingPageViews += Number(r.landingPageViews) || 0;
+    if (!c.creativeId && r.creativeId) c.creativeId = r.creativeId;
+    if (!c.thumbnailUrl && r.thumbnailUrl) c.thumbnailUrl = r.thumbnailUrl;
+    if (!c.previewUrl && r.previewUrl) c.previewUrl = r.previewUrl;
+    if (!c.landingUrl && r.landingUrl) c.landingUrl = r.landingUrl;
+    if (c.prodType === 'Unknown' && r.type && r.type !== 'Unknown') c.prodType = r.type;
+    if (!c.productId && r.productId) c.productId = r.productId;
+    if (!c.adset && r.adset) c.adset = r.adset;
   });
-  document.getElementById('cp-crea-tbl').innerHTML = mkTable(
-    ['Preview', 'Creative ID / Ad', 'Product Type', 'Spend', 'Attr.Revenue', 'Attr.ROAS', 'Attr.Order', 'Landing Page'], creaRows
-  );
+  return Object.keys(grouped).map(function(key) {
+    var c = grouped[key];
+    c.roas = c.spend > 0 ? c.revenue / c.spend : 0;
+    c.ctr = c.impressions > 0 ? c.outboundClicks / c.impressions * 100 : 0;
+    c.cpc = c.outboundClicks > 0 ? c.spend / c.outboundClicks : 0;
+    c.group = creativeGroup(c);
+    return c;
+  });
+}
+
+function creativeSortHeader(scope, label, key) {
+  var view = CREATIVE_VIEW[scope];
+  var arrow = view.sort === key ? (view.dir < 0 ? ' ▼' : ' ▲') : ' ↕';
+  return '<button type="button" class="creative-sort" onclick="sortCreativeTable(\'' + scope + '\',\'' + key + '\')">'
+    + label + arrow + '</button>';
+}
+
+function sortCreativeTable(scope, key) {
+  var view = CREATIVE_VIEW[scope];
+  if (view.sort === key) view.dir *= -1;
+  else { view.sort = key; view.dir = -1; }
+  view.page = 0;
+  if (scope === 'facebook') renderTopCreatives(DATA);
+  else renderCreativePerformance(DATA);
+}
+
+function creativeFilterChanged() {
+  CREATIVE_VIEW.performance.page = 0;
+  renderCreativePerformance(DATA);
+}
+
+function setCreativeGroup(key) {
+  CREATIVE_GROUP = key;
+  CREATIVE_VIEW.performance.page = 0;
+  renderCreativePerformance(DATA);
+}
+
+function setCreativePage(scope, page) {
+  CREATIVE_VIEW[scope].page = page;
+  if (scope === 'facebook') renderTopCreatives(DATA);
+  else renderCreativePerformance(DATA);
+}
+
+function sortCreativeRows(rows, scope) {
+  var view = CREATIVE_VIEW[scope];
+  return rows.slice().sort(function(a, b) {
+    var av = a[view.sort], bv = b[view.sort];
+    var cmp = typeof av === 'number' && typeof bv === 'number'
+      ? av - bv : String(av || '').localeCompare(String(bv || ''), 'vi');
+    return (cmp * view.dir) || (b.spend - a.spend) || String(a.adId).localeCompare(String(b.adId));
+  });
+}
+
+function creativePager(scope, count) {
+  var view = CREATIVE_VIEW[scope];
+  var pages = Math.max(1, Math.ceil(count / view.pageSize));
+  view.page = Math.min(Math.max(0, view.page), pages - 1);
+  var id = scope === 'facebook' ? 'cp-crea-pager' : 'creative-pager';
+  document.getElementById(id).innerHTML = count > view.pageSize
+    ? '<span>' + count + ' creative · Trang ' + (view.page + 1) + '/' + pages + '</span>'
+      + '<button type="button" onclick="setCreativePage(\'' + scope + '\',' + (view.page - 1) + ')"' + (view.page === 0 ? ' disabled' : '') + '>Trước</button>'
+      + '<button type="button" onclick="setCreativePage(\'' + scope + '\',' + (view.page + 1) + ')"' + (view.page >= pages - 1 ? ' disabled' : '') + '>Sau</button>'
+    : (count ? '<span>' + count + ' creative</span>' : '');
+}
+
+function creativeTableMarkup(rows, scope) {
+  var view = CREATIVE_VIEW[scope];
+  var sorted = sortCreativeRows(rows, scope);
+  creativePager(scope, sorted.length);
+  var page = sorted.slice(view.page * view.pageSize, (view.page + 1) * view.pageSize);
+  var heads = [
+    'Preview', creativeSortHeader(scope, 'Ad / Creative ID', 'ad'),
+    creativeSortHeader(scope, 'Market', 'market'), creativeSortHeader(scope, 'Product Type', 'prodType'),
+    creativeSortHeader(scope, 'Spend', 'spend'), creativeSortHeader(scope, 'Attr.Revenue', 'revenue'),
+    creativeSortHeader(scope, 'Attr.ROAS', 'roas'), creativeSortHeader(scope, 'Purchase', 'purchases'),
+    creativeSortHeader(scope, 'ATC', 'atc'), creativeSortHeader(scope, 'Outbound CTR', 'ctr'),
+    creativeSortHeader(scope, 'Outbound CPC', 'cpc'), creativeSortHeader(scope, 'LPV', 'landingPageViews'),
+    creativeSortHeader(scope, 'Nhóm hiệu quả', 'group'), 'Landing Page', 'Ads Manager'
+  ];
+  if (scope === 'performance') heads.splice(2, 0, 'Ad set');
+  var body = page.map(function(c) {
+    var managerUrl = fbAdManagerUrl(c.accountId, c.adId);
+    var openUrl = c.previewUrl || managerUrl;
+    var preview = c.thumbnailUrl
+      ? '<img src="' + escHtml(c.thumbnailUrl) + '" alt="" loading="lazy" style="width:52px;height:40px;object-fit:cover;border-radius:4px">'
+      : '–';
+    if (openUrl && c.thumbnailUrl) preview = '<a href="' + escHtml(openUrl) + '" target="_blank" rel="noopener">' + preview + '</a>';
+    var adName = escHtml(c.ad || c.adId || 'Creative');
+    if (openUrl) adName = '<a href="' + escHtml(openUrl) + '" target="_blank" rel="noopener">' + adName + '</a>';
+    var title = '<strong>' + adName + '</strong><br><span style="font-size:10px;color:#64748b">Ad ' + escHtml(c.adId || '–')
+      + ' · Creative ' + escHtml(c.creativeId || '–') + '</span>';
+    var info = CREATIVE_GROUPS.filter(function(g) { return g.key === c.group; })[0];
+    var status = '<span class="creative-status ' + c.group + '" title="' + escHtml(info.hint) + '">' + escHtml(info.label) + '</span>';
+    var out = [preview, title,
+      '<span class="badge b-' + c.market.toLowerCase() + '">' + escHtml(c.market) + '</span>',
+      '<span style="color:#a78bfa">' + escHtml(c.prodType || 'Unknown') + '</span>',
+      '<span class="num">' + cur(c.spend) + '</span>', '<span class="num">' + cur(c.revenue) + '</span>',
+      '<span class="num">' + nf(c.roas, 2) + 'x</span>', '<span class="num">' + nf(c.purchases, 1) + '</span>',
+      '<span class="num">' + nf(c.atc, 1) + '</span>', '<span class="num">' + pct(c.ctr) + '</span>',
+      '<span class="num">' + (c.outboundClicks ? cur(c.cpc) : '–') + '</span>',
+      '<span class="num">' + nf(c.landingPageViews, 0) + '</span>', status,
+      /^https?:\/\//i.test(c.landingUrl || '') ? '<a href="' + escHtml(c.landingUrl) + '" target="_blank" rel="noopener">Destination ↗</a>' : '–',
+      managerUrl ? '<a href="' + escHtml(managerUrl) + '" target="_blank" rel="noopener">Mở ad ↗</a>' : '–'
+    ];
+    if (scope === 'performance') out.splice(2, 0, escHtml(c.adset || '–'));
+    return out;
+  });
+  return body.length ? mkTable(heads, body) : '<div class="placeholder">Không có creative theo bộ lọc và khoảng ngày đã chọn.</div>';
+}
+
+function renderTopCreatives(d) {
+  CREATIVE_ROWS = buildFacebookCreativeRows(d);
+  var rows = AD_PRODUCT_FOCUS ? CREATIVE_ROWS.filter(function(c) { return String(c.productId) === AD_PRODUCT_FOCUS; }) : CREATIVE_ROWS;
+  document.getElementById('cp-crea-tbl').innerHTML = creativeTableMarkup(rows, 'facebook');
+}
+
+function renderCreativePerformance(d) {
+  if (!d) return;
+  if (!CREATIVE_ROWS.length) CREATIVE_ROWS = buildFacebookCreativeRows(d);
+  var marketEl = document.getElementById('creative-market');
+  var typeEl = document.getElementById('creative-type');
+  var selectedMarket = marketEl.value || 'all';
+  var selectedType = typeEl.value || 'all';
+  function fillSelect(el, allText, items, selected) {
+    var options = ['<option value="all">' + allText + '</option>'].concat(items.map(function(v) {
+      return '<option value="' + escHtml(v) + '">' + escHtml(v) + '</option>';
+    }));
+    el.innerHTML = options.join('');
+    el.value = items.indexOf(selected) >= 0 ? selected : 'all';
+  }
+  var markets = Array.from(new Set(CREATIVE_ROWS.map(function(c) { return c.market; }))).sort();
+  var types = Array.from(new Set(CREATIVE_ROWS.map(function(c) { return c.prodType || 'Unknown'; }))).sort();
+  fillSelect(marketEl, 'Tất cả market', markets, selectedMarket);
+  fillSelect(typeEl, 'Tất cả product type', types, selectedType);
+  var query = (document.getElementById('creative-search').value || '').trim().toLowerCase();
+  var campaignScope = document.getElementById('creative-scope').value || 'all';
+  var base = CREATIVE_ROWS.filter(function(c) {
+    return (campaignScope === 'all' || /XMas2026/i.test(c.campaign || ''))
+      && (marketEl.value === 'all' || c.market === marketEl.value)
+      && (typeEl.value === 'all' || c.prodType === typeEl.value)
+      && (!query || [c.ad, c.adset, c.campaign, c.adId, c.creativeId, c.productId]
+        .join(' ').toLowerCase().indexOf(query) >= 0);
+  });
+  var groups = [{ key: 'all', label: 'Tất cả', hint: 'Toàn bộ creative theo bộ lọc' }].concat(CREATIVE_GROUPS);
+  document.getElementById('creative-groups').innerHTML = groups.map(function(g) {
+    var subset = g.key === 'all' ? base : base.filter(function(c) { return c.group === g.key; });
+    var spend = subset.reduce(function(sum, c) { return sum + c.spend; }, 0);
+    return '<button type="button" class="creative-group-card' + (CREATIVE_GROUP === g.key ? ' active' : '')
+      + '" onclick="setCreativeGroup(\'' + g.key + '\')"><span>' + escHtml(g.label) + '</span><strong>'
+      + subset.length + '</strong><span>' + cur(spend) + ' spend</span></button>';
+  }).join('');
+  var filtered = CREATIVE_GROUP === 'all' ? base : base.filter(function(c) { return c.group === CREATIVE_GROUP; });
+  document.getElementById('creative-filter-note').textContent = 'Ngưỡng theo sheet phân tích 12–22/10: spend $20; scale khi có ≥2 purchase và Attr.ROAS ≥1.8; 1 purchase với ROAS ≥1.8 là tín hiệu tốt nhưng mẫu nhỏ. Sheet mẫu chỉ tính campaign XMas2026, có thể chọn phạm vi này ở bộ lọc. ROAS 1.8 là ngưỡng theo dõi Meta, chưa phải BE ROAS. Product Type “Unknown” nghĩa là URL đích chưa map được sản phẩm.';
+  document.getElementById('creative-count').textContent = filtered.length + ' / ' + base.length + ' creative · ' + (d.fromDate || '') + ' → ' + (d.toDate || '');
+  document.getElementById('creative-table').innerHTML = creativeTableMarkup(filtered, 'performance');
 }
 
 function renderFbHierarchy(d) {
