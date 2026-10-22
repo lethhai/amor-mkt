@@ -156,6 +156,8 @@ tbody tr:hover{background:#181b2e}
 .creative-more:hover{border-color:#a78bfa;background:#241d3d}
 #creative-detail-modal{display:none;position:fixed;inset:0;background:rgba(7,9,17,.88);z-index:750;align-items:center;justify-content:center;padding:18px}
 #creative-detail-modal.open{display:flex}
+#product-detail-modal{display:none;position:fixed;inset:0;background:rgba(7,9,17,.88);z-index:750;align-items:center;justify-content:center;padding:18px}
+#product-detail-modal.open{display:flex}
 .creative-detail-box{background:#101321;border:1px solid #303451;border-radius:12px;width:min(1180px,96vw);max-height:94vh;overflow:auto;padding:16px}
 .creative-detail-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}
 .creative-detail-title{font-size:14px;font-weight:700;color:#e2e8f0;line-height:1.5}
@@ -294,6 +296,17 @@ thead th.sortable:hover{color:#a78bfa}
     </div>
     <div class="creative-detail-controls" id="creative-detail-controls"></div>
     <div class="creative-detail-chart"><div class="chart-container"><canvas id="ch-creative-detail"></canvas></div></div>
+  </div>
+</div>
+
+<div id="product-detail-modal" onclick="if(event.target===this) closeProductPerformance()">
+  <div class="creative-detail-box">
+    <div class="creative-detail-head">
+      <div><div class="creative-detail-title" id="product-detail-title"></div><div class="creative-detail-sub" id="product-detail-sub"></div></div>
+      <button class="image-modal-close" onclick="closeProductPerformance()" title="Đóng">×</button>
+    </div>
+    <div class="creative-detail-controls" id="product-detail-controls"></div>
+    <div class="creative-detail-chart"><div class="chart-container"><canvas id="ch-product-detail"></canvas></div></div>
   </div>
 </div>
 
@@ -2776,6 +2789,7 @@ var PI_PAGE       = 1;
 var PI_PAGE_SIZE  = 25;
 var PI_CREATED_FROM = '';
 var PI_CREATED_TO   = '';
+var PI_CURRENT_FILTER = null;
 
 var ST_OCCASIONS = [];
 var ST_INTERESTS = [];
@@ -2939,6 +2953,7 @@ function renderProducts(d) {
   renderFilterPills('pi-recipient-pills', 'Recipient', fo.recipients || [], PI_RECIPIENTS_FILTER, 'setProductRecipient');
   var filter = { market: PI_MKT_FILTER, types: PI_TYPES_FILTER, occasions: PI_OCCASIONS_FILTER,
     interests: PI_INTERESTS_FILTER, recipients: PI_RECIPIENTS_FILTER };
+  PI_CURRENT_FILTER = filter;
   var shopRows = (d.shopifyRows || []).filter(function(r) { return !isServiceType(r.type) && rowMatchesFilters(r, filter); });
   var adRows = (d.adsRows || []).filter(function(r) { return rowMatchesFilters(r, filter); });
   // Product Gross ROAS uses spend that can be joined to a Shopify product.
@@ -3076,7 +3091,7 @@ function renderPITable() {
   var pageRows = filtered.slice(startIdx, startIdx + PI_PAGE_SIZE);
   if (countEl) countEl.textContent = filtered.length + ' sản phẩm · Trang ' + PI_PAGE + '/' + totalPages;
 
-  var headers = ['#','ID','Preview','Product Created At','Product','Type','Market','Paid Spend','Shopify Items Sold','Shopify Product Gross Sales ($)','Product Gross ROAS','Attr.Revenue ($)','Attr.ROAS','FB/GG Spend','Xem Ads'];
+  var headers = ['#','ID','Preview','Product Created At','Product','Type','Market','Paid Spend','Shopify Items Sold','Shopify Product Gross Sales ($)','Product Gross ROAS','Attr.Revenue ($)','Attr.ROAS','FB/GG Spend','Xem Ads','Product Perform'];
   var sortableIdx = [3,7,8,9,10,11,12]; // Created, Spend, Items Sold, Gross Sales, Gross ROAS, Attr Rev, Attr ROAS
 
   var headerHtml = '<thead><tr>' + headers.map(function(h, i) {
@@ -3130,6 +3145,7 @@ function renderPITable() {
         + '/<span style="color:#4ade80">' + cur(p.ggSpend) + '</span></td>'
       + '<td>' + (p.productId ? '<button class="filter-btn" onclick="openProductAds(this,\'facebook\')" data-product-id="' + escHtml(p.productId) + '">FB</button> '
         + '<button class="filter-btn" onclick="openProductAds(this,\'google\')" data-product-id="' + escHtml(p.productId) + '">GG</button>' : '–') + '</td>'
+      + '<td><button class="filter-btn" onclick="showProductPerformance(this)" data-product-id="' + escHtml(p.productId || '') + '" data-product-title="' + escHtml(p.title || '') + '">Xem perform</button></td>'
       + '</tr>';
   }).join('') + '</tbody>';
 
@@ -3153,6 +3169,101 @@ function renderPITable() {
       + pageBtns.join('')
       + '<button class="filter-btn" onclick="setPIPage(' + (PI_PAGE + 1) + ')" ' + (PI_PAGE >= totalPages ? 'disabled style="opacity:.45;cursor:not-allowed"' : '') + '>Sau</button>';
   }
+}
+
+var PRODUCT_DAILY_METRICS = [
+  { key: 'spend', label: 'Paid Spend ($)', color: '#60a5fa', axis: 'yMoney', format: 'money', shown: true },
+  { key: 'revenue', label: 'Shopify Product Gross Sales ($)', color: '#4ade80', axis: 'yMoney', format: 'money', shown: true },
+  { key: 'roas', label: 'Product Gross ROAS (x)', color: '#fbbf24', axis: 'yRoas', format: 'roas', shown: true }
+];
+
+function closeProductPerformance() {
+  if (CH['ch-product-detail']) { CH['ch-product-detail'].destroy(); delete CH['ch-product-detail']; }
+  var modal = document.getElementById('product-detail-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+function toggleProductPerformanceMetric(key, checked) {
+  var chart = CH['ch-product-detail'];
+  if (!chart) return;
+  var index = PRODUCT_DAILY_METRICS.findIndex(function(m) { return m.key === key; });
+  if (index < 0) return;
+  chart.setDatasetVisibility(index, checked);
+  var enabled = Array.from(document.querySelectorAll('#product-detail-controls input:checked')).map(function(el) { return el.value; });
+  chart.options.scales.yMoney.display = enabled.indexOf('spend') >= 0 || enabled.indexOf('revenue') >= 0;
+  chart.options.scales.yRoas.display = enabled.indexOf('roas') >= 0;
+  chart.update();
+}
+
+function showProductPerformance(button) {
+  var productId = String(button.getAttribute('data-product-id') || '');
+  var productTitle = String(button.getAttribute('data-product-title') || productId || 'Sản phẩm');
+  if (!DATA) return;
+  closeProductPerformance();
+  var filter = PI_CURRENT_FILTER || { market: 'all', types: [], occasions: [], interests: [], recipients: [] };
+  var daily = {};
+  function isSelectedProduct(row) {
+    if (productId) return String(row.productId || '') === productId;
+    return String(row.title || '') === productTitle;
+  }
+  (DATA.shopifyRows || []).forEach(function(row) {
+    if (!isSelectedProduct(row) || !rowMatchesFilters(row, filter) || !row.date) return;
+    if (!daily[row.date]) daily[row.date] = { spend: 0, revenue: 0 };
+    daily[row.date].revenue += Number(row.revenue) || 0;
+  });
+  (DATA.adsRows || []).forEach(function(row) {
+    if ((row.source !== 'FB' && row.source !== 'GG') || !isSelectedProduct(row) || !rowMatchesFilters(row, filter) || !row.date) return;
+    if (!daily[row.date]) daily[row.date] = { spend: 0, revenue: 0 };
+    daily[row.date].spend += Number(row.spend) || 0;
+  });
+  var dates = [];
+  if (DATA.fromDate && DATA.toDate) {
+    for (var day = DATA.fromDate; day <= DATA.toDate; day = addDays(day, 1)) dates.push(day);
+  } else dates = Object.keys(daily).sort();
+  var rows = dates.map(function(date) {
+    var m = daily[date] || { spend: 0, revenue: 0 };
+    return { date: date, spend: m.spend, revenue: m.revenue,
+      roas: m.spend > 0 ? m.revenue / m.spend : null };
+  });
+  var totals = rows.reduce(function(out, row) {
+    out.spend += row.spend || 0;
+    out.revenue += row.revenue || 0;
+    return out;
+  }, { spend: 0, revenue: 0 });
+  document.getElementById('product-detail-title').textContent = productTitle;
+  document.getElementById('product-detail-sub').textContent = 'Product ID ' + (productId || '–') +
+    ' · ' + (DATA.fromDate || '') + ' → ' + (DATA.toDate || '') +
+    ' · Spend ' + cur(totals.spend) + ' · Shopify Product Gross Sales ' + cur(totals.revenue) +
+    ' · Product Gross ROAS ' + nf(totals.spend > 0 ? totals.revenue / totals.spend : 0, 2) + 'x';
+  document.getElementById('product-detail-controls').innerHTML = PRODUCT_DAILY_METRICS.map(function(metric) {
+    return '<label><input type="checkbox" value="' + metric.key + '"' + (metric.shown ? ' checked' : '') +
+      ' onchange="toggleProductPerformanceMetric(\'' + metric.key + '\',this.checked)">' +
+      '<span style="color:' + metric.color + '">' + escHtml(metric.label) + '</span></label>';
+  }).join('');
+  document.getElementById('product-detail-modal').classList.add('open');
+  mkCh('ch-product-detail', {
+    type: 'bar',
+    data: { labels: rows.map(function(row) { return fd(row.date); }), datasets: PRODUCT_DAILY_METRICS.map(function(metric) {
+      return { type: metric.key === 'spend' ? 'bar' : 'line', label: metric.label,
+        data: rows.map(function(row) { return row[metric.key]; }), yAxisID: metric.axis,
+        backgroundColor: metric.key === 'spend' ? 'rgba(96,165,250,.58)' : metric.color + '22',
+        borderColor: metric.color, borderRadius: metric.key === 'spend' ? 3 : 0,
+        hidden: !metric.shown, tension: .25, pointRadius: metric.key === 'spend' ? 0 : 2, spanGaps: false };
+    }) },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(context) {
+        var metric = PRODUCT_DAILY_METRICS[context.datasetIndex];
+        return metric.label + ': ' + (metric.format === 'roas' ? nf(context.raw, 2) + 'x' : cur(context.raw));
+      } } } },
+      scales: {
+        x: { grid: GRID, ticks: { autoSkip: true, maxTicksLimit: 16 } },
+        yMoney: { type: 'linear', position: 'left', beginAtZero: true, grid: GRID,
+          title: { display: true, text: 'USD ($)' }, ticks: { callback: function(value) { return '$' + nf(value, 0); } } },
+        yRoas: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false },
+          title: { display: true, text: 'Product Gross ROAS (x)' }, ticks: { callback: function(value) { return nf(value, 1) + 'x'; } } }
+      }
+    }
+  });
 }
 
 function openProductAds(button, channel) {
