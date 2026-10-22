@@ -11,9 +11,10 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
      background:#0d0f1a;color:#e2e8f0;font-size:13px;min-height:100vh}
 a{color:inherit;text-decoration:none}
 /* ── TOP BAR ── */
+#sticky-header{position:sticky;top:0;z-index:300}
 #topbar{background:#131626;border-bottom:1px solid #252840;padding:9px 18px;
         display:flex;align-items:center;gap:12px;flex-wrap:wrap;
-        position:sticky;top:0;z-index:200}
+        position:relative}
 .logo{font-weight:800;font-size:15px;color:#a78bfa;white-space:nowrap}
 .logo span{color:#60a5fa}
 .date-pills{display:flex;gap:3px;flex-wrap:wrap}
@@ -135,6 +136,10 @@ tbody tr:hover{background:#181b2e}
 .creative-status.retest{background:#352009;color:#fbbf24}.creative-status.off{background:#3d1117;color:#f87171}
 .creative-status.low-cpc{background:#302516;color:#facc15}.creative-status.insufficient{background:#202638;color:#94a3b8}
 .creative-status.unclassified{background:#30203e;color:#d8b4fe}
+.creative-ad-status{display:inline-block;border-radius:20px;padding:4px 8px;font-size:10px;font-weight:700;white-space:nowrap}
+.creative-ad-status.active{background:#052e1c;color:#4ade80}.creative-ad-status.inactive{background:#302516;color:#fbbf24}
+.creative-ad-status.unknown{background:#202638;color:#94a3b8}
+.creative-status-freshness{font-size:10px;color:#94a3b8;margin:-4px 0 10px}
 .creative-group-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:9px;margin:0 0 14px}
 .creative-group-card{background:#131626;border:1px solid #252840;border-radius:8px;padding:10px 12px;
   color:#cbd5e1;text-align:left;cursor:pointer;font-size:11px}
@@ -292,6 +297,7 @@ thead th.sortable:hover{color:#a78bfa}
   </div>
 </div>
 
+<div id="sticky-header">
 <div id="topbar">
   <div class="logo">Amor<span>1970s</span></div>
   <div class="date-pills">
@@ -324,10 +330,11 @@ thead th.sortable:hover{color:#a78bfa}
 <div id="tab-bar">
   <button class="tab-btn active" data-tab="overview">📈 Marketing Overview</button>
   <button class="tab-btn" data-tab="store">🛒 Store</button>
+  <button class="tab-btn" data-tab="products">🔬 Product Performance</button>
   <button class="tab-btn" data-tab="facebook">📘 Facebook Ads</button>
   <button class="tab-btn" data-tab="creative">🎯 Creative Performance</button>
   <button class="tab-btn" data-tab="google">🔎 Google Ads</button>
-  <button class="tab-btn" data-tab="products">🔬 Product ROAS</button>
+</div>
 </div>
 
 <div id="main">
@@ -444,10 +451,12 @@ thead th.sortable:hover{color:#a78bfa}
   <div class="tab-panel" id="tab-creative">
     <div class="section">
       <div class="st">Creative Performance · Facebook</div>
-      <div class="infobox">Chọn khoảng ngày ở thanh trên. Mỗi dòng là một market + Ad ID; doanh thu, purchase và ROAS là số Meta ghi nhận. Chọn nhóm để xem quy tắc, hoặc “Xem thêm” để xem biểu đồ theo ngày.</div>
+      <div class="infobox">Chọn khoảng ngày ở thanh trên. Mỗi dòng là một market + Ad ID; doanh thu, purchase và ROAS là số Meta ghi nhận. Trạng thái Active/Inactive lấy từ lần quét cấu trúc Facebook gần nhất.</div>
+      <div class="creative-status-freshness">Lần quét trạng thái gần nhất: <strong id="creative-status-last-scan">Chưa có dữ liệu</strong></div>
       <div class="creative-controls">
         <select id="creative-campaign" onchange="creativeFilterChanged()" aria-label="Lọc campaign theo tài khoản"><option value="all">Tất cả campaign</option></select>
         <select id="creative-market" onchange="creativeFilterChanged()" aria-label="Lọc market"><option value="all">Tất cả market</option></select>
+        <select id="creative-status-filter" onchange="creativeFilterChanged()" aria-label="Lọc trạng thái ad"><option value="all">Tất cả trạng thái</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="unknown">Chưa rõ trạng thái</option></select>
         <select id="creative-type" onchange="creativeFilterChanged()" aria-label="Lọc product type"><option value="all">Tất cả product type</option></select>
         <input id="creative-search" type="search" placeholder="Tìm ad, creative, ad set, ID..." oninput="creativeFilterChanged()" aria-label="Tìm creative">
       </div>
@@ -472,7 +481,7 @@ thead th.sortable:hover{color:#a78bfa}
   <!-- TAB 4 — PRODUCT INTELLIGENCE -->
   <div class="tab-panel" id="tab-products">
     <div class="section">
-      <div class="st">Bộ lọc Product ROAS</div>
+      <div class="st">Bộ lọc Product Performance</div>
       <div class="infobox">Các bộ lọc bên dưới áp dụng đồng thời cho KPI, biểu đồ theo ngày và cả hai bảng. Search, ngày tạo sản phẩm và lọc BE chỉ áp dụng cho bảng sản phẩm.</div>
       <div class="filter-bar" id="pi-market-pills"></div>
       <div class="filter-bar" id="pi-type-pills"></div>
@@ -716,7 +725,7 @@ function isServiceType(t) {
 // ═══════════════════════════════════════
 // CONFIG & STATE
 // ═══════════════════════════════════════
-var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyNxEQqsV0orymwUnDkLO54F5RPGx_xu3suIBZFCOd0n-8xIOOCJBf-V6Yg-IMXXhOM/exec';
+var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbywSpRF7x2-87NnLiOWB86KMSL3rp8KUnoeIR3hbyDauAt-yEug8mzDRc-uCE7QLg_o/exec';
 function getGasUrl() { return localStorage.getItem('gas_url') || DEFAULT_GAS_URL; }
 
 Chart.defaults.color       = '#64748b';
@@ -2074,6 +2083,7 @@ function buildFacebookCreativeRows(d) {
       adId: r.adId || '', creativeId: r.creativeId || '', ad: r.ad || '',
       adset: r.adset || '', campaignId: r.campaignId || '', campaign: r.campaign || '',
       campaignKey: account + '|' + String(r.campaignId || r.campaign || 'Unknown'),
+      adStatus: r.adStatus || '', effectiveStatus: r.effectiveStatus || '', statusUpdatedAt: r.statusUpdatedAt || '',
       prodType: r.type || 'Unknown',
       productId: r.productId || '', thumbnailUrl: r.thumbnailUrl || '',
       previewUrl: r.previewUrl || '', landingUrl: r.landingUrl || '',
@@ -2094,6 +2104,11 @@ function buildFacebookCreativeRows(d) {
     if (c.prodType === 'Unknown' && r.type && r.type !== 'Unknown') c.prodType = r.type;
     if (!c.productId && r.productId) c.productId = r.productId;
     if (!c.adset && r.adset) c.adset = r.adset;
+    if (r.statusUpdatedAt && r.statusUpdatedAt >= c.statusUpdatedAt) {
+      c.adStatus = r.adStatus || '';
+      c.effectiveStatus = r.effectiveStatus || '';
+      c.statusUpdatedAt = r.statusUpdatedAt;
+    }
   });
   var benchmarks = {};
   Object.keys(grouped).forEach(function(key) {
@@ -2115,6 +2130,8 @@ function buildFacebookCreativeRows(d) {
     c.cpcBenchmark = bench.clicks > 0 ? bench.spend / bench.clicks : 0;
     c.cpcValid = c.outboundClicks > 0 && c.cpcBenchmark > 0;
     c.cpcHigh = c.cpcValid && c.cpc > c.cpcBenchmark;
+    c.statusCode = String(c.effectiveStatus || c.adStatus || '').toUpperCase();
+    c.statusGroup = c.statusCode === 'ACTIVE' ? 'active' : (c.statusCode ? 'inactive' : 'unknown');
     c.group = creativeGroup(c);
     return c;
   });
@@ -2193,7 +2210,10 @@ function creativeTableMarkup(rows, scope) {
   heads.push(creativeSortHeader(scope, 'Outbound CPC', 'cpc'));
   if (scope === 'facebook') heads.push(creativeSortHeader(scope, 'CPC vs TB', 'cpcBenchmark'));
   heads.push(creativeSortHeader(scope, 'Nhóm hiệu quả', 'group'), 'Landing Page', 'Ads Manager', 'Phân tích ngày');
-  if (scope === 'performance') heads.splice(2, 0, 'Ad set');
+  if (scope === 'performance') {
+    heads.splice(2, 0, 'Ad set');
+    heads.splice(4, 0, creativeSortHeader(scope, 'Ad Status', 'statusCode'));
+  }
   CREATIVE_DETAIL_ROWS[scope] = [];
   var body = page.map(function(c) {
     var detailIndex = CREATIVE_DETAIL_ROWS[scope].push(c) - 1;
@@ -2226,7 +2246,16 @@ function creativeTableMarkup(rows, scope) {
       managerUrl ? '<a href="' + escHtml(managerUrl) + '" target="_blank" rel="noopener">Mở ad ↗</a>' : '–',
       '<button type="button" class="creative-more" onclick="showCreativeDetail(\'' + scope + '\',' + detailIndex + ')">Xem thêm ↗</button>'
     );
-    if (scope === 'performance') out.splice(2, 0, escHtml(c.adset || '–'));
+    if (scope === 'performance') {
+      out.splice(2, 0, escHtml(c.adset || '–'));
+      var statusText = c.statusGroup === 'active' ? 'Active'
+        : c.statusGroup === 'inactive' ? 'Inactive · ' + c.statusCode.replace(/_/g, ' ')
+        : 'Chưa rõ';
+      var statusTitle = 'Effective status: ' + (c.statusCode || 'không có trong FB_ADS_STATUS')
+        + (c.adStatus ? ' · Status: ' + c.adStatus : '')
+        + (c.statusUpdatedAt ? ' · Quét lúc: ' + c.statusUpdatedAt : '');
+      out.splice(4, 0, '<span class="creative-ad-status ' + c.statusGroup + '" title="' + escHtml(statusTitle) + '">' + escHtml(statusText) + '</span>');
+    }
     return out;
   });
   return body.length ? mkTable(heads, body) : '<div class="placeholder">Không có creative theo bộ lọc và khoảng ngày đã chọn.</div>';
@@ -2243,6 +2272,7 @@ function renderCreativePerformance(d) {
   if (!CREATIVE_ROWS.length) CREATIVE_ROWS = buildFacebookCreativeRows(d);
   var campaignEl = document.getElementById('creative-campaign');
   var marketEl = document.getElementById('creative-market');
+  var statusEl = document.getElementById('creative-status-filter');
   var typeEl = document.getElementById('creative-type');
   var selectedCampaign = campaignEl.value || 'all';
   var selectedMarket = marketEl.value || 'all';
@@ -2270,9 +2300,11 @@ function renderCreativePerformance(d) {
   fillSelect(marketEl, 'Tất cả market', markets, selectedMarket);
   fillSelect(typeEl, 'Tất cả product type', types, selectedType);
   var query = (document.getElementById('creative-search').value || '').trim().toLowerCase();
+  document.getElementById('creative-status-last-scan').textContent = d.fbStructureLastUpdatedAt || 'Chưa có lần quét cấu trúc';
   var base = CREATIVE_ROWS.filter(function(c) {
     return (campaignEl.value === 'all' || c.campaignKey === campaignEl.value)
       && (marketEl.value === 'all' || c.market === marketEl.value)
+      && (statusEl.value === 'all' || c.statusGroup === statusEl.value)
       && (typeEl.value === 'all' || c.prodType === typeEl.value)
       && (!query || [c.ad, c.adset, c.campaign, c.adId, c.creativeId, c.productId]
         .join(' ').toLowerCase().indexOf(query) >= 0);
@@ -2410,11 +2442,11 @@ function renderFbHierarchy(d) {
   }
   var campaigns = d.fbHierarchy || [];
   var available = d.fbStructureAvailable || {};
-  var notice = (!available.FB_AD_STRUCTURE || !available.FB_CREATIVE_ASSETS)
-    ? '<div style="margin-bottom:8px;padding:8px 10px;background:#1e293b;color:#fbbf24;border-radius:5px;font-size:11px">Daily Facebook performance is in FB_ADS. Optional campaign, ad set, ad, and creative details are in FB_CAMPAIGNS, FB_ADSETS, FB_AD_STRUCTURE, and FB_CREATIVE_ASSETS. Run FB_REFRESH_STRUCTURE() to refresh those details.</div>'
+  var notice = (!available.FB_ADS_STATUS || !available.FB_CREATIVE_ASSETS)
+    ? '<div style="margin-bottom:8px;padding:8px 10px;background:#1e293b;color:#fbbf24;border-radius:5px;font-size:11px">Daily Facebook performance is in FB_ADS. Optional campaign, ad set, ad, and creative details are in FB_CAMPAIGNS, FB_ADSETS, FB_ADS_STATUS, and FB_CREATIVE_ASSETS. Run FB_REFRESH_STRUCTURE() to refresh those details.</div>'
     : '';
   if (!campaigns.length) {
-    var hint = available.FB_AD_STRUCTURE ? 'No Facebook ad delivery rows in this date range.'
+    var hint = available.FB_ADS_STATUS ? 'No Facebook ad delivery rows in this date range.'
       : 'Campaign metadata sheets are not populated yet. Run FB_REFRESH_STRUCTURE() in the Facebook Ads script.';
     root.innerHTML = notice + '<div class="cbox" style="color:#94a3b8;font-size:12px">' + escHtml(hint) + '</div>';
     return;
