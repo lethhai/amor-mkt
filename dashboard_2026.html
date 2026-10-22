@@ -423,7 +423,7 @@ thead th.sortable:hover{color:#a78bfa}
     </div>
     <div class="section">
       <div class="st">Product Types — Product Gross ROAS vs BE ROAS (provisional)</div>
-      <div class="infobox">Product Gross ROAS = Shopify Product Gross Sales ÷ mapped FB/Google spend. Gross sales theo sản phẩm không gồm shipping, tip hoặc discount. BE ROAS hiện là ngưỡng tạm thời; cấu hình <code>BE_ROAS_CONFIG</code> đang chờ cập nhật, nên chưa dùng để kết luận đạt/chưa đạt.</div>
+      <div class="infobox">Product Gross ROAS = Shopify Product Gross Sales ÷ mapped FB/Google spend. Gross sales theo sản phẩm không gồm shipping, tip hoặc discount. BE ROAS hiện là ngưỡng tạm thời; cấu hình <code>BE_ROAS</code> đang chờ cập nhật, nên chưa dùng để kết luận đạt/chưa đạt.</div>
       <div id="pi-types-tbl" class="twrap"></div>
     </div>
     <div class="section">
@@ -436,8 +436,8 @@ thead th.sortable:hover{color:#a78bfa}
         <span style="color:#475569">→</span>
         <input type="date" id="pi-created-to" onchange="setProductCreatedFilter()">
         <button class="filter-btn" onclick="clearProductCreatedFilter()">Tất cả ngày tạo</button>
-        <button class="filter-btn" data-roas="below" disabled title="Chờ chuẩn hóa BE_ROAS_CONFIG">Dưới BE · chờ cấu hình</button>
-        <button class="filter-btn" data-roas="above" disabled title="Chờ chuẩn hóa BE_ROAS_CONFIG">Trên BE · chờ cấu hình</button>
+        <button class="filter-btn" data-roas="below" disabled title="Chờ chuẩn hóa BE_ROAS">Dưới BE · chờ cấu hình</button>
+        <button class="filter-btn" data-roas="above" disabled title="Chờ chuẩn hóa BE_ROAS">Trên BE · chờ cấu hình</button>
         <span style="font-size:11px;color:#475569;margin-left:4px" id="pi-count"></span>
       </div>
       <div id="pi-top-tbl" class="twrap"></div>
@@ -650,7 +650,7 @@ function isServiceType(t) {
 // ═══════════════════════════════════════
 // CONFIG & STATE
 // ═══════════════════════════════════════
-var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzx8J7l92zlH06QeMhqsL92SHkDdSBeEDQTjvbp99HBQPmTCi3DItM3J7fzNEA1lTg9/exec';
+var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyNxEQqsV0orymwUnDkLO54F5RPGx_xu3suIBZFCOd0n-8xIOOCJBf-V6Yg-IMXXhOM/exec';
 function getGasUrl() { return localStorage.getItem('gas_url') || DEFAULT_GAS_URL; }
 
 Chart.defaults.color       = '#64748b';
@@ -1898,7 +1898,7 @@ function renderGoogleAds(d) {
     kpi('Attr.CPA', cur(totals.cpa), 'Spend ÷ Attr.Order'),
     kpi('Impressions', nf(totals.impressions, 0), 'CTR ' + pct(ctr)),
     kpi('Clicks', nf(totals.clicks, 0), 'CPC ' + cur(cpc))
-  ].join('') : '<div class="placeholder"><div class="ph-title">Không có Google Ads delivery trong khoảng ngày này</div><div class="ph-note">Kiểm tra date range hoặc dữ liệu GOOGLE_ADS.</div></div>';
+  ].join('') : '<div class="placeholder"><div class="ph-title">Không có Google Ads delivery trong khoảng ngày này</div><div class="ph-note">Kiểm tra date range hoặc dữ liệu GG_ADS.</div></div>';
 
   var dates = Object.keys(daily).sort();
   mkCh('ch-gg-daily', {
@@ -2027,11 +2027,11 @@ function renderFbHierarchy(d) {
   }
   var campaigns = d.fbHierarchy || [];
   var available = d.fbStructureAvailable || {};
-  var notice = (!available.FB_ADS || !available.FB_CREATIVE_ASSETS)
-    ? '<div style="margin-bottom:8px;padding:8px 10px;background:#1e293b;color:#fbbf24;border-radius:5px;font-size:11px">Hierarchy metrics are available from FB_AD_DATA. Run FB_REFRESH_STRUCTURE() to populate current statuses, Meta shareable previews, and flexible creative assets.</div>'
+  var notice = (!available.FB_AD_STRUCTURE || !available.FB_CREATIVE_ASSETS)
+    ? '<div style="margin-bottom:8px;padding:8px 10px;background:#1e293b;color:#fbbf24;border-radius:5px;font-size:11px">Daily Facebook performance is in FB_ADS. Optional campaign, ad set, ad, and creative details are in FB_CAMPAIGNS, FB_ADSETS, FB_AD_STRUCTURE, and FB_CREATIVE_ASSETS. Run FB_REFRESH_STRUCTURE() to refresh those details.</div>'
     : '';
   if (!campaigns.length) {
-    var hint = available.FB_ADS ? 'No Facebook ad delivery rows in this date range.'
+    var hint = available.FB_AD_STRUCTURE ? 'No Facebook ad delivery rows in this date range.'
       : 'Campaign metadata sheets are not populated yet. Run FB_REFRESH_STRUCTURE() in the Facebook Ads script.';
     root.innerHTML = notice + '<div class="cbox" style="color:#94a3b8;font-size:12px">' + escHtml(hint) + '</div>';
     return;
