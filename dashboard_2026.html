@@ -132,8 +132,11 @@ tbody tr:hover{background:#181b2e}
 .creative-controls select:focus,.creative-controls input:focus{outline:none;border-color:#6366f1}
 .creative-status{display:inline-block;border-radius:20px;padding:4px 8px;font-size:10px;font-weight:700;white-space:nowrap}
 .creative-status.scale{background:#052e1c;color:#4ade80}.creative-status.promising{background:#11243d;color:#93c5fd}
-.creative-status.below{background:#352009;color:#fbbf24}.creative-status.atc{background:#30203e;color:#d8b4fe}
-.creative-status.weak{background:#3d1117;color:#f87171}.creative-status.insufficient{background:#202638;color:#94a3b8}
+.creative-status.near{background:#352009;color:#fbbf24}.creative-status.sale-poor-high{background:#391b15;color:#fb923c}
+.creative-status.sale-poor-ok,.creative-status.sale-poor-small{background:#352009;color:#facc15}
+.creative-status.atc{background:#30203e;color:#d8b4fe}.creative-status.off{background:#3d1117;color:#f87171}
+.creative-status.low-cvr{background:#302516;color:#facc15}.creative-status.testing{background:#202638;color:#cbd5e1}
+.creative-status.insufficient{background:#202638;color:#94a3b8}
 .creative-group-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:9px;margin:0 0 14px}
 .creative-group-card{background:#131626;border:1px solid #252840;border-radius:8px;padding:10px 12px;
   color:#cbd5e1;text-align:left;cursor:pointer;font-size:11px}
@@ -146,6 +149,20 @@ tbody tr:hover{background:#181b2e}
 .creative-pager{display:flex;align-items:center;justify-content:flex-end;gap:9px;margin:10px 0 16px;color:#94a3b8;font-size:11px}
 .creative-pager button{background:#1a1d30;border:1px solid #2d3154;color:#cbd5e1;border-radius:6px;padding:5px 9px;cursor:pointer}
 .creative-pager button:disabled{opacity:.35;cursor:default}
+.creative-more{background:#1a1d30;border:1px solid #3b3f64;color:#c4b5fd;border-radius:5px;padding:5px 8px;cursor:pointer;font-size:10px;white-space:nowrap}
+.creative-more:hover{border-color:#a78bfa;background:#241d3d}
+#creative-detail-modal{display:none;position:fixed;inset:0;background:rgba(7,9,17,.88);z-index:750;align-items:center;justify-content:center;padding:18px}
+#creative-detail-modal.open{display:flex}
+.creative-detail-box{background:#101321;border:1px solid #303451;border-radius:12px;width:min(1180px,96vw);max-height:94vh;overflow:auto;padding:16px}
+.creative-detail-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}
+.creative-detail-title{font-size:14px;font-weight:700;color:#e2e8f0;line-height:1.5}
+.creative-detail-sub{font-size:11px;color:#94a3b8;margin-top:3px}
+.creative-detail-controls{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}
+.creative-detail-controls label{display:flex;align-items:center;gap:5px;color:#cbd5e1;font-size:11px;background:#181b2e;border:1px solid #2d3154;border-radius:6px;padding:6px 8px;cursor:pointer}
+.creative-detail-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.creative-detail-chart{background:#131626;border:1px solid #252840;border-radius:8px;padding:10px;min-height:170px}
+.creative-detail-chart strong{display:block;color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.creative-detail-chart .chart-container{height:125px}
 /* ── LOADING OVERLAY ── */
 #overlay{position:fixed;inset:0;background:rgba(13,15,26,.93);
          display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999}
@@ -264,6 +281,17 @@ thead th.sortable:hover{color:#a78bfa}
     </div>
     <img class="image-modal-img" id="product-image-large" src="" alt="Product preview">
     <a class="image-modal-link" id="product-image-link" href="#" target="_blank" rel="noopener">Mở sản phẩm</a>
+  </div>
+</div>
+
+<div id="creative-detail-modal" onclick="if(event.target===this) closeCreativeDetail()">
+  <div class="creative-detail-box">
+    <div class="creative-detail-head">
+      <div><div class="creative-detail-title" id="creative-detail-title"></div><div class="creative-detail-sub" id="creative-detail-sub"></div></div>
+      <button class="image-modal-close" onclick="closeCreativeDetail()" title="Đóng">×</button>
+    </div>
+    <div class="creative-detail-controls" id="creative-detail-controls"></div>
+    <div class="creative-detail-charts" id="creative-detail-charts"></div>
   </div>
 </div>
 
@@ -412,14 +440,14 @@ thead th.sortable:hover{color:#a78bfa}
     <div id="fb-focus" class="infobox" style="display:none"></div>
     <div class="section"><div class="st">Facebook Campaign → Ad Set → Ad</div><div id="cp-fb-hierarchy" class="twrap"></div></div>
     <div class="section"><div class="st">Tín hiệu cần xem lại ở cấp ad</div><div class="infobox">Frequency là trung bình ngày có trọng số theo impressions; không phải frequency cộng dồn của toàn khoảng ngày. CPC so với CPC của cùng tài khoản trong khoảng ngày đã chọn. Cảnh báo chỉ để ưu tiên kiểm tra.</div><div id="fb-signals" class="twrap"></div></div>
-    <div class="section"><div class="st">Creative hiệu quả theo Ad / Creative ID</div><div class="infobox">Một dòng = một market + Ad ID trong khoảng ngày đang chọn. Nhấn tiêu đề Spend, Attr.ROAS hoặc các chỉ số khác để sắp xếp. Nhãn hiệu quả được tính lại khi đổi khoảng ngày.</div><div id="cp-crea-tbl" class="twrap"></div><div id="cp-crea-pager" class="creative-pager"></div></div>
+    <div class="section"><div class="st">Creative hiệu quả theo Ad / Creative ID</div><div class="infobox">Một dòng = một market + Ad ID trong khoảng ngày đang chọn. Nhãn được tính lại theo date range; CPC cao so với trung bình account + market là tín hiệu để xem lại chất lượng traffic.</div><div id="cp-crea-tbl" class="twrap"></div><div id="cp-crea-pager" class="creative-pager"></div></div>
   </div>
 
   <!-- TAB 4 — CREATIVE PERFORMANCE -->
   <div class="tab-panel" id="tab-creative">
     <div class="section">
       <div class="st">Creative Performance · Facebook</div>
-      <div class="infobox">Dùng khoảng ngày ở thanh trên. Mỗi creative được gộp theo market + Ad ID. Spend, purchase, Add to Cart và doanh thu ghi nhận bởi Meta; Attr.ROAS = Attr.Revenue ÷ Spend. Đây là tín hiệu vận hành để rà soát trong Ads Manager, không phải ROAS từ Shopify hay lệnh tự động tắt/tăng ngân sách.</div>
+      <div class="infobox">Dùng khoảng ngày ở thanh trên. Mỗi creative được gộp theo market + Ad ID. Spend, purchase, Add to Cart và doanh thu ghi nhận bởi Meta; Attr.ROAS = Attr.Revenue ÷ Spend. Nhãn là hàng đợi rà soát, không phải ROAS từ Shopify hay lệnh tự động tắt/tăng ngân sách. Chọn “Xem thêm” để xem biến động từng ngày.</div>
       <div class="creative-controls">
         <select id="creative-campaign" onchange="creativeFilterChanged()" aria-label="Lọc campaign theo tài khoản"><option value="all">Tất cả campaign</option></select>
         <select id="creative-market" onchange="creativeFilterChanged()" aria-label="Lọc market"><option value="all">Tất cả market</option></select>
@@ -703,6 +731,7 @@ var MD_DATA = null;
 var GG_PRODUCT_ROWS = [];
 var AD_PRODUCT_FOCUS = '';
 var CREATIVE_ROWS = [];
+var CREATIVE_DETAIL_ROWS = { facebook: [], performance: [] };
 var CREATIVE_GROUP = 'all';
 var CREATIVE_VIEW = {
   facebook: { sort: 'spend', dir: -1, page: 0, pageSize: 50 },
@@ -755,6 +784,7 @@ async function fetchGAS(from, to) {
 }
 
 async function loadAll(from, to) {
+  closeCreativeDetail();
   ov(true, 'Đang tải dữ liệu...');
 
   var main, prev, prevFrom, prevTo;
@@ -2006,23 +2036,33 @@ function fbAdManagerUrl(accountId, adId) {
 }
 
 var CREATIVE_GROUPS = [
-  { key: 'scale', label: 'Đạt tiêu chí scale', hint: '≥$20 · ≥2 purchase · ROAS ≥1.8' },
-  { key: 'promising', label: 'Tín hiệu tốt, ít mẫu', hint: '1 purchase · ROAS ≥1.8' },
-  { key: 'below', label: 'Có purchase, ROAS thấp', hint: 'ROAS <1.8' },
-  { key: 'atc', label: 'Có ATC, chưa purchase', hint: '0 purchase · ≥1 ATC' },
-  { key: 'weak', label: 'Tín hiệu yếu', hint: '≥$20 · 0 ATC · 0 purchase' },
-  { key: 'insufficient', label: 'Chưa đủ dữ liệu', hint: 'Spend <$20' }
+  { key: 'scale', label: 'Win · ứng viên scale', hint: 'Spend ≥$50 · ≥2 purchase · ROAS ≥1.8' },
+  { key: 'promising', label: 'Có tín hiệu tốt, mẫu nhỏ', hint: 'Spend $10–$50 · có purchase · ROAS ≥1.8' },
+  { key: 'one-sale-good', label: 'ROAS tốt · cần thêm đơn xác nhận', hint: 'Spend ≥$50 · đúng 1 purchase · ROAS ≥1.8' },
+  { key: 'near', label: 'Có đơn · ROAS gần ngưỡng', hint: 'Spend ≥$50 · ROAS 1.4–<1.8' },
+  { key: 'sale-poor-high', label: 'Có đơn · ROAS thấp · CPC cao', hint: 'Spend ≥$50 · ROAS <1.4 · CPC >1.5× benchmark' },
+  { key: 'sale-poor-ok', label: 'Có đơn · ROAS thấp · CPC ổn', hint: 'Spend ≥$50 · ROAS <1.4 · CPC ≤1.5× benchmark' },
+  { key: 'sale-poor-small', label: 'Có đơn · CPC chưa đủ mẫu', hint: 'Spend ≥$50 · ROAS <1.4 · dưới 20 outbound clicks' },
+  { key: 'atc', label: 'Có ATC · chưa purchase', hint: 'Spend ≥$50 · 0 purchase · ≥1 ATC' },
+  { key: 'off', label: 'CPC cao · chưa có tín hiệu mua', hint: 'Spend ≥$50 · 0 purchase · 0 ATC · CPC cao' },
+  { key: 'low-cvr', label: 'Click ổn · chưa có tín hiệu mua', hint: 'Spend ≥$50 · 0 purchase · 0 ATC · CPC chưa cao' },
+  { key: 'testing', label: 'Đang test · chưa kết luận', hint: 'Spend $10–$50' },
+  { key: 'insufficient', label: 'Chưa đủ dữ liệu', hint: 'Spend <$10' }
 ];
 
+var CREATIVE_THRESHOLDS = { minimumSpend: 10, matureSpend: 50, strongRoas: 1.8, nearRoas: 1.4, highCpcMultiplier: 1.5, minimumClicksForCpc: 20 };
+
 function creativeGroup(c) {
-  // The $20 and 1.8 thresholds come from the FB Dashboard 12-22 Oct review sheet.
-  // 1.8 is an operational Meta ROAS threshold, not a validated BE ROAS.
-  if (c.spend < 20) return 'insufficient';
-  if (c.purchases >= 2 && c.roas >= 1.8) return 'scale';
-  if (c.purchases >= 1 && c.purchases < 2 && c.roas >= 1.8) return 'promising';
-  if (c.purchases >= 1) return 'below';
+  if (c.spend < CREATIVE_THRESHOLDS.minimumSpend) return 'insufficient';
+  if (c.spend < CREATIVE_THRESHOLDS.matureSpend) {
+    return c.purchases >= 1 && c.roas >= CREATIVE_THRESHOLDS.strongRoas ? 'promising' : 'testing';
+  }
+  if (c.purchases >= 2 && c.roas >= CREATIVE_THRESHOLDS.strongRoas) return 'scale';
+  if (c.purchases === 1 && c.roas >= CREATIVE_THRESHOLDS.strongRoas) return 'one-sale-good';
+  if (c.purchases >= 1 && c.roas >= CREATIVE_THRESHOLDS.nearRoas) return 'near';
+  if (c.purchases >= 1) return !c.cpcValid ? 'sale-poor-small' : (c.cpcHigh ? 'sale-poor-high' : 'sale-poor-ok');
   if (c.atc >= 1) return 'atc';
-  return 'weak';
+  return c.cpcHigh ? 'off' : 'low-cvr';
 }
 
 function buildFacebookCreativeRows(d) {
@@ -2042,7 +2082,7 @@ function buildFacebookCreativeRows(d) {
       prodType: r.type || 'Unknown',
       productId: r.productId || '', thumbnailUrl: r.thumbnailUrl || '',
       previewUrl: r.previewUrl || '', landingUrl: r.landingUrl || '',
-      spend: 0, revenue: 0, purchases: 0, atc: 0, impressions: 0,
+      key: key, spend: 0, revenue: 0, purchases: 0, atc: 0, impressions: 0,
       outboundClicks: 0, landingPageViews: 0
     };
     c.spend += Number(r.spend) || 0;
@@ -2060,11 +2100,26 @@ function buildFacebookCreativeRows(d) {
     if (!c.productId && r.productId) c.productId = r.productId;
     if (!c.adset && r.adset) c.adset = r.adset;
   });
+  var benchmarks = {};
+  Object.keys(grouped).forEach(function(key) {
+    var c = grouped[key];
+    var benchKey = [c.accountId || c.account, c.market].join('|');
+    if (!benchmarks[benchKey]) benchmarks[benchKey] = { spend: 0, clicks: 0 };
+    benchmarks[benchKey].spend += c.spend;
+    benchmarks[benchKey].clicks += c.outboundClicks;
+  });
   return Object.keys(grouped).map(function(key) {
     var c = grouped[key];
     c.roas = c.spend > 0 ? c.revenue / c.spend : 0;
     c.ctr = c.impressions > 0 ? c.outboundClicks / c.impressions * 100 : 0;
     c.cpc = c.outboundClicks > 0 ? c.spend / c.outboundClicks : 0;
+    c.lpvRate = c.outboundClicks > 0 ? c.landingPageViews / c.outboundClicks * 100 : 0;
+    c.atcRate = c.landingPageViews > 0 ? c.atc / c.landingPageViews * 100 : 0;
+    var benchKey = [c.accountId || c.account, c.market].join('|');
+    var bench = benchmarks[benchKey] || { spend: 0, clicks: 0 };
+    c.cpcBenchmark = bench.clicks > 0 ? bench.spend / bench.clicks : 0;
+    c.cpcValid = c.outboundClicks >= CREATIVE_THRESHOLDS.minimumClicksForCpc && c.cpcBenchmark > 0;
+    c.cpcHigh = c.cpcValid && c.cpc > c.cpcBenchmark * CREATIVE_THRESHOLDS.highCpcMultiplier;
     c.group = creativeGroup(c);
     return c;
   });
@@ -2135,12 +2190,15 @@ function creativeTableMarkup(rows, scope) {
     creativeSortHeader(scope, 'Market', 'market'), creativeSortHeader(scope, 'Product Type', 'prodType'),
     creativeSortHeader(scope, 'Spend', 'spend'), creativeSortHeader(scope, 'Attr.Revenue', 'revenue'),
     creativeSortHeader(scope, 'Attr.ROAS', 'roas'), creativeSortHeader(scope, 'Purchase', 'purchases'),
-    creativeSortHeader(scope, 'ATC', 'atc'), creativeSortHeader(scope, 'Outbound CTR', 'ctr'),
-    creativeSortHeader(scope, 'Outbound CPC', 'cpc'), creativeSortHeader(scope, 'LPV', 'landingPageViews'),
-    creativeSortHeader(scope, 'Nhóm hiệu quả', 'group'), 'Landing Page', 'Ads Manager'
+    creativeSortHeader(scope, 'ATC', 'atc'), creativeSortHeader(scope, 'ATC / LPV', 'atcRate'),
+    creativeSortHeader(scope, 'Outbound CTR', 'ctr'), creativeSortHeader(scope, 'LPV / click', 'lpvRate'),
+    creativeSortHeader(scope, 'Outbound CPC', 'cpc'), creativeSortHeader(scope, 'CPC vs TB', 'cpcBenchmark'),
+    creativeSortHeader(scope, 'Nhóm hiệu quả', 'group'), 'Landing Page', 'Ads Manager', 'Phân tích ngày'
   ];
   if (scope === 'performance') heads.splice(2, 0, 'Ad set');
+  CREATIVE_DETAIL_ROWS[scope] = [];
   var body = page.map(function(c) {
+    var detailIndex = CREATIVE_DETAIL_ROWS[scope].push(c) - 1;
     var managerUrl = fbAdManagerUrl(c.accountId, c.adId);
     var openUrl = c.previewUrl || managerUrl;
     var preview = c.thumbnailUrl
@@ -2158,11 +2216,13 @@ function creativeTableMarkup(rows, scope) {
       '<span style="color:#a78bfa">' + escHtml(c.prodType || 'Unknown') + '</span>',
       '<span class="num">' + cur(c.spend) + '</span>', '<span class="num">' + cur(c.revenue) + '</span>',
       '<span class="num">' + nf(c.roas, 2) + 'x</span>', '<span class="num">' + nf(c.purchases, 1) + '</span>',
-      '<span class="num">' + nf(c.atc, 1) + '</span>', '<span class="num">' + pct(c.ctr) + '</span>',
-      '<span class="num">' + (c.outboundClicks ? cur(c.cpc) : '–') + '</span>',
-      '<span class="num">' + nf(c.landingPageViews, 0) + '</span>', status,
+      '<span class="num">' + nf(c.atc, 1) + '</span>', '<span class="num">' + pct(c.atcRate) + '</span>',
+      '<span class="num">' + pct(c.ctr) + '</span>', '<span class="num">' + pct(c.lpvRate) + '</span>',
+      '<span class="num" title="' + (c.cpcBenchmark ? 'Benchmark $' + nf(c.cpcBenchmark, 2) : 'Chưa có benchmark') + '">' + (c.outboundClicks ? cur(c.cpc) : '–') + '</span>',
+      '<span class="num" title="Benchmark account + market; chỉ đánh giá khi có ít nhất 20 outbound clicks" style="' + (c.cpcHigh ? 'color:#f87171;font-weight:700' : '') + '">' + (c.cpcValid ? cur(c.cpcBenchmark) + (c.cpcHigh ? ' ↑' : ' ✓') : 'Chưa đủ mẫu') + '</span>', status,
       /^https?:\/\//i.test(c.landingUrl || '') ? '<a href="' + escHtml(c.landingUrl) + '" target="_blank" rel="noopener">Destination ↗</a>' : '–',
-      managerUrl ? '<a href="' + escHtml(managerUrl) + '" target="_blank" rel="noopener">Mở ad ↗</a>' : '–'
+      managerUrl ? '<a href="' + escHtml(managerUrl) + '" target="_blank" rel="noopener">Mở ad ↗</a>' : '–',
+      '<button type="button" class="creative-more" onclick="showCreativeDetail(\'' + scope + '\',' + detailIndex + ')">Xem thêm ↗</button>'
     ];
     if (scope === 'performance') out.splice(2, 0, escHtml(c.adset || '–'));
     return out;
@@ -2224,9 +2284,91 @@ function renderCreativePerformance(d) {
       + subset.length + '</strong><span>' + cur(spend) + ' spend</span></button>';
   }).join('');
   var filtered = CREATIVE_GROUP === 'all' ? base : base.filter(function(c) { return c.group === CREATIVE_GROUP; });
-  document.getElementById('creative-filter-note').textContent = 'Danh sách campaign lấy từ các ads có dữ liệu trong khoảng ngày đang chọn; mặc định tính tất cả campaign. Ngưỡng tham khảo theo sheet phân tích 12–22/10: spend $20; scale khi có ≥2 purchase và Attr.ROAS ≥1.8; 1 purchase với ROAS ≥1.8 là tín hiệu tốt nhưng mẫu nhỏ. ROAS 1.8 là ngưỡng theo dõi Meta, chưa phải BE ROAS. Product Type “Unknown” nghĩa là URL đích chưa map được sản phẩm.';
+  document.getElementById('creative-filter-note').textContent = 'Quy tắc tạm thời: <$10 chưa đánh giá; $10–<$50 đang test; từ $50 mới xét nhóm trưởng thành. Win cần ≥2 purchase và Attr.ROAS ≥1.8. CPC cao = >1.5× CPC trung bình account + market, chỉ kết luận khi creative có ≥20 outbound clicks. ROAS 1.8 và ROAS 1.4 là ngưỡng vận hành tham khảo, chưa phải BE ROAS. Nhãn “cân nhắc tắt gấp” cần người kiểm tra trong Ads Manager. Product Type Unknown nghĩa là URL chưa map được.';
   document.getElementById('creative-count').textContent = filtered.length + ' / ' + base.length + ' creative · ' + (d.fromDate || '') + ' → ' + (d.toDate || '');
   document.getElementById('creative-table').innerHTML = creativeTableMarkup(filtered, 'performance');
+}
+
+var CREATIVE_DAILY_METRICS = [
+  { key: 'spend', label: 'Spend ($)', color: '#60a5fa', format: 'money' },
+  { key: 'revenue', label: 'Attr.Revenue ($)', color: '#4ade80', format: 'money' },
+  { key: 'roas', label: 'Attr.ROAS (x)', color: '#fbbf24', format: 'roas' },
+  { key: 'cpc', label: 'Outbound CPC ($)', color: '#f472b6', format: 'money' },
+  { key: 'cpm', label: 'CPM ($)', color: '#a78bfa', format: 'money' }
+];
+
+function closeCreativeDetail() {
+  CREATIVE_DAILY_METRICS.forEach(function(m) {
+    var id = 'ch-creative-detail-' + m.key;
+    if (CH[id]) { CH[id].destroy(); delete CH[id]; }
+  });
+  document.getElementById('creative-detail-modal').classList.remove('open');
+}
+
+function toggleCreativeDetailMetric(key, checked) {
+  var card = document.getElementById('creative-detail-card-' + key);
+  if (card) card.style.display = checked ? '' : 'none';
+  var id = 'ch-creative-detail-' + key;
+  if (checked && CH[id]) setTimeout(function() { try { CH[id].resize(); } catch(e) {} }, 20);
+}
+
+function showCreativeDetail(scope, index) {
+  var c = (CREATIVE_DETAIL_ROWS[scope] || [])[index];
+  if (!c || !DATA) return;
+  closeCreativeDetail();
+  var daily = {};
+  (DATA.adsRows || []).forEach(function(r) {
+    if (r.source !== 'FB' || String(r.country || 'Unknown').toUpperCase() !== c.market) return;
+    if (String(r.accountId || r.account || '') !== String(c.accountId || c.account || '')) return;
+    if (c.adId ? String(r.adId || '') !== String(c.adId) : String(r.creativeId || '') !== String(c.creativeId || '')) return;
+    var date = r.date || '';
+    if (!date) return;
+    if (!daily[date]) daily[date] = { spend: 0, revenue: 0, purchases: 0, outboundClicks: 0, impressions: 0 };
+    daily[date].spend += Number(r.spend) || 0;
+    daily[date].revenue += Number(r.revenue) || 0;
+    daily[date].purchases += Number(r.purchases) || 0;
+    daily[date].outboundClicks += Number(r.outboundClicks) || 0;
+    daily[date].impressions += Number(r.impressions) || 0;
+  });
+  var dates = [];
+  if (DATA.fromDate && DATA.toDate) {
+    for (var day = DATA.fromDate; day <= DATA.toDate; day = addDays(day, 1)) dates.push(day);
+  } else dates = Object.keys(daily).sort();
+  var rows = dates.map(function(date) {
+    var m = daily[date] || { spend: 0, revenue: 0, purchases: 0, outboundClicks: 0, impressions: 0 };
+    return { date: date, spend: m.spend, revenue: m.revenue,
+      roas: m.spend > 0 ? m.revenue / m.spend : 0,
+      cpc: m.outboundClicks > 0 ? m.spend / m.outboundClicks : 0,
+      cpm: m.impressions > 0 ? m.spend / m.impressions * 1000 : 0 };
+  });
+  var managerUrl = fbAdManagerUrl(c.accountId, c.adId);
+  document.getElementById('creative-detail-title').innerHTML = escHtml(c.ad || 'Creative')
+    + ' · ' + escHtml(c.market) + (managerUrl ? ' · <a href="' + escHtml(managerUrl) + '" target="_blank" rel="noopener">Mở trong Ads Manager ↗</a>' : '');
+  document.getElementById('creative-detail-sub').textContent = 'Ad ID ' + (c.adId || '–') + ' · Creative ID ' + (c.creativeId || '–')
+    + ' · ' + (DATA.fromDate || '') + ' → ' + (DATA.toDate || '') + ' · Số liệu theo ngày của Meta';
+  document.getElementById('creative-detail-controls').innerHTML = CREATIVE_DAILY_METRICS.map(function(m) {
+    return '<label><input type="checkbox" checked onchange="toggleCreativeDetailMetric(\'' + m.key + '\',this.checked)">'
+      + '<span style="color:' + m.color + '">' + escHtml(m.label) + '</span></label>';
+  }).join('');
+  document.getElementById('creative-detail-charts').innerHTML = CREATIVE_DAILY_METRICS.map(function(m) {
+    return '<div class="creative-detail-chart" id="creative-detail-card-' + m.key + '"><strong>' + escHtml(m.label)
+      + '</strong><div class="chart-container"><canvas id="ch-creative-detail-' + m.key + '"></canvas></div></div>';
+  }).join('');
+  var labels = rows.map(function(r) { return fd(r.date); });
+  CREATIVE_DAILY_METRICS.forEach(function(m) {
+    mkCh('ch-creative-detail-' + m.key, {
+      type: 'line',
+      data: { labels: labels, datasets: [{ label: m.label, data: rows.map(function(r) { return r[m.key]; }),
+        borderColor: m.color, backgroundColor: m.color + '22', fill: true, tension: .25, pointRadius: 2, spanGaps: false }] },
+      options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) {
+          return m.format === 'roas' ? ' ' + nf(ctx.raw, 2) + 'x' : ' ' + cur(ctx.raw);
+        } } } }, scales: { y: { beginAtZero: true, grid: GRID, ticks: { callback: function(v) {
+          return m.format === 'roas' ? nf(v, 1) + 'x' : '$' + nf(v, 0);
+        } } } } }
+    });
+  });
+  document.getElementById('creative-detail-modal').classList.add('open');
 }
 
 function renderFbHierarchy(d) {
