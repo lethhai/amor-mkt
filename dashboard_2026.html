@@ -130,6 +130,8 @@ tbody tr:hover{background:#181b2e}
 .creative-controls select,.creative-controls input{background:#1a1d30;border:1px solid #2d3154;color:#e2e8f0;
   border-radius:6px;padding:7px 9px;font-size:11px;max-width:100%}
 .creative-controls input{min-width:220px}
+.creative-export{background:#4f46e5;border:1px solid #6366f1;color:#fff;border-radius:6px;padding:7px 11px;font-size:11px;font-weight:700;cursor:pointer}
+.creative-export:hover{background:#4338ca}
 .creative-controls select:focus,.creative-controls input:focus{outline:none;border-color:#6366f1}
 .creative-status{display:inline-block;border-radius:20px;padding:4px 8px;font-size:10px;font-weight:700;white-space:nowrap}
 .creative-status.scale{background:#052e1c;color:#4ade80}.creative-status.promising{background:#11243d;color:#93c5fd}
@@ -472,6 +474,7 @@ thead th.sortable:hover{color:#a78bfa}
         <select id="creative-status-filter" onchange="creativeFilterChanged()" aria-label="Lọc trạng thái ad"><option value="all">Tất cả trạng thái</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="unknown">Chưa rõ trạng thái</option></select>
         <select id="creative-type" onchange="creativeFilterChanged()" aria-label="Lọc product type"><option value="all">Tất cả product type</option></select>
         <input id="creative-search" type="search" placeholder="Tìm ad, creative, ad set, ID..." oninput="creativeFilterChanged()" aria-label="Tìm creative">
+        <button type="button" class="creative-export" onclick="exportCreativePerformanceCsv()">Xuất CSV</button>
       </div>
       <div id="creative-groups" class="creative-group-grid"></div>
       <div id="creative-filter-note" class="infobox" style="display:none"></div>
@@ -750,6 +753,7 @@ var MD_DATA = null;
 var GG_PRODUCT_ROWS = [];
 var AD_PRODUCT_FOCUS = '';
 var CREATIVE_ROWS = [];
+var CREATIVE_EXPORT_ROWS = [];
 var CREATIVE_DETAIL_ROWS = { facebook: [], performance: [] };
 var CREATIVE_GROUP = 'all';
 var CREATIVE_VIEW = {
@@ -2331,12 +2335,52 @@ function renderCreativePerformance(d) {
       + subset.length + '</strong><span>' + cur(spend) + ' spend</span></button>';
   }).join('');
   var filtered = CREATIVE_GROUP === 'all' ? base : base.filter(function(c) { return c.group === CREATIVE_GROUP; });
+  CREATIVE_EXPORT_ROWS = filtered.slice();
   var selectedGroup = CREATIVE_GROUPS.filter(function(g) { return g.key === CREATIVE_GROUP; })[0];
   var ruleNote = document.getElementById('creative-filter-note');
   ruleNote.style.display = selectedGroup ? '' : 'none';
   ruleNote.textContent = selectedGroup ? selectedGroup.label + ': ' + selectedGroup.detail : '';
   document.getElementById('creative-count').textContent = filtered.length + ' / ' + base.length + ' creative · ' + (d.fromDate || '') + ' → ' + (d.toDate || '');
   document.getElementById('creative-table').innerHTML = creativeTableMarkup(filtered, 'performance');
+}
+
+function exportCreativePerformanceCsv() {
+  var rows = CREATIVE_EXPORT_ROWS || [];
+  if (!rows.length) { alert('Không có creative theo bộ lọc hiện tại để xuất.'); return; }
+  function csvCell(value) {
+    var text = value == null ? '' : String(value);
+    return '"' + text.replace(/"/g, '""') + '"';
+  }
+  var headers = [
+    'Date range from', 'Date range to', 'Account', 'Campaign', 'Campaign ID', 'Ad set', 'Market',
+    'Ad ID', 'Ad name', 'Creative ID', 'Product ID', 'Product type', 'Ad status', 'Effective status',
+    'Status last updated', 'Performance group', 'Spend', 'Attr. revenue', 'Attr. ROAS', 'Purchases',
+    'Add to cart', 'Impressions', 'Outbound clicks', 'Outbound CTR (%)', 'Outbound CPC',
+    'Account + market CPC benchmark', 'Landing page URL', 'Preview URL', 'Thumbnail URL', 'Ads Manager URL'
+  ];
+  var from = DATA && DATA.fromDate || '';
+  var to = DATA && DATA.toDate || '';
+  var values = rows.map(function(c) {
+    var managerUrl = fbAdManagerUrl(c.accountId, c.adId);
+    return [from, to, c.account || c.accountId, c.campaign, c.campaignId, c.adset, c.market,
+      c.adId, c.ad, c.creativeId, c.productId, c.prodType,
+      c.statusGroup === 'active' ? 'Active' : c.statusGroup === 'inactive' ? 'Inactive' : 'Unknown',
+      c.effectiveStatus, c.statusUpdatedAt, c.group, c.spend, c.revenue, c.roas,
+      c.purchases, c.atc, c.impressions, c.outboundClicks, c.ctr, c.cpc, c.cpcBenchmark,
+      c.landingUrl, c.previewUrl, c.thumbnailUrl, managerUrl];
+  });
+  var csv = '\uFEFF' + [headers].concat(values).map(function(row) { return row.map(csvCell).join(','); }).join('\r\n');
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var link = document.createElement('a');
+  var range = (from || 'start') + '_to_' + (to || 'end');
+  var group = CREATIVE_GROUP === 'all' ? 'all-groups' : CREATIVE_GROUP;
+  link.href = url;
+  link.download = 'facebook_creative_performance_' + range + '_' + group + '.csv';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
 }
 
 var CREATIVE_DAILY_METRICS = [
