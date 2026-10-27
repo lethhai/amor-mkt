@@ -741,7 +741,7 @@ function isServiceType(t) {
 // ═══════════════════════════════════════
 // CONFIG & STATE
 // ═══════════════════════════════════════
-var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyQv7wf-ld-H6dgdO4GqxK0JxUBfU-8qawioGYHBysDPyX4W20BALJBiJGWLupMIvM/exec';
+var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzdi3JuVPOIB30tVXXBuuWnUc7y4cq3HIEGo94r8a-8qS_ofDSNxjk9oZ7VXCR4DtX-/exec';
 function getGasUrl() { return localStorage.getItem('gas_url') || DEFAULT_GAS_URL; }
 
 Chart.defaults.color       = '#64748b';
@@ -2236,10 +2236,12 @@ function creativeTableMarkup(rows, scope) {
     var detailIndex = CREATIVE_DETAIL_ROWS[scope].push(c) - 1;
     var managerUrl = fbAdManagerUrl(c.accountId, c.adId);
     var openUrl = c.previewUrl || managerUrl;
-    var preview = c.thumbnailUrl
-      ? '<img src="' + escHtml(c.thumbnailUrl) + '" alt="" loading="lazy" style="width:52px;height:40px;object-fit:cover;border-radius:4px">'
+    var thumbUrl = c.thumbnailUrl || c.imageUrl || '';
+    var thumbFallback = c.thumbnailUrl && c.imageUrl && c.thumbnailUrl !== c.imageUrl ? c.imageUrl : '';
+    var preview = thumbUrl
+      ? '<img src="' + escHtml(thumbUrl) + '" data-fallback="' + escHtml(thumbFallback) + '" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback=&quot;&quot;}else{this.style.display=&quot;none&quot;}" alt="" loading="lazy" style="width:52px;height:40px;object-fit:cover;border-radius:4px">'
       : '–';
-    if (openUrl && c.thumbnailUrl) preview = '<a href="' + escHtml(openUrl) + '" target="_blank" rel="noopener">' + preview + '</a>';
+    if (openUrl && thumbUrl) preview = '<a href="' + escHtml(openUrl) + '" target="_blank" rel="noopener">' + preview + '</a>';
     var adName = escHtml(c.ad || c.adId || 'Creative');
     if (openUrl) adName = '<a href="' + escHtml(openUrl) + '" target="_blank" rel="noopener">' + adName + '</a>';
     var title = '<strong>' + adName + '</strong><br><span style="font-size:10px;color:#64748b">Ad ' + escHtml(c.adId || '–')
@@ -2516,10 +2518,12 @@ function renderFbHierarchy(d) {
         var m = a.metrics || {};
         var adOpenUrl = a.previewUrl || fbAdManagerUrl(c.accountId, a.id);
         var adOpenLabel = a.previewUrl ? 'Open Meta preview' : 'Open this ad in Ads Manager';
-        var img = a.thumbnailUrl
+        var thumbUrl = a.thumbnailUrl || a.imageUrl || '';
+        var thumbFallback = a.thumbnailUrl && a.imageUrl && a.thumbnailUrl !== a.imageUrl ? a.imageUrl : '';
+        var img = thumbUrl
           ? (adOpenUrl
-            ? '<a href="' + escHtml(adOpenUrl) + '" target="_blank" rel="noopener" title="' + adOpenLabel + '"><img src="' + escHtml(a.thumbnailUrl) + '" alt="" style="width:48px;height:36px;object-fit:cover;border-radius:4px"></a>'
-            : '<img src="' + escHtml(a.thumbnailUrl) + '" alt="" title="Ad ID/account ID unavailable" style="width:48px;height:36px;object-fit:cover;border-radius:4px">')
+            ? '<a href="' + escHtml(adOpenUrl) + '" target="_blank" rel="noopener" title="' + adOpenLabel + '"><img src="' + escHtml(thumbUrl) + '" data-fallback="' + escHtml(thumbFallback) + '" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback=&quot;&quot;}else{this.style.display=&quot;none&quot;}" alt="" style="width:48px;height:36px;object-fit:cover;border-radius:4px"></a>'
+            : '<img src="' + escHtml(thumbUrl) + '" data-fallback="' + escHtml(thumbFallback) + '" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback=&quot;&quot;}else{this.style.display=&quot;none&quot;}" alt="" title="Ad ID/account ID unavailable" style="width:48px;height:36px;object-fit:cover;border-radius:4px">')
           : '–';
         var adName = adOpenUrl
           ? '<a href="' + escHtml(adOpenUrl) + '" target="_blank" rel="noopener" title="' + adOpenLabel + '">' + escHtml(a.name || a.id || 'Ad') + '</a>'
