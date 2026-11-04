@@ -221,6 +221,15 @@ tbody tr:hover{background:#181b2e}
 .fc-row-harvest{background:#1a0e00}
 .fc-row-past{opacity:.85}
 
+/* ── XMAS SALES TARGET & FORECAST ── */
+.xmas-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin:0 0 12px}
+.xmas-field{display:flex;flex-direction:column;gap:4px;color:#94a3b8;font-size:10px;font-weight:600}
+.xmas-field input{width:145px;background:#1a1d30;border:1px solid #2d3154;color:#e2e8f0;
+  border-radius:6px;padding:7px 9px;font-size:12px}
+.xmas-field input:focus{outline:none;border-color:#6366f1}
+.xmas-field input::placeholder{color:#64748b}
+.xmas-local-note{font-size:10px;color:#64748b;margin-top:-5px;margin-bottom:12px}
+
 /* ── Kết thúc style ── */
 
      
@@ -357,6 +366,28 @@ thead th.sortable:hover{color:#a78bfa}
   <!-- TAB 1 — BUSINESS OVERVIEW -->
   <div class="tab-panel active" id="tab-overview">
     <div id="ov-kpis" class="kpi-grid"></div>
+    <div class="section" id="xmas-forecast-section">
+      <div class="st">🎄 Christmas sales target &amp; forecast · November–December 2026</div>
+      <div class="infobox" id="xmas-forecast-note">Forecast dùng Shopify Total Sales và tổng FB + Google spend. Baseline spend/Store ROAS lấy từ 14 ngày hoàn tất gần nhất; không dùng Q4 năm trước.</div>
+      <div class="xmas-controls">
+        <label class="xmas-field">Target Shopify Total Sales · Nov ($)
+          <input id="xmas-target-nov" type="number" min="0" step="100" placeholder="Nhập target tháng 11" onchange="saveXmasForecastSettings()">
+        </label>
+        <label class="xmas-field">Target Shopify Total Sales · Dec ($)
+          <input id="xmas-target-dec" type="number" min="0" step="100" placeholder="Nhập target tháng 12" onchange="saveXmasForecastSettings()">
+        </label>
+        <label class="xmas-field">Store ROAS giả định tương lai
+          <input id="xmas-roas-assumption" type="number" min="0" step="0.01" placeholder="Mặc định: ROAS 14 ngày" onchange="saveXmasForecastSettings()">
+        </label>
+      </div>
+      <div class="xmas-local-note">Target và giả định ROAS được lưu riêng trên trình duyệt này. Chưa đặt trần ngân sách; spend dự phóng sẽ cộng dồn theo mức scale.</div>
+      <div id="xmas-forecast-kpis" class="kpi-grid"></div>
+      <div class="cbox">
+        <div class="ctitle">Shopify Total Sales thực tế / dự báo và spend quảng cáo dự phóng</div>
+        <div class="chart-container-lg"><canvas id="ch-xmas-forecast"></canvas></div>
+      </div>
+      <div class="infobox" id="xmas-forecast-rules"></div>
+    </div>
     <div class="section">
       <div class="st">Hiệu quả theo Market — ES vs IT</div>
       <div class="infobox">💱 <strong>Shopify Order Revenue</strong> là tổng cấp đơn theo Shopify. <strong>Shopify Product Gross Sales</strong> = giá bán niêm yết × số item bán; không trừ discount và không cộng shipping/tip. Discount được theo dõi riêng ở cấp store. <strong>Attr.*</strong> là số platform tự ghi nhận, có thể trùng attribution giữa Facebook và Google.</div>
@@ -750,6 +781,8 @@ Chart.defaults.font.size   = 11;
 
 var DATA    = null;
 var MD_DATA = null;
+var XMAS_DATA = null;
+var XMAS_DATA_DAY = '';
 var GG_PRODUCT_ROWS = [];
 var AD_PRODUCT_FOCUS = '';
 var CREATIVE_ROWS = [];
@@ -810,7 +843,7 @@ async function loadAll(from, to) {
   closeCreativeDetail();
   ov(true, 'Đang tải dữ liệu...');
 
-  var main, prev, prevFrom, prevTo;
+  var main, prev, prevFrom, prevTo, xmas;
   try {
     var fromDate = new Date(from + 'T12:00:00Z');
     var toDate_  = new Date(to   + 'T12:00:00Z');
@@ -821,6 +854,23 @@ async function loadAll(from, to) {
     // Chỉ gọi một payload chính và tùy chọn một kỳ so sánh; tránh fetch thừa.
     main = await fetchGAS(from, to);
     prev = WOW_ON   ? await fetchGAS(prevFrom, prevTo) : null;
+
+    // Xmas forecast uses a fixed season window plus a rolling 14 completed days.
+    // Keep it independent from the global dashboard date filter.
+    var xmasToday = today();
+    if (!XMAS_DATA || XMAS_DATA_DAY !== xmasToday) {
+      var xmasFrom = addDays(xmasToday, -14);
+      if (xmasFrom > '2026-11-01') xmasFrom = '2026-11-01';
+      try {
+        xmas = await fetchGAS(xmasFrom, xmasToday);
+        if (xmas && xmas.ok) {
+          XMAS_DATA = xmas;
+          XMAS_DATA_DAY = xmasToday;
+        }
+      } catch (xmasError) {
+        console.warn('[xmas forecast] history fetch failed:', xmasError);
+      }
+    }
 
     if (!main || !main.ok) throw new Error(
       (main && main.error) ? main.error : 'GAS không trả về dữ liệu hợp lệ'
@@ -861,11 +911,166 @@ function toggleWoW() {
 
 function renderAll() {
   renderOverview(DATA);
+  renderXmasForecast(XMAS_DATA);
   renderStore(DATA);
   renderFacebookAds(DATA);
   renderCreativePerformance(DATA);
   renderGoogleAds(DATA);
   renderProducts(DATA);
+}
+
+// ═══════════════════════════════════════
+// CHRISTMAS SALES TARGET & FORECAST
+// Baseline = last 14 completed days; ROAS = Shopify Total Sales / FB+Google spend.
+// Future ROAS is a scenario assumption, not platform attribution or a promise.
+// ═══════════════════════════════════════
+var XMAS_FORECAST_SETTINGS_KEY = 'amor_xmas_forecast_2026';
+
+function getXmasForecastSettings() {
+  try { return JSON.parse(localStorage.getItem(XMAS_FORECAST_SETTINGS_KEY) || '{}') || {}; }
+  catch (e) { return {}; }
+}
+
+function saveXmasForecastSettings() {
+  var settings = {
+    targetNov: parseFloat(document.getElementById('xmas-target-nov').value) || 0,
+    targetDec: parseFloat(document.getElementById('xmas-target-dec').value) || 0,
+    assumedRoas: parseFloat(document.getElementById('xmas-roas-assumption').value) || 0
+  };
+  try { localStorage.setItem(XMAS_FORECAST_SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {}
+  renderXmasForecast(XMAS_DATA);
+}
+
+function xmasGrowthRate(roas) {
+  if (roas == null || !isFinite(roas) || roas < 1.7) return 0;
+  if (roas < 1.9) return 0.05;
+  if (roas < 2.1) return 0.10;
+  if (roas < 2.4) return 0.15;
+  return 0.20;
+}
+
+function renderXmasForecast(d) {
+  var note = document.getElementById('xmas-forecast-note');
+  var rules = document.getElementById('xmas-forecast-rules');
+  var out = document.getElementById('xmas-forecast-kpis');
+  if (!note || !out || !rules) return;
+
+  var settings = getXmasForecastSettings();
+  var targetNovInput = document.getElementById('xmas-target-nov');
+  var targetDecInput = document.getElementById('xmas-target-dec');
+  var roasInput = document.getElementById('xmas-roas-assumption');
+  if (document.activeElement !== targetNovInput) targetNovInput.value = settings.targetNov || '';
+  if (document.activeElement !== targetDecInput) targetDecInput.value = settings.targetDec || '';
+  if (document.activeElement !== roasInput) roasInput.value = settings.assumedRoas || '';
+
+  if (!d || !d.ok) {
+    note.textContent = 'Không tải được dữ liệu lịch sử cho forecast. Kiểm tra kết nối WebApp rồi tải lại dashboard.';
+    out.innerHTML = '';
+    rules.textContent = '';
+    if (CH['ch-xmas-forecast']) { CH['ch-xmas-forecast'].destroy(); delete CH['ch-xmas-forecast']; }
+    return;
+  }
+
+  var todayStr = today();
+  var historyStart = addDays(todayStr, -14);
+  var yesterday = addDays(todayStr, -1);
+  var spendByDate = {};
+  var revenueByDate = {};
+  (d.dailyTrend || []).forEach(function(r) { spendByDate[r.date] = (spendByDate[r.date] || 0) + (r.spend || 0); });
+  (d.shopifyOrderDaily || []).forEach(function(r) { revenueByDate[r.date] = (revenueByDate[r.date] || 0) + (r.totalRevenue || 0); });
+
+  var baseSpend = 0, baseRevenue = 0;
+  for (var i = 0; i < 14; i++) {
+    var baseDate = addDays(historyStart, i);
+    baseSpend += spendByDate[baseDate] || 0;
+    baseRevenue += revenueByDate[baseDate] || 0;
+  }
+  var avgDailySpend = baseSpend / 14;
+  var baseStoreRoas = baseSpend > 0 ? baseRevenue / baseSpend : 0;
+  var ySpend = spendByDate[yesterday] || 0;
+  var yRevenue = revenueByDate[yesterday] || 0;
+  var yesterdayRoas = ySpend > 0 ? yRevenue / ySpend : null;
+  var assumedRoas = settings.assumedRoas > 0 ? settings.assumedRoas : baseStoreRoas;
+
+  var monthNovActual = 0, monthNovForecast = 0, monthDecForecast = 0, monthNovSpend = 0, monthDecSpend = 0;
+  var labels = [], actualRevenue = [], forecastRevenue = [], forecastSpend = [];
+  var plannedSpend = avgDailySpend;
+  var day = '2026-11-01';
+  while (day <= '2026-12-31') {
+    labels.push(fd(day));
+    var isActual = day < todayStr;
+    if (isActual) {
+      var rev = revenueByDate[day] || 0;
+      actualRevenue.push(rev);
+      forecastRevenue.push(null);
+      forecastSpend.push(null);
+      if (day <= '2026-11-30') monthNovActual += rev;
+    } else {
+      var rate = day === todayStr ? xmasGrowthRate(yesterdayRoas) : xmasGrowthRate(assumedRoas);
+      plannedSpend = plannedSpend * (1 + rate);
+      var projectedRev = plannedSpend * assumedRoas;
+      actualRevenue.push(null);
+      forecastRevenue.push(projectedRev);
+      forecastSpend.push(plannedSpend);
+      if (day <= '2026-11-30') { monthNovForecast += projectedRev; monthNovSpend += plannedSpend; }
+      else { monthDecForecast += projectedRev; monthDecSpend += plannedSpend; }
+    }
+    day = addDays(day, 1);
+  }
+
+  var novTotal = monthNovActual + monthNovForecast;
+  var targetNov = settings.targetNov || 0;
+  var targetDec = settings.targetDec || 0;
+  function attainment(total, target) { return target > 0 ? nf(total / target * 100, 1) + '%' : 'Chưa đặt'; }
+  function gapText(total, target) {
+    if (!target) return 'Nhập target để xem khoảng cách';
+    var gap = target - total;
+    return gap > 0 ? 'Còn thiếu theo forecast: ' + cur(gap) : 'Forecast vượt target: ' + cur(Math.abs(gap));
+  }
+
+  out.innerHTML = [
+    kpi('Nov · Shopify Total Sales forecast', cur(novTotal), 'Actual đến hôm qua ' + cur(monthNovActual) + ' · dự báo còn lại ' + cur(monthNovForecast), 'green'),
+    kpi('Nov · Target', targetNov ? cur(targetNov) : 'Chưa đặt', 'Forecast đạt ' + attainment(novTotal, targetNov) + ' · ' + gapText(novTotal, targetNov), 'blue'),
+    kpi('Dec · Shopify Total Sales forecast', cur(monthDecForecast), 'Dự báo spend ' + cur(monthDecSpend), 'green'),
+    kpi('Dec · Target', targetDec ? cur(targetDec) : 'Chưa đặt', 'Forecast đạt ' + attainment(monthDecForecast, targetDec) + ' · ' + gapText(monthDecForecast, targetDec), 'blue'),
+    kpi('Spend nền · 14 ngày', cur(avgDailySpend) + '/ngày', cur(baseSpend) + ' tổng spend · 14 ngày hoàn tất'),
+    kpi('Store ROAS nền · 14 ngày', nf(baseStoreRoas, 2) + 'x', cur(baseRevenue) + ' Shopify Total Sales ÷ ' + cur(baseSpend))
+  ].join('');
+
+  var effectiveRoasInput = settings.assumedRoas > 0 ? settings.assumedRoas : baseStoreRoas;
+  var startScale = yesterdayRoas == null ? 0 : xmasGrowthRate(yesterdayRoas) * 100;
+  var assumptionLabel = settings.assumedRoas > 0 ? 'ROAS giả định do bạn nhập' : 'ROAS weighted 14 ngày';
+  note.textContent = 'Baseline: ' + fdFull(historyStart) + '–' + fdFull(yesterday)
+    + ' · spend bình quân ' + cur(avgDailySpend) + '/ngày · Store ROAS weighted ' + nf(baseStoreRoas, 2) + 'x.'
+    + ' ROAS tương lai đang giả định ' + nf(effectiveRoasInput, 2) + 'x (' + assumptionLabel + ').';
+  rules.textContent = 'Quy tắc scale theo Shopify Store ROAS của ngày trước: dưới 1.7 giữ ngân sách; 1.70–<1.90 tăng 5%; 1.90–<2.10 tăng 10%; 2.10–<2.40 tăng 15%; từ 2.40 tăng 20%. Ngày đầu forecast dùng ROAS thực tế hôm qua (' + (yesterdayRoas == null ? 'không đủ spend, giữ mức nền' : nf(yesterdayRoas, 2) + 'x → +' + nf(startScale, 0) + '%') + '); những ngày sau dùng ROAS giả định ở trên. Không đặt trần spend nên tăng trưởng cộng dồn có thể tạo forecast rất lớn. Đây là kịch bản tham khảo, không phải khuyến nghị tự động đổi ngân sách.';
+
+  mkCh('ch-xmas-forecast', {
+    type: 'bar',
+    data: { labels: labels, datasets: [
+      { type: 'bar', label: 'Shopify Total Sales · thực tế', data: actualRevenue,
+        backgroundColor: 'rgba(74,222,128,.72)', borderRadius: 2, yAxisID: 'yRevenue' },
+      { type: 'line', label: 'Shopify Total Sales · forecast', data: forecastRevenue,
+        borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,.12)', borderDash: [6,4],
+        pointRadius: 0, borderWidth: 2, tension: .25, spanGaps: false, yAxisID: 'yRevenue' },
+      { type: 'line', label: 'Paid spend · forecast', data: forecastSpend,
+        borderColor: '#60a5fa', backgroundColor: 'transparent', borderDash: [3,3],
+        pointRadius: 0, borderWidth: 2, tension: .2, yAxisID: 'ySpend' }
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' }, tooltip: { callbacks: {
+        label: function(ctx) { return ctx.dataset.label + ': ' + cur(ctx.parsed.y || 0); }
+      }}},
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 20 } },
+        yRevenue: { position: 'left', grid: GRID, beginAtZero: true,
+          title: { display: true, text: 'Shopify Total Sales ($)' }, ticks: { callback: function(v) { return '$' + nf(v); } } },
+        ySpend: { position: 'right', grid: { drawOnChartArea: false }, beginAtZero: true,
+          title: { display: true, text: 'Paid spend forecast ($)' }, ticks: { callback: function(v) { return '$' + nf(v); } } }
+      }
+    }
+  });
 }
 
 // ═══════════════════════════════════════
