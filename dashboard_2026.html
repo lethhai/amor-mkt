@@ -824,6 +824,7 @@ Chart.defaults.font.size   = 11;
 var DATA    = null;
 var XMAS_DATA = null;
 var XMAS_DATA_DAY = '';
+var XMAS_DATA_LOADING_DAY = '';
 var GG_PRODUCT_ROWS = [];
 var AD_PRODUCT_FOCUS = '';
 var CREATIVE_ROWS = [];
@@ -884,7 +885,7 @@ async function loadAll(from, to) {
   closeCreativeDetail();
   ov(true, 'Đang tải dữ liệu...');
 
-  var main, prev, prevFrom, prevTo, xmas;
+  var main, prev, prevFrom, prevTo;
   try {
     var fromDate = new Date(from + 'T12:00:00Z');
     var toDate_  = new Date(to   + 'T12:00:00Z');
@@ -895,23 +896,6 @@ async function loadAll(from, to) {
     // Chỉ gọi một payload chính và tùy chọn một kỳ so sánh; tránh fetch thừa.
     main = await fetchGAS(from, to);
     prev = WOW_ON   ? await fetchGAS(prevFrom, prevTo) : null;
-
-    // Xmas forecast uses a fixed season window plus a rolling 14 completed days.
-    // Keep it independent from the global dashboard date filter.
-    var xmasToday = today();
-    if (!XMAS_DATA || XMAS_DATA_DAY !== xmasToday) {
-      var xmasFrom = addDays(xmasToday, -14);
-      if (xmasFrom > '2026-11-01') xmasFrom = '2026-11-01';
-      try {
-        xmas = await fetchGAS(xmasFrom, xmasToday);
-        if (xmas && xmas.ok) {
-          XMAS_DATA = xmas;
-          XMAS_DATA_DAY = xmasToday;
-        }
-      } catch (xmasError) {
-        console.warn('[xmas forecast] history fetch failed:', xmasError);
-      }
-    }
 
     if (!main || !main.ok) throw new Error(
       (main && main.error) ? main.error : 'GAS không trả về dữ liệu hợp lệ'
@@ -937,6 +921,33 @@ async function loadAll(from, to) {
       + (WOW_ON ? '  |  vs ' + fdFull(prevFrom) + '→' + fdFull(prevTo) : '');
   } catch(renderErr) {
     console.error('[renderAll] crash:', renderErr);
+  }
+
+  // Forecast history is optional and can be slower than the dashboard payload.
+  // Load it after the main tabs render so a slow forecast query cannot block the UI.
+  loadXmasForecastHistory(today());
+}
+
+async function loadXmasForecastHistory(todayStr) {
+  todayStr = todayStr || today();
+  if (XMAS_DATA && XMAS_DATA_DAY === todayStr) return;
+  if (XMAS_DATA_LOADING_DAY === todayStr) return;
+  XMAS_DATA_LOADING_DAY = todayStr;
+  var xmasFrom = addDays(todayStr, -14);
+  if (xmasFrom > '2026-11-01') xmasFrom = '2026-11-01';
+  try {
+    var xmas = await fetchGAS(xmasFrom, todayStr);
+    if (xmas && xmas.ok) {
+      XMAS_DATA = xmas;
+      XMAS_DATA_DAY = todayStr;
+      renderXmasForecast(XMAS_DATA);
+    } else {
+      console.warn('[xmas forecast] history payload unavailable');
+    }
+  } catch (xmasError) {
+    console.warn('[xmas forecast] history fetch failed:', xmasError);
+  } finally {
+    XMAS_DATA_LOADING_DAY = '';
   }
 }
 
