@@ -209,6 +209,16 @@ tbody tr:hover{background:#181b2e}
 .xmas-field input:focus{outline:none;border-color:#6366f1}
 .xmas-field input::placeholder{color:#64748b}
 .xmas-local-note{font-size:10px;color:#64748b;margin-top:-5px;margin-bottom:12px}
+.xmas-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:10px;margin:12px 0}
+.xmas-scale-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin:10px 0 14px}
+.xmas-scale-card{background:#131626;border:1px solid #252840;border-radius:8px;padding:9px 11px;color:#94a3b8;font-size:10px;line-height:1.55}
+.xmas-scale-card strong{display:block;color:#e2e8f0;font-size:12px;margin-bottom:2px}
+.xmas-scale-card.active{border-color:#a78bfa;background:#1d1834}
+.xmas-table-wrap{max-height:560px;overflow:auto;border-radius:10px;border:1px solid #252840}
+.xmas-table-wrap table{min-width:900px}
+.xmas-table-wrap thead th{position:sticky;top:0;z-index:2}
+.xmas-month-btn{padding:5px 11px;border-radius:18px;border:1px solid #2d3154;background:transparent;color:#94a3b8;font-size:10px;font-weight:600;cursor:pointer}
+.xmas-month-btn.active{background:#4338ca;border-color:#6366f1;color:#fff}
 
 /* ── Kết thúc style ── */
 
@@ -410,11 +420,23 @@ thead th.sortable:hover{color:#a78bfa}
       </div>
       <div class="xmas-local-note">Target và giả định ROAS được lưu riêng trên trình duyệt này. Chưa đặt trần ngân sách; spend dự phóng sẽ cộng dồn theo mức scale.</div>
       <div id="xmas-forecast-kpis" class="kpi-grid"></div>
+      <div class="st">Lộ trình scale theo Shopify Store ROAS hôm trước</div>
+      <div id="xmas-scale-rules" class="xmas-scale-grid"></div>
       <div class="cbox">
         <div class="ctitle">Shopify Total Sales thực tế / dự báo và spend quảng cáo dự phóng</div>
         <div class="chart-container-lg"><canvas id="ch-xmas-forecast"></canvas></div>
       </div>
       <div class="infobox" id="xmas-forecast-rules"></div>
+      <div class="section">
+        <div class="st">Chi tiết từng ngày · Actual vs Forecast</div>
+        <div class="filter-bar" id="xmas-month-filter">
+          <button type="button" class="xmas-month-btn active" data-xmas-month="all" onclick="setXmasMonthFilter('all')">Toàn mùa</button>
+          <button type="button" class="xmas-month-btn" data-xmas-month="11" onclick="setXmasMonthFilter('11')">Tháng 11</button>
+          <button type="button" class="xmas-month-btn" data-xmas-month="12" onclick="setXmasMonthFilter('12')">Tháng 12</button>
+          <span id="xmas-daily-summary" style="font-size:10px;color:#64748b"></span>
+        </div>
+        <div id="xmas-daily-table" class="xmas-table-wrap"></div>
+      </div>
     </div>
   </div>
 
@@ -943,6 +965,7 @@ function renderAll() {
 // Future ROAS is a scenario assumption, not platform attribution or a promise.
 // ═══════════════════════════════════════
 var XMAS_FORECAST_SETTINGS_KEY = 'amor_xmas_forecast_2026';
+var XMAS_MONTH_FILTER = 'all';
 
 function getXmasForecastSettings() {
   try { return JSON.parse(localStorage.getItem(XMAS_FORECAST_SETTINGS_KEY) || '{}') || {}; }
@@ -967,6 +990,18 @@ function xmasGrowthRate(roas) {
   return 0.20;
 }
 
+function setXmasMonthFilter(month) {
+  XMAS_MONTH_FILTER = month || 'all';
+  document.querySelectorAll('[data-xmas-month]').forEach(function(btn) {
+    btn.classList.toggle('active', btn.getAttribute('data-xmas-month') === XMAS_MONTH_FILTER);
+  });
+  renderXmasForecast(XMAS_DATA);
+}
+
+function xmasScaleText(rate) {
+  return rate > 0 ? '+' + nf(rate * 100, 0) + '%' : 'Giữ';
+}
+
 function renderXmasForecast(d) {
   var note = document.getElementById('xmas-forecast-note');
   var rules = document.getElementById('xmas-forecast-rules');
@@ -985,6 +1020,10 @@ function renderXmasForecast(d) {
     note.textContent = 'Không tải được dữ liệu lịch sử cho forecast. Kiểm tra kết nối WebApp rồi tải lại dashboard.';
     out.innerHTML = '';
     rules.textContent = '';
+    var dailyTableEmpty = document.getElementById('xmas-daily-table');
+    var scaleRulesEmpty = document.getElementById('xmas-scale-rules');
+    if (dailyTableEmpty) dailyTableEmpty.innerHTML = '';
+    if (scaleRulesEmpty) scaleRulesEmpty.innerHTML = '';
     if (CH['ch-xmas-forecast']) { CH['ch-xmas-forecast'].destroy(); delete CH['ch-xmas-forecast']; }
     return;
   }
@@ -1010,33 +1049,54 @@ function renderXmasForecast(d) {
   var yesterdayRoas = ySpend > 0 ? yRevenue / ySpend : null;
   var assumedRoas = settings.assumedRoas > 0 ? settings.assumedRoas : baseStoreRoas;
 
-  var monthNovActual = 0, monthNovForecast = 0, monthDecForecast = 0, monthNovSpend = 0, monthDecSpend = 0;
-  var labels = [], actualRevenue = [], forecastRevenue = [], forecastSpend = [];
+  var monthNovActual = 0, monthNovForecast = 0, monthDecForecast = 0;
+  var monthNovSpend = 0, monthNovSpendActual = 0, monthDecSpend = 0;
+  var labels = [], actualRevenue = [], actualSpend = [], forecastRevenue = [], forecastSpend = [];
+  var dailyRows = [], monthlyRunning = { '11': 0, '12': 0 };
   var plannedSpend = avgDailySpend;
   var day = '2026-11-01';
   while (day <= '2026-12-31') {
     labels.push(fd(day));
     var isActual = day < todayStr;
+    var daySpend, dayRevenue, triggerRoas, scaleRate;
     if (isActual) {
       var rev = revenueByDate[day] || 0;
+      daySpend = spendByDate[day] || 0;
+      dayRevenue = rev;
+      triggerRoas = null;
+      scaleRate = null;
       actualRevenue.push(rev);
+      actualSpend.push(daySpend);
       forecastRevenue.push(null);
       forecastSpend.push(null);
-      if (day <= '2026-11-30') monthNovActual += rev;
+      if (day <= '2026-11-30') { monthNovActual += rev; monthNovSpendActual += daySpend; }
     } else {
-      var rate = day === todayStr ? xmasGrowthRate(yesterdayRoas) : xmasGrowthRate(assumedRoas);
-      plannedSpend = plannedSpend * (1 + rate);
+      triggerRoas = day === todayStr ? yesterdayRoas : assumedRoas;
+      scaleRate = xmasGrowthRate(triggerRoas);
+      plannedSpend = plannedSpend * (1 + scaleRate);
       var projectedRev = plannedSpend * assumedRoas;
+      daySpend = plannedSpend;
+      dayRevenue = projectedRev;
       actualRevenue.push(null);
+      actualSpend.push(null);
       forecastRevenue.push(projectedRev);
       forecastSpend.push(plannedSpend);
       if (day <= '2026-11-30') { monthNovForecast += projectedRev; monthNovSpend += plannedSpend; }
       else { monthDecForecast += projectedRev; monthDecSpend += plannedSpend; }
     }
+    var monthKey = day.slice(5, 7);
+    monthlyRunning[monthKey] = (monthlyRunning[monthKey] || 0) + dayRevenue;
+    dailyRows.push({ date: day, actual: isActual, spend: daySpend, revenue: dayRevenue,
+      roas: daySpend > 0 ? dayRevenue / daySpend : null, triggerRoas: triggerRoas,
+      scaleRate: scaleRate, monthKey: monthKey, monthRunning: monthlyRunning[monthKey] });
     day = addDays(day, 1);
   }
 
   var novTotal = monthNovActual + monthNovForecast;
+  var novSpendTotal = monthNovSpendActual + monthNovSpend;
+  var projectedSeasonSpend = novSpendTotal + monthDecSpend;
+  var novProjectedRoas = novSpendTotal > 0 ? novTotal / novSpendTotal : 0;
+  var decProjectedRoas = monthDecSpend > 0 ? monthDecForecast / monthDecSpend : 0;
   var targetNov = settings.targetNov || 0;
   var targetDec = settings.targetDec || 0;
   function attainment(total, target) { return target > 0 ? nf(total / target * 100, 1) + '%' : 'Chưa đặt'; }
@@ -1051,9 +1111,57 @@ function renderXmasForecast(d) {
     kpi('Nov · Target', targetNov ? cur(targetNov) : 'Chưa đặt', 'Forecast đạt ' + attainment(novTotal, targetNov) + ' · ' + gapText(novTotal, targetNov), 'blue'),
     kpi('Dec · Shopify Total Sales forecast', cur(monthDecForecast), 'Dự báo spend ' + cur(monthDecSpend), 'green'),
     kpi('Dec · Target', targetDec ? cur(targetDec) : 'Chưa đặt', 'Forecast đạt ' + attainment(monthDecForecast, targetDec) + ' · ' + gapText(monthDecForecast, targetDec), 'blue'),
+    kpi('Paid Spend · Nov–Dec', cur(projectedSeasonSpend), 'Nov actual + forecast · Dec forecast'),
+    kpi('Store ROAS dự phóng · Nov', nf(novProjectedRoas, 2) + 'x', 'Nov Shopify Total Sales ÷ total paid spend', '', novSpendTotal <= 0),
+    kpi('Store ROAS dự phóng · Dec', nf(decProjectedRoas, 2) + 'x', 'Dựa trên ROAS giả định tương lai', '', monthDecSpend <= 0),
     kpi('Spend nền · 14 ngày', cur(avgDailySpend) + '/ngày', cur(baseSpend) + ' tổng spend · 14 ngày hoàn tất'),
     kpi('Store ROAS nền · 14 ngày', nf(baseStoreRoas, 2) + 'x', cur(baseRevenue) + ' Shopify Total Sales ÷ ' + cur(baseSpend))
   ].join('');
+
+  var currentScale = xmasGrowthRate(yesterdayRoas);
+  var ladder = [
+    { label: 'ROAS < 1.70x', rate: 0, detail: 'Giữ ngân sách' },
+    { label: '1.70–1.89x', rate: 0.05, detail: 'Tăng 5%' },
+    { label: '1.90–2.09x', rate: 0.10, detail: 'Tăng 10%' },
+    { label: '2.10–2.39x', rate: 0.15, detail: 'Tăng 15%' },
+    { label: 'ROAS ≥ 2.40x', rate: 0.20, detail: 'Tăng 20%' }
+  ];
+  var ladderEl = document.getElementById('xmas-scale-rules');
+  if (ladderEl) ladderEl.innerHTML = ladder.map(function(item) {
+    return '<div class="xmas-scale-card' + (item.rate === currentScale ? ' active' : '') + '">'
+      + '<strong>' + item.label + '</strong>' + item.detail + '</div>';
+  }).join('');
+
+  var visibleRows = dailyRows.filter(function(row) {
+    return XMAS_MONTH_FILTER === 'all' || row.monthKey === XMAS_MONTH_FILTER;
+  });
+  var tableHeads = ['Ngày', 'Dữ liệu', 'Paid Spend', 'Shopify Total Sales', 'Store ROAS', 'ROAS dùng để scale', 'Điều chỉnh spend', 'Lũy kế tháng / target'];
+  var tableBody = visibleRows.map(function(row) {
+    var target = row.monthKey === '11' ? targetNov : targetDec;
+    var kind = row.actual
+      ? '<span class="badge b-it">Actual</span>'
+      : '<span class="badge b-fb">Forecast</span>';
+    var trigger = row.triggerRoas == null ? '–' : nf(row.triggerRoas, 2) + 'x';
+    var change = row.scaleRate == null ? '–' : xmasScaleText(row.scaleRate);
+    var pace = cur(row.monthRunning) + ' / ' + (target > 0 ? cur(target) : 'chưa đặt')
+      + (target > 0 ? ' · ' + nf(row.monthRunning / target * 100, 1) + '%' : '');
+    return '<tr>'
+      + '<td style="white-space:nowrap">' + fdFull(row.date) + '</td>'
+      + '<td>' + kind + '</td>'
+      + '<td class="num">' + cur(row.spend) + '</td>'
+      + '<td class="num" style="color:#4ade80">' + cur(row.revenue) + '</td>'
+      + '<td class="num">' + (row.roas == null ? '–' : nf(row.roas, 2) + 'x') + '</td>'
+      + '<td class="num">' + trigger + '</td>'
+      + '<td class="num">' + change + '</td>'
+      + '<td class="num" style="white-space:nowrap">' + pace + '</td>'
+      + '</tr>';
+  }).join('');
+  var dailyTable = document.getElementById('xmas-daily-table');
+  if (dailyTable) dailyTable.innerHTML = '<table><thead><tr>'
+    + tableHeads.map(function(head) { return '<th>' + head + '</th>'; }).join('')
+    + '</tr></thead><tbody>' + tableBody + '</tbody></table>';
+  var dailySummary = document.getElementById('xmas-daily-summary');
+  if (dailySummary) dailySummary.textContent = visibleRows.length + ' ngày · Actual được lấy tự động từ Shopify và Ads trong payload; forecast dùng giả định đang chọn.';
 
   var effectiveRoasInput = settings.assumedRoas > 0 ? settings.assumedRoas : baseStoreRoas;
   var startScale = yesterdayRoas == null ? 0 : xmasGrowthRate(yesterdayRoas) * 100;
@@ -1068,6 +1176,9 @@ function renderXmasForecast(d) {
     data: { labels: labels, datasets: [
       { type: 'bar', label: 'Shopify Total Sales · thực tế', data: actualRevenue,
         backgroundColor: 'rgba(74,222,128,.72)', borderRadius: 2, yAxisID: 'yRevenue' },
+      { type: 'line', label: 'Paid spend · thực tế', data: actualSpend,
+        borderColor: '#60a5fa', backgroundColor: 'transparent', pointRadius: 2,
+        borderWidth: 2, tension: .2, spanGaps: false, yAxisID: 'ySpend' },
       { type: 'line', label: 'Shopify Total Sales · forecast', data: forecastRevenue,
         borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,.12)', borderDash: [6,4],
         pointRadius: 0, borderWidth: 2, tension: .25, spanGaps: false, yAxisID: 'yRevenue' },
