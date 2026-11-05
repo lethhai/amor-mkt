@@ -815,7 +815,15 @@ function isServiceType(t) {
 // CONFIG & STATE
 // ═══════════════════════════════════════
 var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzJ0SPUH7g5La9IxxkD4JMeTQv4ZtRb_RjBEJbWf6FfiM-70C4Mt06v20L5tJLKJ-A8/exec';
-function getGasUrl() { return localStorage.getItem('gas_url') || DEFAULT_GAS_URL; }
+function getGasUrl() {
+  var saved = localStorage.getItem('gas_url') || '';
+  // Migrate the stale deployment URL that was previously hard-coded in this dashboard.
+  if (saved.indexOf('AKfycbyYxK1qf90CMEtEAS9os0si4m7EWCjnw3S-wmzAwKKjvhi3XNAGuXu0qQh4drT-LDdE') >= 0) {
+    localStorage.setItem('gas_url', DEFAULT_GAS_URL);
+    return DEFAULT_GAS_URL;
+  }
+  return saved || DEFAULT_GAS_URL;
+}
 
 Chart.defaults.color       = '#64748b';
 Chart.defaults.font.family = "'Inter',-apple-system,sans-serif";
@@ -906,7 +914,9 @@ async function loadAll(from, to) {
 
   } catch(e) {
     document.getElementById('ov-msg').textContent = '❌ Fetch lỗi: ' + e.message;
+    document.getElementById('st-txt').textContent = 'Lỗi tải dữ liệu';
     console.error('[loadAll] fetch error:', e);
+    ov(false);
     return;
   }
 
