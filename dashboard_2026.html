@@ -782,9 +782,12 @@ function applyMetricFilterToTab(tab) {
     });
   });
   var count = document.getElementById('metric-filter-count-' + tab);
-  if (count) count.textContent = active
-    ? (visible + ' dòng hiển thị' + (applicable ? ' · lọc trên ' + applicable + '/' + total + ' dòng có chỉ số' : ' · không có bảng phù hợp'))
-    : (total + ' dòng bảng');
+  if (count) {
+    var label = active
+      ? (visible + ' dòng hiển thị' + (applicable ? ' · lọc trên ' + applicable + '/' + total + ' dòng có chỉ số' : ' · không có bảng phù hợp'))
+      : (total + ' dòng bảng');
+    if (count.textContent !== label) count.textContent = label;
+  }
 }
 
 function applyAllMetricFilters() {
@@ -804,7 +807,17 @@ if (window.ResizeObserver) {
   window.addEventListener('resize', updateStickyTableOffset);
 }
 if (window.MutationObserver) {
-  var metricTableObserver = new MutationObserver(function() { applyAllMetricFilters(); });
+  // Observe table replacements only. Observing all of #main also catches the
+  // filter counter's own text update and creates an endless render loop.
+  var metricTableObserver = new MutationObserver(function(records) {
+    var tabs = {};
+    records.forEach(function(record) {
+      var host = record.target.closest && record.target.closest('.twrap');
+      var panel = host && host.closest('.tab-panel');
+      if (panel) tabs[panel.id.replace(/^tab-/, '')] = true;
+    });
+    Object.keys(tabs).forEach(applyMetricFilterToTab);
+  });
   metricTableObserver.observe(document.getElementById('main'), { childList: true, subtree: true });
 }
 function mkCh(id, cfg) {
@@ -857,6 +870,7 @@ var CREATIVE_VIEW = {
   performance: { sort: 'spend', dir: -1, page: 0, pageSize: 50 }
 };
 var CH      = {};
+var TAB_RENDERED = {};
 var WOW_ON  = false;   // Week-over-Week toggle state
 var WOW_DATA= null;    // previous period data
 var OV_MARKET = 'all'; // Marketing Overview chart store selector
@@ -951,6 +965,8 @@ async function loadAll(from, to) {
   }
 
   ov(false);
+  // Allow Chrome to paint the cleared overlay before building tables and charts.
+  await new Promise(function(resolve) { setTimeout(resolve, 0); });
 
   try {
     renderAll();
@@ -1002,24 +1018,35 @@ function toggleWoW() {
 }
 
 function renderAll() {
-  var sections = [
-    ['overview', function() { renderOverview(DATA); }],
-    ['forecast', function() { renderXmasForecast(XMAS_DATA); }],
-    ['store', function() { renderStore(DATA); }],
-    ['facebook', function() { renderFacebookAds(DATA); }],
-    ['creative', function() { renderCreativePerformance(DATA); }],
-    ['google', function() { renderGoogleAds(DATA); }],
-    ['products', function() { renderProducts(DATA); }]
-  ];
-  sections.forEach(function(section) {
-    try { section[1](); }
-    catch (err) {
-      console.error('[renderAll:' + section[0] + '] ' + (err && err.message || err), err);
-      var panel = document.getElementById('tab-' + section[0]);
-      if (panel) panel.insertAdjacentHTML('afterbegin',
-        '<div class="infobox">Không hiển thị được tab này: ' + escHtml(err && err.message || String(err)) + '</div>');
-    }
-  });
+  TAB_RENDERED = {};
+  renderActiveTab();
+}
+function renderActiveTab() {
+  if (!DATA) return;
+  var active = document.querySelector('.tab-btn.active');
+  var name = active ? active.dataset.tab : 'overview';
+  if (TAB_RENDERED[name]) return;
+  var renderers = {
+    overview: function() { renderOverview(DATA); },
+    forecast: function() { renderXmasForecast(XMAS_DATA); },
+    store: function() { renderStore(DATA); },
+    facebook: function() { renderFacebookAds(DATA); },
+    creative: function() { renderCreativePerformance(DATA); },
+    google: function() { renderGoogleAds(DATA); },
+    products: function() { renderProducts(DATA); }
+  };
+  if (!renderers[name]) return;
+  try {
+    renderers[name]();
+    applyMetricFilterToTab(name);
+    TAB_RENDERED[name] = true;
+  } catch (err) {
+    console.error('[renderTab:' + name + '] ' + (err && err.message || err), err);
+    var panel = document.getElementById('tab-' + name);
+    if (panel) panel.insertAdjacentHTML('afterbegin',
+      '<div class="infobox">Không hiển thị được tab này: ' + escHtml(err && err.message || String(err)) + '</div>');
+    TAB_RENDERED[name] = true;
+  }
 }
 
 // ═══════════════════════════════════════
@@ -3572,6 +3599,7 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
     document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    renderActiveTab();
     if (btn.dataset.tab === 'forecast' && DATA) loadXmasForecastHistory(today());
     setTimeout(function() {
       Object.values(CH).forEach(function(c) { try { c.resize(); } catch(e) {} });
