@@ -185,6 +185,10 @@ tbody tr:hover{background:#181b2e}
 @keyframes spin{to{transform:rotate(360deg)}}
 #overlay p{color:#94a3b8;font-size:13px}
 #overlay.hidden{display:none}
+#ov-actions{display:none;gap:8px;margin-top:15px}
+#ov-actions.show{display:flex}
+#ov-actions button{background:#1a1d30;border:1px solid #6366f1;color:#c4b5fd;
+  border-radius:6px;padding:7px 12px;cursor:pointer}
 /* ── SETTINGS MODAL ── */
 #settings-modal{display:none;position:fixed;inset:0;background:rgba(13,15,26,.85);z-index:500;
                 align-items:center;justify-content:center}
@@ -261,6 +265,10 @@ thead th.sortable:hover{color:#a78bfa}
 <div id="overlay">
   <div class="spinner"></div>
   <p id="ov-msg">Đang tải dữ liệu...</p>
+  <div id="ov-actions">
+    <button type="button" onclick="retryDashboard()">Thử lại</button>
+    <button type="button" onclick="ov(false);openSettings()">Kiểm tra URL Web App</button>
+  </div>
 </div>
 
 <div id="settings-modal">
@@ -581,6 +589,9 @@ thead th.sortable:hover{color:#a78bfa}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
+if (!window.Chart) document.write('<scr' + 'ipt src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></scr' + 'ipt>');
+</script>
+<script>
 // ═══════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════
@@ -815,14 +826,16 @@ function isServiceType(t) {
 // CONFIG & STATE
 // ═══════════════════════════════════════
 var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzJ0SPUH7g5La9IxxkD4JMeTQv4ZtRb_RjBEJbWf6FfiM-70C4Mt06v20L5tJLKJ-A8/exec';
+var GAS_URL_VERSION = '2026-11-07-v10';
 function getGasUrl() {
-  var saved = localStorage.getItem('gas_url') || '';
-  // Migrate the stale deployment URL that was previously hard-coded in this dashboard.
-  if (saved.indexOf('AKfycbyYxK1qf90CMEtEAS9os0si4m7EWCjnw3S-wmzAwKKjvhi3XNAGuXu0qQh4drT-LDdE') >= 0) {
-    localStorage.setItem('gas_url', DEFAULT_GAS_URL);
-    return DEFAULT_GAS_URL;
-  }
-  return saved || DEFAULT_GAS_URL;
+  try {
+    // Older releases may have saved a retired deployment in this browser.
+    if (localStorage.getItem('gas_url_version') !== GAS_URL_VERSION) {
+      localStorage.removeItem('gas_url');
+      localStorage.setItem('gas_url_version', GAS_URL_VERSION);
+    }
+    return localStorage.getItem('gas_url') || DEFAULT_GAS_URL;
+  } catch(e) { return DEFAULT_GAS_URL; }
 }
 
 Chart.defaults.color       = '#64748b';
@@ -878,15 +891,33 @@ function rangeFrom(r) {
 function ov(show, msg) {
   document.getElementById('overlay').classList.toggle('hidden', !show);
   if (msg) document.getElementById('ov-msg').textContent = msg;
+  if (show) document.getElementById('ov-actions').classList.remove('show');
+}
+function showLoadError(message) {
+  document.getElementById('overlay').classList.remove('hidden');
+  document.getElementById('ov-msg').textContent = message;
+  document.getElementById('ov-actions').classList.add('show');
+}
+function retryDashboard() {
+  var from = document.getElementById('cf').value;
+  var to = document.getElementById('ct').value;
+  loadAll(from, to);
 }
 
 // ═══════════════════════════════════════
 // FETCH
 // ═══════════════════════════════════════
 async function fetchGAS(from, to) {
-  var r = await fetch(getGasUrl() + '?from=' + from + '&to=' + to);
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  return r.json();
+  var controller = new AbortController();
+  var timeout = setTimeout(function() { controller.abort(); }, 90000);
+  try {
+    var r = await fetch(getGasUrl() + '?from=' + from + '&to=' + to, {signal: controller.signal});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  } catch(e) {
+    if (e.name === 'AbortError') throw new Error('Web App không trả dữ liệu sau 90 giây');
+    throw e;
+  } finally { clearTimeout(timeout); }
 }
 
 async function loadAll(from, to) {
@@ -913,10 +944,9 @@ async function loadAll(from, to) {
     WOW_DATA = prev;
 
   } catch(e) {
-    document.getElementById('ov-msg').textContent = '❌ Fetch lỗi: ' + e.message;
     document.getElementById('st-txt').textContent = 'Lỗi tải dữ liệu';
     console.error('[loadAll] fetch error:', e);
-    ov(false);
+    showLoadError('Không tải được dữ liệu: ' + e.message);
     return;
   }
 
@@ -933,9 +963,10 @@ async function loadAll(from, to) {
     console.error('[renderAll] crash:', renderErr);
   }
 
-  // Forecast history is optional and can be slower than the dashboard payload.
-  // Load it after the main tabs render so a slow forecast query cannot block the UI.
-  loadXmasForecastHistory(today());
+  // Forecast history is requested only when its tab is opened.
+  if (document.querySelector('.tab-btn.active')?.dataset.tab === 'forecast') {
+    loadXmasForecastHistory(today());
+  }
 }
 
 async function loadXmasForecastHistory(todayStr) {
@@ -971,13 +1002,24 @@ function toggleWoW() {
 }
 
 function renderAll() {
-  renderOverview(DATA);
-  renderXmasForecast(XMAS_DATA);
-  renderStore(DATA);
-  renderFacebookAds(DATA);
-  renderCreativePerformance(DATA);
-  renderGoogleAds(DATA);
-  renderProducts(DATA);
+  var sections = [
+    ['overview', function() { renderOverview(DATA); }],
+    ['forecast', function() { renderXmasForecast(XMAS_DATA); }],
+    ['store', function() { renderStore(DATA); }],
+    ['facebook', function() { renderFacebookAds(DATA); }],
+    ['creative', function() { renderCreativePerformance(DATA); }],
+    ['google', function() { renderGoogleAds(DATA); }],
+    ['products', function() { renderProducts(DATA); }]
+  ];
+  sections.forEach(function(section) {
+    try { section[1](); }
+    catch (err) {
+      console.error('[renderAll:' + section[0] + '] ' + (err && err.message || err), err);
+      var panel = document.getElementById('tab-' + section[0]);
+      if (panel) panel.insertAdjacentHTML('afterbegin',
+        '<div class="infobox">Không hiển thị được tab này: ' + escHtml(err && err.message || String(err)) + '</div>');
+    }
+  });
 }
 
 // ═══════════════════════════════════════
@@ -3530,6 +3572,7 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
     document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'forecast' && DATA) loadXmasForecastHistory(today());
     setTimeout(function() {
       Object.values(CH).forEach(function(c) { try { c.resize(); } catch(e) {} });
     }, 50);
