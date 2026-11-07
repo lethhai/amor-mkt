@@ -82,9 +82,13 @@ a{color:inherit;text-decoration:none}
 /* ── TABLE ── */
 .twrap{overflow-x:auto;border-radius:10px;border:1px solid #252840;margin-bottom:16px;scrollbar-gutter:stable}
 table{width:100%;border-collapse:collapse;font-size:12px}
-thead th{position:sticky;top:var(--table-sticky-top,110px);z-index:120;background:#131626;color:#475569;font-weight:700;text-transform:uppercase;
+thead th{position:static;background:#131626;color:#475569;font-weight:700;text-transform:uppercase;
          font-size:10px;letter-spacing:.6px;padding:8px 11px;text-align:left;
          border-bottom:1px solid #252840;white-space:nowrap}
+#sticky-table-header-host{position:fixed;display:none;z-index:250;overflow:hidden;pointer-events:none;background:#131626;border-bottom:1px solid #252840;box-shadow:0 4px 10px rgba(0,0,0,.24)}
+#sticky-table-header-host table{position:absolute;top:0;border-collapse:collapse;table-layout:fixed;font-size:12px;pointer-events:auto}
+#sticky-table-header-host th{position:static!important;background:#131626;color:#475569;font-weight:700;text-transform:uppercase;
+         font-size:10px;letter-spacing:.6px;padding:8px 11px;text-align:left;border-bottom:1px solid #252840;white-space:nowrap}
 tbody tr{border-bottom:1px solid #1a1d2e}
 tbody tr:last-child{border-bottom:none}
 tbody td{padding:7px 11px;color:#cbd5e1;vertical-align:middle}
@@ -798,7 +802,83 @@ function updateStickyTableOffset() {
   var header = document.getElementById('sticky-header');
   if (!header) return;
   document.documentElement.style.setProperty('--table-sticky-top', Math.ceil(header.getBoundingClientRect().height) + 'px');
+  scheduleStickyTableHeaderUpdate();
 }
+
+var STICKY_TABLE_UPDATE_PENDING = false;
+function scheduleStickyTableHeaderUpdate() {
+  if (STICKY_TABLE_UPDATE_PENDING) return;
+  STICKY_TABLE_UPDATE_PENDING = true;
+  requestAnimationFrame(function() {
+    STICKY_TABLE_UPDATE_PENDING = false;
+    updateStickyTableHeader();
+  });
+}
+
+function updateStickyTableHeader() {
+  var header = document.getElementById('sticky-header');
+  var panel = document.querySelector('.tab-panel.active');
+  if (!header || !panel) return;
+  var host = document.getElementById('sticky-table-header-host');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'sticky-table-header-host';
+    host.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(host);
+  }
+
+  var top = Math.ceil(header.getBoundingClientRect().bottom);
+  var chosen = null;
+  panel.querySelectorAll('.twrap table').forEach(function(table) {
+    var wrap = table.closest('.twrap');
+    var thead = table.tHead;
+    if (!wrap || !thead || !table.getClientRects().length) return;
+    var headRect = thead.getBoundingClientRect();
+    var wrapRect = wrap.getBoundingClientRect();
+    var headHeight = headRect.height;
+    if (headRect.top < top && wrapRect.bottom > top + headHeight && wrapRect.top < top) {
+      if (!chosen || headRect.top > chosen.headRect.top) {
+        chosen = { table: table, wrap: wrap, thead: thead, headRect: headRect, wrapRect: wrapRect };
+      }
+    }
+  });
+
+  if (!chosen) {
+    host.style.display = 'none';
+    host.replaceChildren();
+    return;
+  }
+
+  var tableRect = chosen.table.getBoundingClientRect();
+  var wrap = chosen.wrap;
+  var wrapRect = chosen.wrapRect;
+  var clipLeft = wrapRect.left + wrap.clientLeft;
+  host.style.display = 'block';
+  host.style.left = clipLeft + 'px';
+  host.style.top = top + 'px';
+  host.style.width = wrap.clientWidth + 'px';
+  host.style.height = chosen.headRect.height + 'px';
+  host.replaceChildren();
+
+  var cloneTable = document.createElement('table');
+  cloneTable.style.width = tableRect.width + 'px';
+  cloneTable.style.left = (tableRect.left - clipLeft) + 'px';
+  var cloneHead = chosen.thead.cloneNode(true);
+  var sourceCells = chosen.thead.querySelectorAll('th');
+  var clonedCells = cloneHead.querySelectorAll('th');
+  clonedCells.forEach(function(cell, index) {
+    cell.style.position = 'static';
+    if (sourceCells[index]) cell.style.width = sourceCells[index].getBoundingClientRect().width + 'px';
+  });
+  cloneTable.appendChild(cloneHead);
+  host.appendChild(cloneTable);
+}
+
+window.addEventListener('scroll', scheduleStickyTableHeaderUpdate, { passive: true });
+window.addEventListener('resize', scheduleStickyTableHeaderUpdate);
+document.addEventListener('scroll', function(event) {
+  if (event.target && event.target.closest && event.target.closest('.twrap')) scheduleStickyTableHeaderUpdate();
+}, true);
 
 renderMetricFilterBars();
 if (window.ResizeObserver) {
@@ -817,9 +897,14 @@ if (window.MutationObserver) {
       if (panel) tabs[panel.id.replace(/^tab-/, '')] = true;
     });
     Object.keys(tabs).forEach(applyMetricFilterToTab);
+    scheduleStickyTableHeaderUpdate();
   });
   metricTableObserver.observe(document.getElementById('main'), { childList: true, subtree: true });
 }
+document.querySelectorAll('.tab-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() { scheduleStickyTableHeaderUpdate(); });
+});
+scheduleStickyTableHeaderUpdate();
 function mkCh(id, cfg) {
   if (CH[id]) { CH[id].destroy(); delete CH[id]; }
   var el = document.getElementById(id);
@@ -859,6 +944,26 @@ var DATA    = null;
 var XMAS_DATA = null;
 var XMAS_DATA_DAY = '';
 var XMAS_DATA_LOADING_DAY = '';
+// Shopify tab filters and table state. These globals are read by the lazy
+// Store/Product renderers before any filter button is clicked.
+var ST_MARKET = 'all';
+var ST_TYPES = [];
+var ST_OCCASIONS = [];
+var ST_INTERESTS = [];
+var PI_MKT_FILTER = 'all';
+var PI_TYPES_FILTER = [];
+var PI_OCCASIONS_FILTER = [];
+var PI_INTERESTS_FILTER = [];
+var PI_RECIPIENTS_FILTER = [];
+var PI_CURRENT_FILTER = null;
+var PI_DATA = [];
+var PI_PAGE = 1;
+var PI_PAGE_SIZE = 20;
+var PI_CREATED_FROM = '';
+var PI_CREATED_TO = '';
+var PI_SORT = { col: 8, dir: -1 };
+var PI_TYPES_DATA = [];
+var PI_TYPES_SORT = { col: 2, dir: -1 };
 var GG_PRODUCT_ROWS = [];
 var AD_PRODUCT_FOCUS = '';
 var CREATIVE_ROWS = [];
@@ -1047,6 +1152,7 @@ function renderActiveTab() {
       '<div class="infobox">Không hiển thị được tab này: ' + escHtml(err && err.message || String(err)) + '</div>');
     TAB_RENDERED[name] = true;
   }
+  scheduleStickyTableHeaderUpdate();
 }
 
 // ═══════════════════════════════════════
@@ -3603,6 +3709,7 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
     if (btn.dataset.tab === 'forecast' && DATA) loadXmasForecastHistory(today());
     setTimeout(function() {
       Object.values(CH).forEach(function(c) { try { c.resize(); } catch(e) {} });
+      scheduleStickyTableHeaderUpdate();
     }, 50);
   });
 });
