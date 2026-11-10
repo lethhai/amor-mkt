@@ -3820,7 +3820,8 @@ async function sendAIChat(event) {
   AI_CHAT_BUSY = true;
   var pending = appendAIChatMessage('assistant', 'Đang đọc số liệu và phân tích…');
   var controller = new AbortController();
-  var timeout = setTimeout(function() { controller.abort(); }, 120000);
+  // Let the Apps Script request run longer; Apps Script still enforces its own execution limit.
+  var timeout = setTimeout(function() { controller.abort(); }, 240000);
   try {
     var body = {
       question: question,
@@ -3846,7 +3847,7 @@ async function sendAIChat(event) {
     document.getElementById('ai-chat-messages').scrollTop = document.getElementById('ai-chat-messages').scrollHeight;
   } catch(err) {
     var message = err.name === 'AbortError'
-      ? 'Yêu cầu mất hơn 2 phút. Hãy thử câu hỏi ngắn hơn hoặc khoảng ngày nhỏ hơn.'
+      ? 'Yêu cầu mất hơn 4 phút nên dashboard đã dừng chờ. Web App có thể đã chạm giới hạn chạy; hãy thử câu hỏi ngắn hơn hoặc khoảng ngày nhỏ hơn.'
       : (err instanceof TypeError
         ? 'Trình duyệt không đọc được phản hồi từ Apps Script (có thể do CORS hoặc deployment). Hãy kiểm tra URL /exec và thử lại sau khi deploy phiên bản mới.'
         : String(err.message || err));
@@ -3948,5 +3949,4 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
 // ═══════════════════════════════════════
 </script>
 </body>
-     
 </html>
