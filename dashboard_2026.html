@@ -193,6 +193,9 @@ tbody tr:hover{background:#181b2e}
 #ov-actions.show{display:flex}
 #ov-actions button{background:#1a1d30;border:1px solid #6366f1;color:#c4b5fd;
   border-radius:6px;padding:7px 12px;cursor:pointer}
+#ov-settings{margin-top:10px;background:#1a1d30;border:1px solid #3b3f64;color:#c4b5fd;
+  border-radius:6px;padding:7px 12px;cursor:pointer;font-size:11px}
+#ov-settings:hover{border-color:#a78bfa;color:#fff}
 /* ── SETTINGS MODAL ── */
 #settings-modal{display:none;position:fixed;inset:0;background:rgba(13,15,26,.85);z-index:500;
                 align-items:center;justify-content:center}
@@ -262,6 +265,27 @@ thead th.sortable:hover{color:#a78bfa}
   margin-left:4px;vertical-align:middle}
 /* ── ROAS ANOMALY FLAG ── */
 .roas-anomaly{font-size:9px;color:#f59e0b;margin-left:3px}
+/* ── AI CHAT ── */
+#ai-chat-launch{position:fixed;right:22px;bottom:22px;z-index:800;background:#4f46e5;border:1px solid #818cf8;color:#fff;border-radius:999px;padding:12px 17px;font-size:12px;font-weight:700;box-shadow:0 8px 28px rgba(0,0,0,.35);cursor:pointer}
+#ai-chat-launch:hover{background:#4338ca;transform:translateY(-1px)}
+#ai-chat-panel{display:none;position:fixed;right:22px;bottom:78px;z-index:800;width:min(430px,calc(100vw - 28px));height:min(620px,calc(100vh - 110px));background:#101321;border:1px solid #343956;border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.55);overflow:hidden;flex-direction:column}
+#ai-chat-panel.open{display:flex}
+.ai-chat-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:#171a2b;border-bottom:1px solid #292d45}
+.ai-chat-head strong{font-size:13px;color:#e2e8f0}.ai-chat-head small{display:block;font-size:10px;color:#8490a8;margin-top:3px}
+.ai-chat-head button{background:transparent;border:1px solid #343956;color:#b8c1d4;border-radius:6px;width:28px;height:28px;font-size:17px;cursor:pointer}
+.ai-chat-context{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:9px 12px;border-bottom:1px solid #252840;background:#121525}
+.ai-chat-context label{font-size:9px;color:#8490a8}.ai-chat-context input,.ai-chat-context select{display:block;width:100%;margin-top:4px;padding:6px 7px;background:#0d0f1a;color:#e2e8f0;border:1px solid #303550;border-radius:6px;font-size:10px;outline:none}
+.ai-chat-context input:focus,.ai-chat-context select:focus{border-color:#6366f1}.ai-chat-dates{grid-column:1/-1;font-size:10px;color:#8490a8}
+#ai-chat-messages{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.ai-chat-msg{max-width:94%;padding:9px 11px;border-radius:10px;font-size:11px;line-height:1.6;white-space:normal;overflow-wrap:anywhere}
+.ai-chat-msg.user{align-self:flex-end;background:#302a62;color:#f1f0ff;border-bottom-right-radius:3px}
+.ai-chat-msg.assistant{align-self:flex-start;background:#1a1d2d;border:1px solid #2c3149;color:#d8deeb;border-bottom-left-radius:3px}
+.ai-chat-msg.error{border-color:#71343c;color:#fecaca}.ai-chat-msg p{margin:0 0 7px}.ai-chat-msg p:last-child{margin-bottom:0}.ai-chat-msg ul{padding-left:18px;margin:5px 0}.ai-chat-msg strong{color:#fff}
+.ai-chat-evidence{margin-top:8px;border-top:1px solid #343956;padding-top:7px;color:#9ca9c1;font-size:10px}
+.ai-chat-evidence summary{cursor:pointer;color:#a5b4fc}.ai-chat-evidence pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:190px;overflow:auto;font-size:9px;margin-top:7px;color:#aeb9cd}
+.ai-chat-compose{padding:10px 12px;border-top:1px solid #252840;background:#141727}.ai-chat-compose textarea{width:100%;height:66px;resize:vertical;background:#0d0f1a;border:1px solid #303550;border-radius:8px;color:#e2e8f0;padding:8px;font-family:inherit;font-size:11px;line-height:1.5;outline:none}.ai-chat-compose textarea:focus{border-color:#6366f1}
+.ai-chat-compose-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:7px}.ai-chat-compose-row small{font-size:9px;color:#707c95}.ai-chat-send{background:#4f46e5;border:0;border-radius:7px;color:#fff;padding:7px 13px;font-size:11px;font-weight:700;cursor:pointer}.ai-chat-send:disabled{opacity:.5;cursor:wait}
+@media(max-width:600px){#ai-chat-launch{right:14px;bottom:14px}#ai-chat-panel{right:8px;bottom:68px;height:min(70vh,620px)}}
 </style>
 </head>
 <body>
@@ -271,8 +295,8 @@ thead th.sortable:hover{color:#a78bfa}
   <p id="ov-msg">Đang tải dữ liệu...</p>
   <div id="ov-actions">
     <button type="button" onclick="retryDashboard()">Thử lại</button>
-    <button type="button" onclick="ov(false);openSettings()">Kiểm tra URL Web App</button>
   </div>
+  <button id="ov-settings" type="button" onclick="ov(false);openSettings()">⚙ Cài đặt URL Web App</button>
 </div>
 
 <div id="settings-modal">
@@ -283,12 +307,42 @@ thead th.sortable:hover{color:#a78bfa}
     <div style="font-size:11px;color:#475569;margin-bottom:14px">
       Paste URL mới sau khi deploy GAS script. URL được lưu trong browser (localStorage).
     </div>
+    <label>GAS Web App URL — AI Chat</label>
+    <input type="text" id="inp-ai-chat-url" placeholder="Để trống nếu dùng chung URL data">
+    <div style="font-size:11px;color:#475569;margin-bottom:14px">
+      Dán URL /exec của deployment AI riêng. Nếu để trống, chat sẽ dùng chung URL data.
+    </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeSettings()">Hủy</button>
       <button class="btn-save" onclick="saveSettings()">Lưu &amp; Tải lại</button>
     </div>
   </div>
 </div>
+
+<button id="ai-chat-launch" type="button" onclick="toggleAIChat(true)">✦ Hỏi AI</button>
+<section id="ai-chat-panel" aria-label="Trợ lý AI dashboard" aria-hidden="true">
+  <div class="ai-chat-head">
+    <div><strong>Trợ lý dữ liệu Amor</strong><small>Phân tích dựa trên dữ liệu trong sheet</small></div>
+    <button type="button" onclick="toggleAIChat(false)" aria-label="Đóng chat">×</button>
+  </div>
+  <div class="ai-chat-context">
+    <label>Market
+      <select id="ai-chat-market"><option value="">Tất cả</option><option value="ES">ES</option><option value="IT">IT</option></select>
+    </label>
+    <label>Product type (không bắt buộc)
+      <input id="ai-chat-product-type" type="text" maxlength="100" placeholder="Ví dụ: Mug">
+    </label>
+    <label style="grid-column:1/-1">Product ID (nếu hỏi riêng một sản phẩm)
+      <input id="ai-chat-product-id" type="text" inputmode="numeric" maxlength="24" placeholder="Dán Product ID để nhận diện chính xác">
+    </label>
+    <div class="ai-chat-dates" id="ai-chat-dates">Khoảng ngày lấy theo bộ chọn trên dashboard.</div>
+  </div>
+  <div id="ai-chat-messages" role="log" aria-live="polite"></div>
+  <form class="ai-chat-compose" onsubmit="sendAIChat(event)">
+    <textarea id="ai-chat-question" maxlength="1200" placeholder="Ví dụ: Vì sao ROAS sản phẩm này thấp và tôi nên kiểm tra gì tiếp?" required></textarea>
+    <div class="ai-chat-compose-row"><small>Enter để gửi · Shift+Enter xuống dòng</small><button class="ai-chat-send" id="ai-chat-send" type="submit">Gửi</button></div>
+  </form>
+</section>
 
 <div id="product-image-modal" onclick="if(event.target===this) closeProductPreview()">
   <div class="image-modal-box">
@@ -935,6 +989,13 @@ function getGasUrl() {
     return localStorage.getItem('gas_url') || DEFAULT_GAS_URL;
   } catch(e) { return DEFAULT_GAS_URL; }
 }
+function getAIChatUrlOverride() {
+  try { return localStorage.getItem('ai_chat_url') || ''; }
+  catch(e) { return ''; }
+}
+function getAIChatUrl() {
+  return getAIChatUrlOverride() || getGasUrl();
+}
 
 Chart.defaults.color       = '#64748b';
 Chart.defaults.font.family = "'Inter',-apple-system,sans-serif";
@@ -1040,6 +1101,7 @@ async function fetchGAS(from, to) {
 }
 
 async function loadAll(from, to) {
+  if (typeof syncAIChatDates === 'function') syncAIChatDates();
   closeCreativeDetail();
   ov(true, 'Đang tải dữ liệu...');
 
@@ -3655,19 +3717,178 @@ function setProductRecipient(btn, value) {
 }
 
 // ═══════════════════════════════════════
+// AI CHAT — calls doPost on the same deployed Apps Script Web App as dashboard data.
+// The Gemini API key stays in Apps Script and is never sent to this page.
+// ═══════════════════════════════════════
+var AI_CHAT_BUSY = false;
+var AI_CHAT_WELCOMED = false;
+
+function toggleAIChat(show) {
+  var panel = document.getElementById('ai-chat-panel');
+  if (!panel) return;
+  var open = typeof show === 'boolean' ? show : !panel.classList.contains('open');
+  panel.classList.toggle('open', open);
+  panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+  if (open) {
+    syncAIChatDates();
+    if (!AI_CHAT_WELCOMED) {
+      appendAIChatMessage('assistant', 'Xin chào! Tôi có thể phân tích doanh thu Shopify, chi tiêu quảng cáo và ROAS trong khoảng ngày đang chọn. Nếu hỏi riêng một sản phẩm, hãy dán Product ID hoặc ghi rõ tên sản phẩm trong câu hỏi.');
+      AI_CHAT_WELCOMED = true;
+    }
+    setTimeout(function() { document.getElementById('ai-chat-question').focus(); }, 30);
+  }
+}
+
+function syncAIChatDates() {
+  var from = document.getElementById('cf').value || '';
+  var to = document.getElementById('ct').value || '';
+  document.getElementById('ai-chat-dates').textContent = from && to
+    ? 'Khoảng dữ liệu: ' + from + ' → ' + to + ' (theo bộ chọn trên dashboard).'
+    : 'Khoảng ngày lấy theo bộ chọn trên dashboard.';
+}
+
+function aiChatEscape(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];
+  });
+}
+
+function aiChatMarkdown(value) {
+  var lines = aiChatEscape(value).replace(/\r/g, '').split('\n');
+  var out = [], inList = false;
+  function inline(s) { return s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>'); }
+  lines.forEach(function(line) {
+    var bullet = /^\s*(?:[-*]|\d+\.)\s+(.+)$/.exec(line);
+    if (bullet) {
+      if (!inList) { out.push('<ul>'); inList = true; }
+      out.push('<li>' + inline(bullet[1]) + '</li>');
+    } else {
+      if (inList) { out.push('</ul>'); inList = false; }
+      if (line.trim()) out.push('<p>' + inline(line) + '</p>');
+    }
+  });
+  if (inList) out.push('</ul>');
+  return out.join('');
+}
+
+function aiChatEvidenceHtml(evidence) {
+  if (!evidence) return '';
+  var calc = evidence.calculated || {};
+  var scope = evidence.scope || {};
+  var lines = [];
+  if (scope.productName) lines.push('Sản phẩm: ' + scope.productName + (scope.productId ? ' · ID ' + scope.productId : ''));
+  lines.push('Paid spend: ' + (calc.paidSpend == null ? '—' : '$' + nf(calc.paidSpend, 2)));
+  if (calc.storeTrueROAS != null) lines.push('Store ROAS: ' + nf(calc.storeTrueROAS, 2) + 'x');
+  if (calc.productGrossROAS != null) lines.push('Product Gross ROAS: ' + nf(calc.productGrossROAS, 2) + 'x');
+  if (calc.fbAttrROAS != null) lines.push('FB Attr. ROAS: ' + nf(calc.fbAttrROAS, 2) + 'x');
+  if (calc.googleAttrROAS != null) lines.push('Google Attr. ROAS: ' + nf(calc.googleAttrROAS, 2) + 'x');
+  var notes = (evidence.definitions || []).slice(0, 3);
+  var compact = lines.concat(notes.map(function(n) { return 'Ghi chú: ' + n; })).join('\n');
+  return '<details class="ai-chat-evidence"><summary>Xem số liệu và phạm vi được dùng</summary><pre>'
+    + aiChatEscape(compact) + '</pre></details>';
+}
+
+function appendAIChatMessage(role, text, evidence, isError) {
+  var host = document.getElementById('ai-chat-messages');
+  var msg = document.createElement('div');
+  msg.className = 'ai-chat-msg ' + (role === 'user' ? 'user' : 'assistant') + (isError ? ' error' : '');
+  if (role === 'user') msg.textContent = text;
+  else msg.innerHTML = aiChatMarkdown(text) + aiChatEvidenceHtml(evidence);
+  host.appendChild(msg);
+  host.scrollTop = host.scrollHeight;
+  return msg;
+}
+
+async function sendAIChat(event) {
+  if (event) event.preventDefault();
+  if (AI_CHAT_BUSY) return;
+  var input = document.getElementById('ai-chat-question');
+  var question = input.value.trim();
+  if (!question) return;
+  var from = document.getElementById('cf').value;
+  var to = document.getElementById('ct').value;
+  if (!from || !to) {
+    appendAIChatMessage('assistant', 'Chưa xác định được khoảng ngày. Hãy chọn ngày trên dashboard rồi gửi lại.', null, true);
+    return;
+  }
+
+  appendAIChatMessage('user', question);
+  input.value = '';
+  var send = document.getElementById('ai-chat-send');
+  send.disabled = true;
+  send.textContent = 'Đang hỏi…';
+  AI_CHAT_BUSY = true;
+  var pending = appendAIChatMessage('assistant', 'Đang đọc số liệu và phân tích…');
+  var controller = new AbortController();
+  var timeout = setTimeout(function() { controller.abort(); }, 120000);
+  try {
+    var body = {
+      question: question,
+      from: from,
+      to: to,
+      market: document.getElementById('ai-chat-market').value,
+      productType: document.getElementById('ai-chat-product-type').value.trim(),
+      productId: document.getElementById('ai-chat-product-id').value.trim()
+    };
+    var response = await fetch(getAIChatUrl(), {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify(body),
+      redirect: 'follow',
+      signal: controller.signal
+    });
+    var result;
+    try { result = await response.json(); }
+    catch(parseError) { throw new Error('Web App không trả JSON đọc được. Hãy kiểm tra deployment và quyền truy cập.'); }
+    if (!response.ok) throw new Error('Web App trả HTTP ' + response.status + '.');
+    if (!result || !result.ok) throw new Error(result && result.error ? result.error : 'AI chưa trả được câu trả lời.');
+    pending.innerHTML = aiChatMarkdown(result.answer || 'Chưa có nội dung trả lời.') + aiChatEvidenceHtml(result.evidence);
+    document.getElementById('ai-chat-messages').scrollTop = document.getElementById('ai-chat-messages').scrollHeight;
+  } catch(err) {
+    var message = err.name === 'AbortError'
+      ? 'Yêu cầu mất hơn 2 phút. Hãy thử câu hỏi ngắn hơn hoặc khoảng ngày nhỏ hơn.'
+      : (err instanceof TypeError
+        ? 'Trình duyệt không đọc được phản hồi từ Apps Script (có thể do CORS hoặc deployment). Hãy kiểm tra URL /exec và thử lại sau khi deploy phiên bản mới.'
+        : String(err.message || err));
+    pending.classList.add('error');
+    pending.textContent = 'Không nhận được câu trả lời: ' + message;
+  } finally {
+    clearTimeout(timeout);
+    AI_CHAT_BUSY = false;
+    send.disabled = false;
+    send.textContent = 'Gửi';
+    input.focus();
+  }
+}
+
+document.getElementById('ai-chat-question').addEventListener('keydown', function(event) {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    document.querySelector('.ai-chat-compose').requestSubmit();
+  }
+});
+
+// ═══════════════════════════════════════
 // SETTINGS
 // ═══════════════════════════════════════
 function openSettings() {
   document.getElementById('inp-url').value = getGasUrl();
+  document.getElementById('inp-ai-chat-url').value = getAIChatUrlOverride();
   document.getElementById('settings-modal').classList.add('open');
 }
 function closeSettings() {
   document.getElementById('settings-modal').classList.remove('open');
 }
 function saveSettings() {
+  var oldGasUrl = getGasUrl();
   var v = document.getElementById('inp-url').value.trim();
   if (v) { localStorage.setItem('gas_url', v); }
+  var dataUrlChanged = !!v && v !== oldGasUrl;
+  var aiUrl = document.getElementById('inp-ai-chat-url').value.trim();
+  if (aiUrl) localStorage.setItem('ai_chat_url', aiUrl);
+  else localStorage.removeItem('ai_chat_url');
   closeSettings();
+  if (!dataUrlChanged) return;
   var activeBtn = document.querySelector('.dp.active');
   var range = rangeFrom(activeBtn ? activeBtn.dataset.r : '7');
   loadAll(range.from, range.to);
